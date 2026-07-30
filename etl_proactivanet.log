@@ -1,0 +1,802 @@
+2026-07-27 17:31:32,726 [INFO] === Inicio de carga | lote 42f91e55-3a8d-4a5e-aadd-d753e07cb1e1 | modo completa ===
+2026-07-27 17:31:32,726 [INFO] Usando reporte COMPLETO (carga inicial).
+2026-07-27 17:33:34,215 [ERROR] Error en la carga: La API no devolvió JSON. Revisa autenticación / la URL. Inicio de la respuesta: 
+Traceback (most recent call last):
+  File "C:\Python313\Lib\site-packages\requests\models.py", line 976, in json
+    return complexjson.loads(self.text, **kwargs)
+           ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python313\Lib\json\__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Python313\Lib\json\decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python313\Lib\json\decoder.py", line 363, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\edgarrad\OneDrive - soriana.com\Documentos\2026\Soriana\Iniciativas_IA\IA\20260727\etl_proactivanet.py", line 211, in extraer
+    datos = r.json()
+  File "C:\Python313\Lib\site-packages\requests\models.py", line 980, in json
+    raise RequestsJSONDecodeError(e.msg, e.doc, e.pos)
+requests.exceptions.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\edgarrad\OneDrive - soriana.com\Documentos\2026\Soriana\Iniciativas_IA\IA\20260727\etl_proactivanet.py", line 458, in main
+    filas_api = extraer(cfg, None, completa=args.completa)
+  File "C:\Users\edgarrad\OneDrive - soriana.com\Documentos\2026\Soriana\Iniciativas_IA\IA\20260727\etl_proactivanet.py", line 213, in extraer
+    raise RuntimeError("La API no devolvió JSON. Revisa autenticación / la URL. "
+                       f"Inicio de la respuesta: {r.text[:300]}")
+RuntimeError: La API no devolvió JSON. Revisa autenticación / la URL. Inicio de la respuesta: 
+2026-07-27 17:44:45,317 [INFO] === Inicio de carga | lote f45e4689-b201-449a-99f6-fc5e198f7d76 | modo completa ===
+2026-07-27 17:44:45,317 [INFO] Usando reporte COMPLETO (carga inicial).
+2026-07-27 17:46:46,681 [ERROR] Error en la carga: La API no devolvió JSON. Revisa autenticación / la URL. Inicio de la respuesta: 
+Traceback (most recent call last):
+  File "C:\Python313\Lib\site-packages\requests\models.py", line 976, in json
+    return complexjson.loads(self.text, **kwargs)
+           ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python313\Lib\json\__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Python313\Lib\json\decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python313\Lib\json\decoder.py", line 363, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\edgarrad\OneDrive - soriana.com\Documentos\2026\Soriana\Iniciativas_IA\IA\20260727\etl_proactivanet.py", line 211, in extraer
+    datos = r.json()
+  File "C:\Python313\Lib\site-packages\requests\models.py", line 980, in json
+    raise RequestsJSONDecodeError(e.msg, e.doc, e.pos)
+requests.exceptions.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\edgarrad\OneDrive - soriana.com\Documentos\2026\Soriana\Iniciativas_IA\IA\20260727\etl_proactivanet.py", line 458, in main
+    filas_api = extraer(cfg, None, completa=args.completa)
+  File "C:\Users\edgarrad\OneDrive - soriana.com\Documentos\2026\Soriana\Iniciativas_IA\IA\20260727\etl_proactivanet.py", line 213, in extraer
+    raise RuntimeError("La API no devolvió JSON. Revisa autenticación / la URL. "
+                       f"Inicio de la respuesta: {r.text[:300]}")
+RuntimeError: La API no devolvió JSON. Revisa autenticación / la URL. Inicio de la respuesta: 
+2026-07-27 17:58:23,614 [INFO] === Inicio de carga | lote 4f2c22cd-eab1-41a7-bb4a-b90a288ceba4 | modo completa ===
+2026-07-27 17:58:23,614 [INFO] Usando reporte COMPLETO (carga inicial).
+2026-07-27 17:58:24,126 [ERROR] Error en la carga: 401 Client Error: Unauthorized for url: https://soriana.proactivanet.com/proactivanet/api/table/data?url=https%3A%2F%2Fsoriana.proactivanet.com%2Fproactivanet%2Fpaw3%2Fpages%2FreportAdm%2Fredirect.paw%3FpawLoadId%3D46e061b4-bbc1-47cb-b4f3-65919e35f8bb%26pawLoadUrl%3D%252Fproactivanet%252Fpanet_files%252FconfigXml%252FspecificPaw%252Fapp%252Fservicedesk%252Fincidents%252FSorianaBacklogTotal.paw%253FpawData%253D_title%25253DBacklog%252BSoriana%252BTotal%252526whereFilter%25253DSourceElementCodeIncidentsSD_Visibility_Active_Id%2525257e803c3c3d-2e68-4d78-b1b6-d4000c45a629%252526id%25253D803c3c3d-2e68-4d78-b1b6-d4000c45a629%2526pawNode%253DpawId703633382%2526pawParentData%253D_title%25253DIncidencias%252B%2525252f%252BPeticiones%252526whereFilter%25253DSourceElementCodeIncidentsSD_Visibility_Active%2526pawParentNode%253DtreeNodeSpecificListings%2526pawNodeExtra%253D%26pawLoadedFromAdm%3DtblGlobalIncidents&numPag=1&labelAsName=true&$limit=1000
+Traceback (most recent call last):
+  File "C:\Users\edgarrad\OneDrive - soriana.com\Documentos\2026\Soriana\Iniciativas_IA\IA\20260727\etl_proactivanet.py", line 458, in main
+    filas_api = extraer(cfg, None, completa=args.completa)
+  File "C:\Users\edgarrad\OneDrive - soriana.com\Documentos\2026\Soriana\Iniciativas_IA\IA\20260727\etl_proactivanet.py", line 209, in extraer
+    r.raise_for_status()
+    ~~~~~~~~~~~~~~~~~~^^
+  File "C:\Python313\Lib\site-packages\requests\models.py", line 1026, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 401 Client Error: Unauthorized for url: https://soriana.proactivanet.com/proactivanet/api/table/data?url=https%3A%2F%2Fsoriana.proactivanet.com%2Fproactivanet%2Fpaw3%2Fpages%2FreportAdm%2Fredirect.paw%3FpawLoadId%3D46e061b4-bbc1-47cb-b4f3-65919e35f8bb%26pawLoadUrl%3D%252Fproactivanet%252Fpanet_files%252FconfigXml%252FspecificPaw%252Fapp%252Fservicedesk%252Fincidents%252FSorianaBacklogTotal.paw%253FpawData%253D_title%25253DBacklog%252BSoriana%252BTotal%252526whereFilter%25253DSourceElementCodeIncidentsSD_Visibility_Active_Id%2525257e803c3c3d-2e68-4d78-b1b6-d4000c45a629%252526id%25253D803c3c3d-2e68-4d78-b1b6-d4000c45a629%2526pawNode%253DpawId703633382%2526pawParentData%253D_title%25253DIncidencias%252B%2525252f%252BPeticiones%252526whereFilter%25253DSourceElementCodeIncidentsSD_Visibility_Active%2526pawParentNode%253DtreeNodeSpecificListings%2526pawNodeExtra%253D%26pawLoadedFromAdm%3DtblGlobalIncidents&numPag=1&labelAsName=true&$limit=1000
+2026-07-27 18:17:03,251 [INFO] === Inicio de carga | lote 55d1b979-1ab6-41a8-bd61-3e66d8e6d7d3 | modo completa ===
+2026-07-27 18:17:03,252 [INFO] Usando reporte COMPLETO (carga inicial).
+2026-07-27 18:19:06,341 [ERROR] Error en la carga: La API no devolvió JSON. Revisa autenticación / la URL. Inicio de la respuesta: 
+Traceback (most recent call last):
+  File "C:\Python313\Lib\site-packages\requests\models.py", line 976, in json
+    return complexjson.loads(self.text, **kwargs)
+           ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python313\Lib\json\__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Python313\Lib\json\decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python313\Lib\json\decoder.py", line 363, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\edgarrad\OneDrive - soriana.com\Documentos\2026\Soriana\Iniciativas_IA\IA\20260727\etl_proactivanet.py", line 211, in extraer
+    datos = r.json()
+  File "C:\Python313\Lib\site-packages\requests\models.py", line 980, in json
+    raise RequestsJSONDecodeError(e.msg, e.doc, e.pos)
+requests.exceptions.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\edgarrad\OneDrive - soriana.com\Documentos\2026\Soriana\Iniciativas_IA\IA\20260727\etl_proactivanet.py", line 458, in main
+    filas_api = extraer(cfg, None, completa=args.completa)
+  File "C:\Users\edgarrad\OneDrive - soriana.com\Documentos\2026\Soriana\Iniciativas_IA\IA\20260727\etl_proactivanet.py", line 213, in extraer
+    raise RuntimeError("La API no devolvió JSON. Revisa autenticación / la URL. "
+                       f"Inicio de la respuesta: {r.text[:300]}")
+RuntimeError: La API no devolvió JSON. Revisa autenticación / la URL. Inicio de la respuesta: 
+2026-07-27 18:55:10,392 [INFO] === Inicio de carga | lote d1051a0d-9163-424d-9cca-f35bd060faf2 | modo completa ===
+2026-07-27 18:55:10,393 [INFO] Usando reporte COMPLETO (carga inicial).
+2026-07-27 18:57:11,925 [ERROR] Error en la carga: La API no devolvió JSON. Revisa autenticación / la URL. Inicio de la respuesta: 
+Traceback (most recent call last):
+  File "C:\Python313\Lib\site-packages\requests\models.py", line 976, in json
+    return complexjson.loads(self.text, **kwargs)
+           ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python313\Lib\json\__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Python313\Lib\json\decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python313\Lib\json\decoder.py", line 363, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\edgarrad\OneDrive - soriana.com\Documentos\2026\Soriana\Iniciativas_IA\IA\20260727\etl_proactivanet.py", line 211, in extraer
+    datos = r.json()
+  File "C:\Python313\Lib\site-packages\requests\models.py", line 980, in json
+    raise RequestsJSONDecodeError(e.msg, e.doc, e.pos)
+requests.exceptions.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\edgarrad\OneDrive - soriana.com\Documentos\2026\Soriana\Iniciativas_IA\IA\20260727\etl_proactivanet.py", line 458, in main
+    filas_api = extraer(cfg, None, completa=args.completa)
+  File "C:\Users\edgarrad\OneDrive - soriana.com\Documentos\2026\Soriana\Iniciativas_IA\IA\20260727\etl_proactivanet.py", line 213, in extraer
+    raise RuntimeError("La API no devolvió JSON. Revisa autenticación / la URL. "
+                       f"Inicio de la respuesta: {r.text[:300]}")
+RuntimeError: La API no devolvió JSON. Revisa autenticación / la URL. Inicio de la respuesta: 
+2026-07-27 19:06:25,207 [INFO] === Inicio de carga | lote a3e0b1bb-da5f-4b50-a88d-8c8872b6372a | modo completa ===
+2026-07-27 19:06:25,208 [INFO] Usando reporte COMPLETO (carga inicial).
+2026-07-27 19:08:26,570 [WARNING] Respuesta VACÍA en pág. 1 tras 121s (HTTP 204). Reintento 1/2...
+2026-07-27 19:10:32,458 [WARNING] Respuesta VACÍA en pág. 1 tras 121s (HTTP 204). Reintento 2/2...
+2026-07-28 12:42:04,080 [INFO] === Inicio de carga | lote 4b8b0413-7cbc-4293-8a15-15ef56ff068c | modo incremental ===
+2026-07-28 12:42:04,223 [INFO] Usando reporte INCREMENTAL (últimos días).
+2026-07-28 12:42:18,453 [INFO] Página 1: 1 registros (14s)
+2026-07-28 12:42:18,454 [INFO] Total de registros descargados de la API (incremental): 1
+2026-07-28 12:42:18,457 [WARNING] Campos del mapeo que no se encontraron en la respuesta: Caducada, Categoría, Causa Raiz Grupos, Causa y raiz Fenix, Cliente, Código, Descripción, Estado, Fecha de registro, Fecha estimada OLA / UC, Fecha estimada resolución, Fecha firma cierre, Fecha firma solución, Fecha última modificación, Firma cierre / revocación solución, Firma solución, Grupo, Intentos de solución, Notificado por, Prioridad, QA - Describe paso a paso qué hiciste, QA - ¿Aparece algún mensaje de error?, QA - ¿Con qué frecuencia ocurre?, QA - ¿En qué aplicación estabas?, QARE - ¿Verificaste la correcta clasificación?, QARe - Adjunta evidencia de la solución, QARe - Describe la solución aplicada, QARe - Tipo de solución aplicada, QARe - ¿Cuál fue la causa?, QARe - ¿El usuario confirmó la solución?, QARe - ¿Esta solución aplica para otros casos?, QARe - ¿Se debe generar/actualizar artículo?, Reasignaciones grupo, Registrado por, Responsable última modificación, SLA, Solución para el usuario, Subestado, Sucursal, Tiempo 1ª respuesta, Tiempo 1ª respuesta (horas / minutos), Tiempo atención (horas / minutos), Tiempo de atención, Tiempo de resolución, Tipo, Tipo relación, Técnico de 2ª línea, Título
+2026-07-28 12:42:18,690 [INFO] Staging: 1 / 1 filas
+2026-07-28 12:42:18,700 [INFO] Filas en staging: 1
+2026-07-28 12:42:18,702 [ERROR] Error en la carga: ('42000', "[42000] [Microsoft][ODBC Driver 18 for SQL Server][SQL Server]The EXECUTE permission was denied on the object 'usp_CargarTicketsDesdeStaging', database 'Tickets_Proactivanet', schema 'dbo'. (229) (SQLExecDirectW)")
+Traceback (most recent call last):
+  File "C:\Users\edgarrad\OneDrive - soriana.com\Documentos\2026\Soriana\Iniciativas_IA\IA\20260727\etl_proactivanet.py", line 565, in main
+    ins, upd = ejecutar_upsert(cn, lote)
+               ~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "C:\Users\edgarrad\OneDrive - soriana.com\Documentos\2026\Soriana\Iniciativas_IA\IA\20260727\etl_proactivanet.py", line 468, in ejecutar_upsert
+    cur.execute("{CALL dbo.usp_CargarTicketsDesdeStaging (?)}", str(lote))
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+pyodbc.ProgrammingError: ('42000', "[42000] [Microsoft][ODBC Driver 18 for SQL Server][SQL Server]The EXECUTE permission was denied on the object 'usp_CargarTicketsDesdeStaging', database 'Tickets_Proactivanet', schema 'dbo'. (229) (SQLExecDirectW)")
+2026-07-29 13:44:36,416 [INFO] === Inicio de carga | lote 22257a24-c5dc-419f-942e-bd76c8e6e445 | modo incremental ===
+2026-07-29 13:44:36,417 [INFO] Usando reporte INCREMENTAL (últimos días).
+2026-07-29 13:44:50,267 [INFO] Página 1: 1 registros (14s)
+2026-07-29 13:44:50,268 [INFO] Total de registros descargados de la API (incremental): 1
+2026-07-29 13:44:50,271 [WARNING] Campos del mapeo que no se encontraron en la respuesta: Caducada, Categoría, Causa Raiz Grupos, Causa y raiz Fenix, Cliente, Código, Descripción, Estado, Fecha de registro, Fecha estimada OLA / UC, Fecha estimada resolución, Fecha firma cierre, Fecha firma solución, Fecha última modificación, Firma cierre / revocación solución, Firma solución, Grupo, Intentos de solución, Notificado por, Prioridad, QA - Describe paso a paso qué hiciste, QA - ¿Aparece algún mensaje de error?, QA - ¿Con qué frecuencia ocurre?, QA - ¿En qué aplicación estabas?, QARE - ¿Verificaste la correcta clasificación?, QARe - Adjunta evidencia de la solución, QARe - Describe la solución aplicada, QARe - Tipo de solución aplicada, QARe - ¿Cuál fue la causa?, QARe - ¿El usuario confirmó la solución?, QARe - ¿Esta solución aplica para otros casos?, QARe - ¿Se debe generar/actualizar artículo?, Reasignaciones grupo, Registrado por, Responsable última modificación, SLA, Solución para el usuario, Subestado, Sucursal, Tiempo 1ª respuesta, Tiempo 1ª respuesta (horas / minutos), Tiempo atención (horas / minutos), Tiempo de atención, Tiempo de resolución, Tipo, Tipo relación, Técnico de 2ª línea, Título
+2026-07-29 13:44:50,518 [INFO] Staging: 1 / 1 filas
+2026-07-29 13:44:50,528 [INFO] Filas en staging: 1
+2026-07-29 13:44:50,602 [INFO] UPSERT terminado -> insertados: 0 | actualizados: 0
+2026-07-29 13:44:50,615 [INFO] === Carga finalizada correctamente en 0:00:14.199048 ===
+2026-07-29 16:16:34,203 [INFO] === Inicio de carga | lote 8c92c486-b850-4aef-8d0c-eb3dbe08e1b9 | modo incremental ===
+2026-07-29 16:16:34,204 [INFO] Usando reporte INCREMENTAL (últimos días).
+2026-07-29 16:16:37,307 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:16:37,307 [INFO] [incremental] Página 1: 1000 registros (3s)
+2026-07-29 16:16:39,801 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:16:39,802 [INFO] [incremental] Página 2: 1000 registros (2s)
+2026-07-29 16:16:42,226 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:16:42,227 [INFO] [incremental] Página 3: 1000 registros (2s)
+2026-07-29 16:16:44,678 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:16:44,679 [INFO] [incremental] Página 4: 1000 registros (2s)
+2026-07-29 16:16:47,092 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:16:47,093 [INFO] [incremental] Página 5: 1000 registros (2s)
+2026-07-29 16:16:49,386 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:16:49,387 [INFO] [incremental] Página 6: 1000 registros (2s)
+2026-07-29 16:16:51,775 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:16:51,776 [INFO] [incremental] Página 7: 1000 registros (2s)
+2026-07-29 16:16:54,162 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:16:54,163 [INFO] [incremental] Página 8: 1000 registros (2s)
+2026-07-29 16:16:56,726 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:16:56,727 [INFO] [incremental] Página 9: 1000 registros (3s)
+2026-07-29 16:16:59,565 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:16:59,566 [INFO] [incremental] Página 10: 1000 registros (3s)
+2026-07-29 16:17:02,059 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:17:02,060 [INFO] [incremental] Página 11: 1000 registros (2s)
+2026-07-29 16:17:04,766 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:17:04,767 [INFO] [incremental] Página 12: 1000 registros (3s)
+2026-07-29 16:17:07,104 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:17:07,104 [INFO] [incremental] Página 13: 1000 registros (2s)
+2026-07-29 16:17:09,764 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:17:09,765 [INFO] [incremental] Página 14: 1000 registros (3s)
+2026-07-29 16:17:12,318 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:17:12,319 [INFO] [incremental] Página 15: 1000 registros (3s)
+2026-07-29 16:17:14,819 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:17:14,821 [INFO] [incremental] Página 16: 1000 registros (2s)
+2026-07-29 16:17:17,203 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:17:17,204 [INFO] [incremental] Página 17: 1000 registros (2s)
+2026-07-29 16:17:19,532 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:17:19,532 [INFO] [incremental] Página 18: 1000 registros (2s)
+2026-07-29 16:17:22,081 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:17:22,083 [INFO] [incremental] Página 19: 1000 registros (3s)
+2026-07-29 16:17:24,979 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:17:24,979 [INFO] [incremental] Página 20: 1000 registros (3s)
+2026-07-29 16:17:29,876 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:17:29,876 [INFO] [incremental] Página 21: 1000 registros (5s)
+2026-07-29 16:17:32,190 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:17:32,192 [INFO] [incremental] Página 22: 1000 registros (2s)
+2026-07-29 16:17:34,449 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:17:34,449 [INFO] [incremental] Página 23: 1000 registros (2s)
+2026-07-29 16:17:36,840 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:17:36,841 [INFO] [incremental] Página 24: 1000 registros (2s)
+2026-07-29 16:17:39,406 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:17:39,407 [INFO] [incremental] Página 25: 1000 registros (3s)
+2026-07-29 16:17:41,738 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:17:41,739 [INFO] [incremental] Página 26: 1000 registros (2s)
+2026-07-29 16:17:44,130 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:17:44,131 [INFO] [incremental] Página 27: 1000 registros (2s)
+2026-07-29 16:17:46,685 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:17:46,687 [INFO] [incremental] Página 28: 1000 registros (3s)
+2026-07-29 16:17:49,068 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:17:49,069 [INFO] [incremental] Página 29: 1000 registros (2s)
+2026-07-29 16:17:51,436 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:17:51,436 [INFO] [incremental] Página 30: 1000 registros (2s)
+2026-07-29 16:17:53,804 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:17:53,805 [INFO] [incremental] Página 31: 1000 registros (2s)
+2026-07-29 16:17:56,129 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:17:56,129 [INFO] [incremental] Página 32: 1000 registros (2s)
+2026-07-29 16:17:59,281 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:17:59,282 [INFO] [incremental] Página 33: 1000 registros (3s)
+2026-07-29 16:18:01,778 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:18:01,778 [INFO] [incremental] Página 34: 1000 registros (2s)
+2026-07-29 16:18:04,498 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:18:04,499 [INFO] [incremental] Página 35: 1000 registros (3s)
+2026-07-29 16:18:06,807 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:18:06,807 [INFO] [incremental] Página 36: 1000 registros (2s)
+2026-07-29 16:18:09,072 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:18:09,072 [INFO] [incremental] Página 37: 1000 registros (2s)
+2026-07-29 16:18:11,506 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:18:11,507 [INFO] [incremental] Página 38: 1000 registros (2s)
+2026-07-29 16:18:13,912 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:18:13,912 [INFO] [incremental] Página 39: 1000 registros (2s)
+2026-07-29 16:18:16,230 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:18:16,230 [INFO] [incremental] Página 40: 1000 registros (2s)
+2026-07-29 16:18:18,801 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:18:18,802 [INFO] [incremental] Página 41: 1000 registros (2s)
+2026-07-29 16:18:21,277 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:18:21,277 [INFO] [incremental] Página 42: 1000 registros (2s)
+2026-07-29 16:18:23,609 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:18:23,609 [INFO] [incremental] Página 43: 1000 registros (2s)
+2026-07-29 16:18:25,909 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:18:25,910 [INFO] [incremental] Página 44: 1000 registros (2s)
+2026-07-29 16:18:28,174 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:18:28,175 [INFO] [incremental] Página 45: 1000 registros (2s)
+2026-07-29 16:18:30,504 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:18:30,505 [INFO] [incremental] Página 46: 1000 registros (2s)
+2026-07-29 16:18:32,952 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:18:32,953 [INFO] [incremental] Página 47: 1000 registros (2s)
+2026-07-29 16:18:35,265 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:18:35,266 [INFO] [incremental] Página 48: 1000 registros (2s)
+2026-07-29 16:18:37,570 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:18:37,571 [INFO] [incremental] Página 49: 1000 registros (2s)
+2026-07-29 16:18:39,844 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:18:39,845 [INFO] [incremental] Página 50: 1000 registros (2s)
+2026-07-29 16:18:42,197 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:18:42,198 [INFO] [incremental] Página 51: 1000 registros (2s)
+2026-07-29 16:18:44,672 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:18:44,673 [INFO] [incremental] Página 52: 1000 registros (2s)
+2026-07-29 16:18:47,212 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:18:47,213 [INFO] [incremental] Página 53: 1000 registros (3s)
+2026-07-29 16:18:49,533 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:18:49,534 [INFO] [incremental] Página 54: 1000 registros (2s)
+2026-07-29 16:18:51,828 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:18:51,829 [INFO] [incremental] Página 55: 1000 registros (2s)
+2026-07-29 16:18:54,176 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:18:54,177 [INFO] [incremental] Página 56: 1000 registros (2s)
+2026-07-29 16:18:56,487 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:18:56,487 [INFO] [incremental] Página 57: 1000 registros (2s)
+2026-07-29 16:18:58,785 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:18:58,786 [INFO] [incremental] Página 58: 1000 registros (2s)
+2026-07-29 16:19:01,091 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:19:01,092 [INFO] [incremental] Página 59: 1000 registros (2s)
+2026-07-29 16:19:03,335 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:19:03,335 [INFO] [incremental] Página 60: 1000 registros (2s)
+2026-07-29 16:19:05,636 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:19:05,637 [INFO] [incremental] Página 61: 1000 registros (2s)
+2026-07-29 16:19:08,073 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:19:08,074 [INFO] [incremental] Página 62: 1000 registros (2s)
+2026-07-29 16:19:10,582 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:19:10,582 [INFO] [incremental] Página 63: 1000 registros (2s)
+2026-07-29 16:19:13,109 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:19:13,110 [INFO] [incremental] Página 64: 1000 registros (3s)
+2026-07-29 16:19:15,565 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:19:15,566 [INFO] [incremental] Página 65: 1000 registros (2s)
+2026-07-29 16:19:17,951 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:19:17,951 [INFO] [incremental] Página 66: 1000 registros (2s)
+2026-07-29 16:19:20,416 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:19:20,416 [INFO] [incremental] Página 67: 1000 registros (2s)
+2026-07-29 16:19:22,850 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:19:22,850 [INFO] [incremental] Página 68: 1000 registros (2s)
+2026-07-29 16:19:25,490 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:19:25,490 [INFO] [incremental] Página 69: 1000 registros (3s)
+2026-07-29 16:19:27,826 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:19:27,827 [INFO] [incremental] Página 70: 1000 registros (2s)
+2026-07-29 16:19:30,103 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:19:30,104 [INFO] [incremental] Página 71: 1000 registros (2s)
+2026-07-29 16:19:32,511 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:19:32,512 [INFO] [incremental] Página 72: 1000 registros (2s)
+2026-07-29 16:19:34,926 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:19:34,927 [INFO] [incremental] Página 73: 1000 registros (2s)
+2026-07-29 16:19:37,188 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:19:37,190 [INFO] [incremental] Página 74: 1000 registros (2s)
+2026-07-29 16:19:39,462 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:19:39,462 [INFO] [incremental] Página 75: 1000 registros (2s)
+2026-07-29 16:19:41,716 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:19:41,716 [INFO] [incremental] Página 76: 1000 registros (2s)
+2026-07-29 16:19:44,097 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:19:44,097 [INFO] [incremental] Página 77: 1000 registros (2s)
+2026-07-29 16:19:46,654 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:19:46,655 [INFO] [incremental] Página 78: 1000 registros (3s)
+2026-07-29 16:19:48,960 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:19:48,960 [INFO] [incremental] Página 79: 1000 registros (2s)
+2026-07-29 16:19:51,380 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:19:51,381 [INFO] [incremental] Página 80: 1000 registros (2s)
+2026-07-29 16:19:53,962 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:19:53,963 [INFO] [incremental] Página 81: 1000 registros (3s)
+2026-07-29 16:19:56,945 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:19:56,946 [INFO] [incremental] Página 82: 1000 registros (3s)
+2026-07-29 16:19:59,765 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:19:59,766 [INFO] [incremental] Página 83: 1000 registros (3s)
+2026-07-29 16:20:02,143 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:20:02,144 [INFO] [incremental] Página 84: 1000 registros (2s)
+2026-07-29 16:20:04,466 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:20:04,467 [INFO] [incremental] Página 85: 1000 registros (2s)
+2026-07-29 16:20:06,947 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:20:06,948 [INFO] [incremental] Página 86: 1000 registros (2s)
+2026-07-29 16:20:09,378 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:20:09,379 [INFO] [incremental] Página 87: 1000 registros (2s)
+2026-07-29 16:20:11,909 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:20:11,909 [INFO] [incremental] Página 88: 1000 registros (3s)
+2026-07-29 16:20:14,272 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:20:14,273 [INFO] [incremental] Página 89: 1000 registros (2s)
+2026-07-29 16:20:16,581 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:20:16,582 [INFO] [incremental] Página 90: 1000 registros (2s)
+2026-07-29 16:20:18,890 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:20:18,891 [INFO] [incremental] Página 91: 1000 registros (2s)
+2026-07-29 16:20:21,371 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:20:21,372 [INFO] [incremental] Página 92: 1000 registros (2s)
+2026-07-29 16:20:23,823 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:20:23,827 [INFO] [incremental] Página 93: 1000 registros (2s)
+2026-07-29 16:20:26,368 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:20:26,368 [INFO] [incremental] Página 94: 1000 registros (3s)
+2026-07-29 16:20:28,840 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:20:28,840 [INFO] [incremental] Página 95: 1000 registros (2s)
+2026-07-29 16:20:31,306 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:20:31,306 [INFO] [incremental] Página 96: 1000 registros (2s)
+2026-07-29 16:20:33,777 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:20:33,777 [INFO] [incremental] Página 97: 1000 registros (2s)
+2026-07-29 16:20:36,204 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:20:36,205 [INFO] [incremental] Página 98: 1000 registros (2s)
+2026-07-29 16:20:38,508 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:20:38,509 [INFO] [incremental] Página 99: 1000 registros (2s)
+2026-07-29 16:20:40,856 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:20:40,856 [INFO] [incremental] Página 100: 1000 registros (2s)
+2026-07-29 16:20:43,182 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:20:43,183 [INFO] [incremental] Página 101: 1000 registros (2s)
+2026-07-29 16:20:45,649 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:20:45,650 [INFO] [incremental] Página 102: 1000 registros (2s)
+2026-07-29 16:20:47,997 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:20:47,997 [INFO] [incremental] Página 103: 1000 registros (2s)
+2026-07-29 16:20:50,404 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:20:50,405 [INFO] [incremental] Página 104: 1000 registros (2s)
+2026-07-29 16:20:52,814 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:20:52,814 [INFO] [incremental] Página 105: 1000 registros (2s)
+2026-07-29 16:20:55,216 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:20:55,217 [INFO] [incremental] Página 106: 1000 registros (2s)
+2026-07-29 16:20:57,663 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:20:57,664 [INFO] [incremental] Página 107: 1000 registros (2s)
+2026-07-29 16:21:00,034 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:21:00,036 [INFO] [incremental] Página 108: 1000 registros (2s)
+2026-07-29 16:21:02,367 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:21:02,368 [INFO] [incremental] Página 109: 1000 registros (2s)
+2026-07-29 16:21:04,756 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:21:04,757 [INFO] [incremental] Página 110: 1000 registros (2s)
+2026-07-29 16:21:07,157 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:21:07,158 [INFO] [incremental] Página 111: 1000 registros (2s)
+2026-07-29 16:21:09,539 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:21:09,540 [INFO] [incremental] Página 112: 1000 registros (2s)
+2026-07-29 16:21:11,976 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:21:11,977 [INFO] [incremental] Página 113: 1000 registros (2s)
+2026-07-29 16:21:14,613 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:21:14,614 [INFO] [incremental] Página 114: 1000 registros (3s)
+2026-07-29 16:21:17,008 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:21:17,008 [INFO] [incremental] Página 115: 1000 registros (2s)
+2026-07-29 16:21:19,450 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:21:19,450 [INFO] [incremental] Página 116: 1000 registros (2s)
+2026-07-29 16:21:21,878 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:21:21,879 [INFO] [incremental] Página 117: 1000 registros (2s)
+2026-07-29 16:21:24,353 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:21:24,354 [INFO] [incremental] Página 118: 1000 registros (2s)
+2026-07-29 16:21:26,957 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:21:26,957 [INFO] [incremental] Página 119: 1000 registros (3s)
+2026-07-29 16:21:29,312 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:21:29,313 [INFO] [incremental] Página 120: 1000 registros (2s)
+2026-07-29 16:21:31,674 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:21:31,675 [INFO] [incremental] Página 121: 1000 registros (2s)
+2026-07-29 16:21:34,035 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:21:34,036 [INFO] [incremental] Página 122: 1000 registros (2s)
+2026-07-29 16:21:36,492 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:21:36,493 [INFO] [incremental] Página 123: 1000 registros (2s)
+2026-07-29 16:21:38,761 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:21:38,762 [INFO] [incremental] Página 124: 1000 registros (2s)
+2026-07-29 16:21:41,109 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:21:41,109 [INFO] [incremental] Página 125: 1000 registros (2s)
+2026-07-29 16:21:43,514 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:21:43,515 [INFO] [incremental] Página 126: 1000 registros (2s)
+2026-07-29 16:21:46,033 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:21:46,034 [INFO] [incremental] Página 127: 1000 registros (2s)
+2026-07-29 16:21:48,466 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:21:48,467 [INFO] [incremental] Página 128: 1000 registros (2s)
+2026-07-29 16:21:50,837 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:21:50,851 [INFO] [incremental] Página 129: 1000 registros (2s)
+2026-07-29 16:21:53,263 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:21:53,266 [INFO] [incremental] Página 130: 1000 registros (2s)
+2026-07-29 16:21:56,796 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:21:56,859 [INFO] [incremental] Página 131: 1000 registros (2s)
+2026-07-29 16:21:59,325 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:21:59,367 [INFO] [incremental] Página 132: 1000 registros (2s)
+2026-07-29 16:22:01,719 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:22:01,724 [INFO] [incremental] Página 133: 1000 registros (2s)
+2026-07-29 16:22:04,519 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:22:04,520 [INFO] [incremental] Página 134: 1000 registros (3s)
+2026-07-29 16:22:07,045 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:22:07,046 [INFO] [incremental] Página 135: 1000 registros (2s)
+2026-07-29 16:22:09,455 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:22:09,456 [INFO] [incremental] Página 136: 1000 registros (2s)
+2026-07-29 16:22:11,920 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:22:11,920 [INFO] [incremental] Página 137: 1000 registros (2s)
+2026-07-29 16:22:14,469 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:22:14,470 [INFO] [incremental] Página 138: 1000 registros (3s)
+2026-07-29 16:22:16,958 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:22:16,959 [INFO] [incremental] Página 139: 1000 registros (2s)
+2026-07-29 16:22:19,388 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:22:19,389 [INFO] [incremental] Página 140: 1000 registros (2s)
+2026-07-29 16:22:21,922 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:22:21,922 [INFO] [incremental] Página 141: 1000 registros (3s)
+2026-07-29 16:22:24,335 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:22:24,335 [INFO] [incremental] Página 142: 1000 registros (2s)
+2026-07-29 16:22:26,710 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:22:26,710 [INFO] [incremental] Página 143: 1000 registros (2s)
+2026-07-29 16:22:30,114 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:22:30,115 [INFO] [incremental] Página 144: 1000 registros (3s)
+2026-07-29 16:22:33,401 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:22:33,402 [INFO] [incremental] Página 145: 1000 registros (3s)
+2026-07-29 16:22:38,111 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:22:38,112 [INFO] [incremental] Página 146: 1000 registros (5s)
+2026-07-29 16:22:40,542 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:22:40,543 [INFO] [incremental] Página 147: 1000 registros (2s)
+2026-07-29 16:22:43,269 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:22:43,270 [INFO] [incremental] Página 148: 1000 registros (3s)
+2026-07-29 16:22:46,601 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:22:46,602 [INFO] [incremental] Página 149: 1000 registros (3s)
+2026-07-29 16:22:49,120 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:22:49,121 [INFO] [incremental] Página 150: 1000 registros (2s)
+2026-07-29 16:22:51,971 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:22:51,972 [INFO] [incremental] Página 151: 1000 registros (3s)
+2026-07-29 16:22:54,722 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:22:54,722 [INFO] [incremental] Página 152: 1000 registros (3s)
+2026-07-29 16:22:57,274 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:22:57,275 [INFO] [incremental] Página 153: 1000 registros (3s)
+2026-07-29 16:23:00,101 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:23:00,102 [INFO] [incremental] Página 154: 1000 registros (3s)
+2026-07-29 16:23:02,986 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:23:02,987 [INFO] [incremental] Página 155: 1000 registros (3s)
+2026-07-29 16:23:05,313 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:23:05,314 [INFO] [incremental] Página 156: 1000 registros (2s)
+2026-07-29 16:23:08,193 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:23:08,194 [INFO] [incremental] Página 157: 1000 registros (3s)
+2026-07-29 16:23:10,610 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:23:10,611 [INFO] [incremental] Página 158: 1000 registros (2s)
+2026-07-29 16:23:13,005 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:23:13,006 [INFO] [incremental] Página 159: 1000 registros (2s)
+2026-07-29 16:23:15,419 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:23:15,420 [INFO] [incremental] Página 160: 1000 registros (2s)
+2026-07-29 16:23:17,817 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:23:17,818 [INFO] [incremental] Página 161: 1000 registros (2s)
+2026-07-29 16:23:20,104 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:23:20,106 [INFO] [incremental] Página 162: 1000 registros (2s)
+2026-07-29 16:23:22,391 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:23:22,392 [INFO] [incremental] Página 163: 1000 registros (2s)
+2026-07-29 16:23:24,741 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:23:24,742 [INFO] [incremental] Página 164: 1000 registros (2s)
+2026-07-29 16:23:27,062 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:23:27,063 [INFO] [incremental] Página 165: 1000 registros (2s)
+2026-07-29 16:23:29,550 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:23:29,551 [INFO] [incremental] Página 166: 1000 registros (2s)
+2026-07-29 16:23:31,925 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:23:31,926 [INFO] [incremental] Página 167: 1000 registros (2s)
+2026-07-29 16:23:34,243 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:23:34,244 [INFO] [incremental] Página 168: 1000 registros (2s)
+2026-07-29 16:23:36,590 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:23:36,591 [INFO] [incremental] Página 169: 1000 registros (2s)
+2026-07-29 16:23:38,876 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:23:38,876 [INFO] [incremental] Página 170: 1000 registros (2s)
+2026-07-29 16:23:41,255 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:23:41,256 [INFO] [incremental] Página 171: 1000 registros (2s)
+2026-07-29 16:23:43,551 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:23:43,552 [INFO] [incremental] Página 172: 1000 registros (2s)
+2026-07-29 16:23:45,863 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:23:45,864 [INFO] [incremental] Página 173: 1000 registros (2s)
+2026-07-29 16:23:48,275 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:23:48,275 [INFO] [incremental] Página 174: 1000 registros (2s)
+2026-07-29 16:23:50,691 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:23:50,692 [INFO] [incremental] Página 175: 1000 registros (2s)
+2026-07-29 16:23:53,063 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:23:53,063 [INFO] [incremental] Página 176: 1000 registros (2s)
+2026-07-29 16:23:55,521 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:23:55,521 [INFO] [incremental] Página 177: 1000 registros (2s)
+2026-07-29 16:23:57,911 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:23:57,912 [INFO] [incremental] Página 178: 1000 registros (2s)
+2026-07-29 16:24:00,408 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:24:00,409 [INFO] [incremental] Página 179: 1000 registros (2s)
+2026-07-29 16:24:02,675 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:24:02,676 [INFO] [incremental] Página 180: 1000 registros (2s)
+2026-07-29 16:24:04,990 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:24:04,991 [INFO] [incremental] Página 181: 1000 registros (2s)
+2026-07-29 16:24:07,395 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:24:07,396 [INFO] [incremental] Página 182: 1000 registros (2s)
+2026-07-29 16:24:09,760 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:24:09,761 [INFO] [incremental] Página 183: 1000 registros (2s)
+2026-07-29 16:24:12,129 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:24:12,130 [INFO] [incremental] Página 184: 1000 registros (2s)
+2026-07-29 16:24:14,411 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:24:14,412 [INFO] [incremental] Página 185: 1000 registros (2s)
+2026-07-29 16:24:16,771 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:24:16,771 [INFO] [incremental] Página 186: 1000 registros (2s)
+2026-07-29 16:24:19,134 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:24:19,135 [INFO] [incremental] Página 187: 1000 registros (2s)
+2026-07-29 16:24:21,644 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:24:21,645 [INFO] [incremental] Página 188: 1000 registros (2s)
+2026-07-29 16:24:24,035 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:24:24,036 [INFO] [incremental] Página 189: 1000 registros (2s)
+2026-07-29 16:24:26,316 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:24:26,317 [INFO] [incremental] Página 190: 1000 registros (2s)
+2026-07-29 16:24:28,571 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:24:28,572 [INFO] [incremental] Página 191: 1000 registros (2s)
+2026-07-29 16:24:31,035 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:24:31,035 [INFO] [incremental] Página 192: 1000 registros (2s)
+2026-07-29 16:24:33,333 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:24:33,334 [INFO] [incremental] Página 193: 1000 registros (2s)
+2026-07-29 16:24:35,613 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:24:35,615 [INFO] [incremental] Página 194: 1000 registros (2s)
+2026-07-29 16:24:37,886 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:24:37,887 [INFO] [incremental] Página 195: 1000 registros (2s)
+2026-07-29 16:24:40,243 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:24:40,244 [INFO] [incremental] Página 196: 1000 registros (2s)
+2026-07-29 16:24:42,566 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:24:42,567 [INFO] [incremental] Página 197: 1000 registros (2s)
+2026-07-29 16:24:44,867 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:24:44,869 [INFO] [incremental] Página 198: 1000 registros (2s)
+2026-07-29 16:24:47,196 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:24:47,197 [INFO] [incremental] Página 199: 1000 registros (2s)
+2026-07-29 16:24:49,507 [INFO] Autodetectada ruta_items='dataTable' (1000 registros). Fíjala en el config para evitar esta búsqueda.
+2026-07-29 16:24:49,508 [INFO] [incremental] Página 200: 1000 registros (2s)
+2026-07-29 16:24:49,509 [WARNING] Se alcanzó el máximo de páginas (200) en 'incremental'. Sube 'max_paginas' si hace falta.
+2026-07-29 16:24:49,530 [INFO] Total de registros descargados de la API (incremental): 200000
+2026-07-29 16:24:54,153 [INFO] Staging: 1000 / 200000 filas
+2026-07-29 16:24:54,304 [INFO] Staging: 2000 / 200000 filas
+2026-07-29 16:24:54,454 [INFO] Staging: 3000 / 200000 filas
+2026-07-29 16:24:54,600 [INFO] Staging: 4000 / 200000 filas
+2026-07-29 16:24:54,746 [INFO] Staging: 5000 / 200000 filas
+2026-07-29 16:24:54,885 [INFO] Staging: 6000 / 200000 filas
+2026-07-29 16:24:55,027 [INFO] Staging: 7000 / 200000 filas
+2026-07-29 16:24:55,171 [INFO] Staging: 8000 / 200000 filas
+2026-07-29 16:24:55,316 [INFO] Staging: 9000 / 200000 filas
+2026-07-29 16:24:55,456 [INFO] Staging: 10000 / 200000 filas
+2026-07-29 16:24:55,599 [INFO] Staging: 11000 / 200000 filas
+2026-07-29 16:24:55,750 [INFO] Staging: 12000 / 200000 filas
+2026-07-29 16:24:55,886 [INFO] Staging: 13000 / 200000 filas
+2026-07-29 16:24:56,024 [INFO] Staging: 14000 / 200000 filas
+2026-07-29 16:24:56,154 [INFO] Staging: 15000 / 200000 filas
+2026-07-29 16:24:56,297 [INFO] Staging: 16000 / 200000 filas
+2026-07-29 16:24:56,447 [INFO] Staging: 17000 / 200000 filas
+2026-07-29 16:24:56,591 [INFO] Staging: 18000 / 200000 filas
+2026-07-29 16:24:56,745 [INFO] Staging: 19000 / 200000 filas
+2026-07-29 16:24:56,888 [INFO] Staging: 20000 / 200000 filas
+2026-07-29 16:24:57,046 [INFO] Staging: 21000 / 200000 filas
+2026-07-29 16:24:57,187 [INFO] Staging: 22000 / 200000 filas
+2026-07-29 16:24:57,334 [INFO] Staging: 23000 / 200000 filas
+2026-07-29 16:24:57,474 [INFO] Staging: 24000 / 200000 filas
+2026-07-29 16:24:57,611 [INFO] Staging: 25000 / 200000 filas
+2026-07-29 16:24:57,760 [INFO] Staging: 26000 / 200000 filas
+2026-07-29 16:24:58,058 [INFO] Staging: 27000 / 200000 filas
+2026-07-29 16:24:58,224 [INFO] Staging: 28000 / 200000 filas
+2026-07-29 16:24:58,371 [INFO] Staging: 29000 / 200000 filas
+2026-07-29 16:24:58,552 [INFO] Staging: 30000 / 200000 filas
+2026-07-29 16:24:58,725 [INFO] Staging: 31000 / 200000 filas
+2026-07-29 16:24:58,897 [INFO] Staging: 32000 / 200000 filas
+2026-07-29 16:24:59,050 [INFO] Staging: 33000 / 200000 filas
+2026-07-29 16:24:59,200 [INFO] Staging: 34000 / 200000 filas
+2026-07-29 16:24:59,335 [INFO] Staging: 35000 / 200000 filas
+2026-07-29 16:24:59,471 [INFO] Staging: 36000 / 200000 filas
+2026-07-29 16:24:59,613 [INFO] Staging: 37000 / 200000 filas
+2026-07-29 16:24:59,756 [INFO] Staging: 38000 / 200000 filas
+2026-07-29 16:24:59,909 [INFO] Staging: 39000 / 200000 filas
+2026-07-29 16:25:00,046 [INFO] Staging: 40000 / 200000 filas
+2026-07-29 16:25:00,208 [INFO] Staging: 41000 / 200000 filas
+2026-07-29 16:25:00,382 [INFO] Staging: 42000 / 200000 filas
+2026-07-29 16:25:00,524 [INFO] Staging: 43000 / 200000 filas
+2026-07-29 16:25:00,680 [INFO] Staging: 44000 / 200000 filas
+2026-07-29 16:25:00,831 [INFO] Staging: 45000 / 200000 filas
+2026-07-29 16:25:00,974 [INFO] Staging: 46000 / 200000 filas
+2026-07-29 16:25:01,128 [INFO] Staging: 47000 / 200000 filas
+2026-07-29 16:25:01,284 [INFO] Staging: 48000 / 200000 filas
+2026-07-29 16:25:01,434 [INFO] Staging: 49000 / 200000 filas
+2026-07-29 16:25:01,580 [INFO] Staging: 50000 / 200000 filas
+2026-07-29 16:25:01,820 [INFO] Staging: 51000 / 200000 filas
+2026-07-29 16:25:01,959 [INFO] Staging: 52000 / 200000 filas
+2026-07-29 16:25:02,105 [INFO] Staging: 53000 / 200000 filas
+2026-07-29 16:25:02,250 [INFO] Staging: 54000 / 200000 filas
+2026-07-29 16:25:02,385 [INFO] Staging: 55000 / 200000 filas
+2026-07-29 16:25:02,531 [INFO] Staging: 56000 / 200000 filas
+2026-07-29 16:25:02,676 [INFO] Staging: 57000 / 200000 filas
+2026-07-29 16:25:02,813 [INFO] Staging: 58000 / 200000 filas
+2026-07-29 16:25:02,954 [INFO] Staging: 59000 / 200000 filas
+2026-07-29 16:25:03,090 [INFO] Staging: 60000 / 200000 filas
+2026-07-29 16:25:03,244 [INFO] Staging: 61000 / 200000 filas
+2026-07-29 16:25:03,398 [INFO] Staging: 62000 / 200000 filas
+2026-07-29 16:25:03,543 [INFO] Staging: 63000 / 200000 filas
+2026-07-29 16:25:03,690 [INFO] Staging: 64000 / 200000 filas
+2026-07-29 16:25:03,834 [INFO] Staging: 65000 / 200000 filas
+2026-07-29 16:25:03,981 [INFO] Staging: 66000 / 200000 filas
+2026-07-29 16:25:04,127 [INFO] Staging: 67000 / 200000 filas
+2026-07-29 16:25:04,286 [INFO] Staging: 68000 / 200000 filas
+2026-07-29 16:25:04,432 [INFO] Staging: 69000 / 200000 filas
+2026-07-29 16:25:04,612 [INFO] Staging: 70000 / 200000 filas
+2026-07-29 16:25:04,822 [INFO] Staging: 71000 / 200000 filas
+2026-07-29 16:25:04,983 [INFO] Staging: 72000 / 200000 filas
+2026-07-29 16:25:05,121 [INFO] Staging: 73000 / 200000 filas
+2026-07-29 16:25:05,265 [INFO] Staging: 74000 / 200000 filas
+2026-07-29 16:25:05,499 [INFO] Staging: 75000 / 200000 filas
+2026-07-29 16:25:05,637 [INFO] Staging: 76000 / 200000 filas
+2026-07-29 16:25:05,775 [INFO] Staging: 77000 / 200000 filas
+2026-07-29 16:25:05,911 [INFO] Staging: 78000 / 200000 filas
+2026-07-29 16:25:06,056 [INFO] Staging: 79000 / 200000 filas
+2026-07-29 16:25:06,194 [INFO] Staging: 80000 / 200000 filas
+2026-07-29 16:25:06,343 [INFO] Staging: 81000 / 200000 filas
+2026-07-29 16:25:06,498 [INFO] Staging: 82000 / 200000 filas
+2026-07-29 16:25:06,643 [INFO] Staging: 83000 / 200000 filas
+2026-07-29 16:25:06,799 [INFO] Staging: 84000 / 200000 filas
+2026-07-29 16:25:06,950 [INFO] Staging: 85000 / 200000 filas
+2026-07-29 16:25:07,106 [INFO] Staging: 86000 / 200000 filas
+2026-07-29 16:25:07,269 [INFO] Staging: 87000 / 200000 filas
+2026-07-29 16:25:07,424 [INFO] Staging: 88000 / 200000 filas
+2026-07-29 16:25:07,567 [INFO] Staging: 89000 / 200000 filas
+2026-07-29 16:25:07,706 [INFO] Staging: 90000 / 200000 filas
+2026-07-29 16:25:07,850 [INFO] Staging: 91000 / 200000 filas
+2026-07-29 16:25:07,996 [INFO] Staging: 92000 / 200000 filas
+2026-07-29 16:25:08,147 [INFO] Staging: 93000 / 200000 filas
+2026-07-29 16:25:08,293 [INFO] Staging: 94000 / 200000 filas
+2026-07-29 16:25:08,451 [INFO] Staging: 95000 / 200000 filas
+2026-07-29 16:25:08,638 [INFO] Staging: 96000 / 200000 filas
+2026-07-29 16:25:08,807 [INFO] Staging: 97000 / 200000 filas
+2026-07-29 16:25:08,975 [INFO] Staging: 98000 / 200000 filas
+2026-07-29 16:25:09,137 [INFO] Staging: 99000 / 200000 filas
+2026-07-29 16:25:09,392 [INFO] Staging: 100000 / 200000 filas
+2026-07-29 16:25:09,538 [INFO] Staging: 101000 / 200000 filas
+2026-07-29 16:25:09,685 [INFO] Staging: 102000 / 200000 filas
+2026-07-29 16:25:09,826 [INFO] Staging: 103000 / 200000 filas
+2026-07-29 16:25:09,974 [INFO] Staging: 104000 / 200000 filas
+2026-07-29 16:25:10,119 [INFO] Staging: 105000 / 200000 filas
+2026-07-29 16:25:10,266 [INFO] Staging: 106000 / 200000 filas
+2026-07-29 16:25:10,420 [INFO] Staging: 107000 / 200000 filas
+2026-07-29 16:25:10,604 [INFO] Staging: 108000 / 200000 filas
+2026-07-29 16:25:10,751 [INFO] Staging: 109000 / 200000 filas
+2026-07-29 16:25:10,894 [INFO] Staging: 110000 / 200000 filas
+2026-07-29 16:25:11,059 [INFO] Staging: 111000 / 200000 filas
+2026-07-29 16:25:11,228 [INFO] Staging: 112000 / 200000 filas
+2026-07-29 16:25:11,391 [INFO] Staging: 113000 / 200000 filas
+2026-07-29 16:25:11,551 [INFO] Staging: 114000 / 200000 filas
+2026-07-29 16:25:11,701 [INFO] Staging: 115000 / 200000 filas
+2026-07-29 16:25:11,841 [INFO] Staging: 116000 / 200000 filas
+2026-07-29 16:25:11,982 [INFO] Staging: 117000 / 200000 filas
+2026-07-29 16:25:12,140 [INFO] Staging: 118000 / 200000 filas
+2026-07-29 16:25:12,303 [INFO] Staging: 119000 / 200000 filas
+2026-07-29 16:25:12,461 [INFO] Staging: 120000 / 200000 filas
+2026-07-29 16:25:12,619 [INFO] Staging: 121000 / 200000 filas
+2026-07-29 16:25:12,772 [INFO] Staging: 122000 / 200000 filas
+2026-07-29 16:25:12,917 [INFO] Staging: 123000 / 200000 filas
+2026-07-29 16:25:13,168 [INFO] Staging: 124000 / 200000 filas
+2026-07-29 16:25:13,339 [INFO] Staging: 125000 / 200000 filas
+2026-07-29 16:25:13,499 [INFO] Staging: 126000 / 200000 filas
+2026-07-29 16:25:13,738 [INFO] Staging: 127000 / 200000 filas
+2026-07-29 16:25:13,986 [INFO] Staging: 128000 / 200000 filas
+2026-07-29 16:25:14,162 [INFO] Staging: 129000 / 200000 filas
+2026-07-29 16:25:14,343 [INFO] Staging: 130000 / 200000 filas
+2026-07-29 16:25:14,494 [INFO] Staging: 131000 / 200000 filas
+2026-07-29 16:25:14,656 [INFO] Staging: 132000 / 200000 filas
+2026-07-29 16:25:14,804 [INFO] Staging: 133000 / 200000 filas
+2026-07-29 16:25:14,952 [INFO] Staging: 134000 / 200000 filas
+2026-07-29 16:25:15,110 [INFO] Staging: 135000 / 200000 filas
+2026-07-29 16:25:15,263 [INFO] Staging: 136000 / 200000 filas
+2026-07-29 16:25:15,410 [INFO] Staging: 137000 / 200000 filas
+2026-07-29 16:25:15,556 [INFO] Staging: 138000 / 200000 filas
+2026-07-29 16:25:15,709 [INFO] Staging: 139000 / 200000 filas
+2026-07-29 16:25:15,859 [INFO] Staging: 140000 / 200000 filas
+2026-07-29 16:25:16,013 [INFO] Staging: 141000 / 200000 filas
+2026-07-29 16:25:16,166 [INFO] Staging: 142000 / 200000 filas
+2026-07-29 16:25:16,353 [INFO] Staging: 143000 / 200000 filas
+2026-07-29 16:25:16,496 [INFO] Staging: 144000 / 200000 filas
+2026-07-29 16:25:16,644 [INFO] Staging: 145000 / 200000 filas
+2026-07-29 16:25:16,801 [INFO] Staging: 146000 / 200000 filas
+2026-07-29 16:25:17,057 [INFO] Staging: 147000 / 200000 filas
+2026-07-29 16:25:17,230 [INFO] Staging: 148000 / 200000 filas
+2026-07-29 16:25:17,382 [INFO] Staging: 149000 / 200000 filas
+2026-07-29 16:25:17,530 [INFO] Staging: 150000 / 200000 filas
+2026-07-29 16:25:17,680 [INFO] Staging: 151000 / 200000 filas
+2026-07-29 16:25:17,839 [INFO] Staging: 152000 / 200000 filas
+2026-07-29 16:25:17,987 [INFO] Staging: 153000 / 200000 filas
+2026-07-29 16:25:18,135 [INFO] Staging: 154000 / 200000 filas
+2026-07-29 16:25:18,285 [INFO] Staging: 155000 / 200000 filas
+2026-07-29 16:25:18,434 [INFO] Staging: 156000 / 200000 filas
+2026-07-29 16:25:18,587 [INFO] Staging: 157000 / 200000 filas
+2026-07-29 16:25:18,751 [INFO] Staging: 158000 / 200000 filas
+2026-07-29 16:25:18,910 [INFO] Staging: 159000 / 200000 filas
+2026-07-29 16:25:19,070 [INFO] Staging: 160000 / 200000 filas
+2026-07-29 16:25:19,218 [INFO] Staging: 161000 / 200000 filas
+2026-07-29 16:25:19,387 [INFO] Staging: 162000 / 200000 filas
+2026-07-29 16:25:19,557 [INFO] Staging: 163000 / 200000 filas
+2026-07-29 16:25:19,708 [INFO] Staging: 164000 / 200000 filas
+2026-07-29 16:25:19,863 [INFO] Staging: 165000 / 200000 filas
+2026-07-29 16:25:20,015 [INFO] Staging: 166000 / 200000 filas
+2026-07-29 16:25:20,164 [INFO] Staging: 167000 / 200000 filas
+2026-07-29 16:25:20,312 [INFO] Staging: 168000 / 200000 filas
+2026-07-29 16:25:20,461 [INFO] Staging: 169000 / 200000 filas
+2026-07-29 16:25:20,611 [INFO] Staging: 170000 / 200000 filas
+2026-07-29 16:25:20,872 [INFO] Staging: 171000 / 200000 filas
+2026-07-29 16:25:21,072 [INFO] Staging: 172000 / 200000 filas
+2026-07-29 16:25:21,219 [INFO] Staging: 173000 / 200000 filas
+2026-07-29 16:25:21,373 [INFO] Staging: 174000 / 200000 filas
+2026-07-29 16:25:21,530 [INFO] Staging: 175000 / 200000 filas
+2026-07-29 16:25:21,687 [INFO] Staging: 176000 / 200000 filas
+2026-07-29 16:25:21,851 [INFO] Staging: 177000 / 200000 filas
+2026-07-29 16:25:22,023 [INFO] Staging: 178000 / 200000 filas
+2026-07-29 16:25:22,187 [INFO] Staging: 179000 / 200000 filas
+2026-07-29 16:25:22,356 [INFO] Staging: 180000 / 200000 filas
+2026-07-29 16:25:22,521 [INFO] Staging: 181000 / 200000 filas
+2026-07-29 16:25:22,695 [INFO] Staging: 182000 / 200000 filas
+2026-07-29 16:25:22,839 [INFO] Staging: 183000 / 200000 filas
+2026-07-29 16:25:22,988 [INFO] Staging: 184000 / 200000 filas
+2026-07-29 16:25:23,142 [INFO] Staging: 185000 / 200000 filas
+2026-07-29 16:25:23,293 [INFO] Staging: 186000 / 200000 filas
+2026-07-29 16:25:23,445 [INFO] Staging: 187000 / 200000 filas
+2026-07-29 16:25:23,590 [INFO] Staging: 188000 / 200000 filas
+2026-07-29 16:25:23,751 [INFO] Staging: 189000 / 200000 filas
+2026-07-29 16:25:23,902 [INFO] Staging: 190000 / 200000 filas
+2026-07-29 16:25:24,064 [INFO] Staging: 191000 / 200000 filas
+2026-07-29 16:25:24,235 [INFO] Staging: 192000 / 200000 filas
+2026-07-29 16:25:24,409 [INFO] Staging: 193000 / 200000 filas
+2026-07-29 16:25:24,574 [INFO] Staging: 194000 / 200000 filas
+2026-07-29 16:25:24,730 [INFO] Staging: 195000 / 200000 filas
+2026-07-29 16:25:24,987 [INFO] Staging: 196000 / 200000 filas
+2026-07-29 16:25:25,144 [INFO] Staging: 197000 / 200000 filas
+2026-07-29 16:25:25,300 [INFO] Staging: 198000 / 200000 filas
+2026-07-29 16:25:25,464 [INFO] Staging: 199000 / 200000 filas
+2026-07-29 16:25:25,616 [INFO] Staging: 200000 / 200000 filas
+2026-07-29 16:25:25,646 [INFO] Filas en staging: 200000
+2026-07-29 16:26:00,683 [INFO] UPSERT terminado -> insertados: 1008 | actualizados: 0
+2026-07-29 16:26:00,694 [INFO] === Carga finalizada correctamente en 0:09:26.490655 ===
+2026-07-29 20:30:35,104 [INFO] === Inicio de carga | lote a4016083-0460-4717-8828-19120027e993 | modo incremental ===
+2026-07-29 20:30:35,105 [INFO] Usando reporte INCREMENTAL (últimos días).
+2026-07-29 20:30:35,622 [ERROR] Error en la carga: HTTP 400 en la página 1 del reporte 'incremental' tras 1s. Inicio de la respuesta: '["Maximum value allowed for $limit is 1000"]'
+Traceback (most recent call last):
+  File "C:\Users\edgarrad\OneDrive - soriana.com\Documentos\2026\Soriana\Iniciativas_IA\IA\20260727\etl_proactivanet.py", line 584, in main
+    filas_api = extraer(cfg, None, completa=args.completa)
+  File "C:\Users\edgarrad\OneDrive - soriana.com\Documentos\2026\Soriana\Iniciativas_IA\IA\20260727\etl_proactivanet.py", line 345, in extraer
+    filas.extend(_paginar_reporte(sesion, u, cfg_api, etq))
+                 ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\edgarrad\OneDrive - soriana.com\Documentos\2026\Soriana\Iniciativas_IA\IA\20260727\etl_proactivanet.py", line 254, in _paginar_reporte
+    raise RuntimeError(
+        f"HTTP {r.status_code} en la página {pagina} del reporte '{etiqueta}' "
+        f"tras {dt:.0f}s. Inicio de la respuesta: {cuerpo[:200]!r}")
+RuntimeError: HTTP 400 en la página 1 del reporte 'incremental' tras 1s. Inicio de la respuesta: '["Maximum value allowed for $limit is 1000"]'
