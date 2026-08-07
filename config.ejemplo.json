@@ -1,0 +1,90 @@
+{
+  "_comentario": "Copia este archivo como config.json y ajústalo. NO lo subas a git con credenciales.",
+  "api": {
+    "base_url": "https://proactivanet.tuempresa.com",
+    "endpoint": "/api/consultas/1234/resultados",
+    "metodo": "GET",
+    "auth": {
+      "_opciones_tipo": "ninguna | basic | bearer | apikey_header | login",
+      "tipo": "basic",
+      "usuario": "usuario_api",
+      "password": "REEMPLAZAR_O_USAR_VARIABLE_PVNET_API_PASS",
+      "token": "",
+      "nombre_header": "X-API-Key",
+      "endpoint_login": "/api/auth/login",
+      "campo_usuario": "user",
+      "campo_password": "password",
+      "ruta_token": "access_token",
+      "prefijo_token": "Bearer"
+    },
+    "headers_extra": {},
+    "params_fijos": {
+      "format": "json"
+    },
+    "_ruta_items": "Dónde vienen las filas dentro del JSON. Vacío si la API devuelve un array plano. Ej: 'data', 'result.items'",
+    "ruta_items": "",
+    "_filtro_incremental": "Nombre del parámetro con el que la consulta acepta 'modificado desde'. Déjalo vacío si no lo soporta (entonces se descarga todo cada vez, lo cual es válido para volúmenes pequeños).",
+    "param_fecha_desde": "fechaDesde",
+    "formato_fecha": "%Y-%m-%dT%H:%M:%S",
+    "paginacion": {
+      "activa": false,
+      "param_pagina": "page",
+      "param_tamano": "pageSize",
+      "pagina_inicial": 1,
+      "tamano": 500,
+      "max_paginas": 500
+    },
+    "verify_ssl": true,
+    "timeout": 180,
+    "_url_cruda_completa": "Reporte de carga inicial (todo el histórico). Se usa con --completa.",
+    "url_cruda_completa": "",
+    "_url_cruda_incremental": "Reporte incremental (ultimos dias). Se usa en cada corrida programada.",
+    "url_cruda_incremental": ""
+  },
+  "sql": {
+    "driver": "ODBC Driver 18 for SQL Server",
+    "servidor": "SERVIDORSQL\\INSTANCIA",
+    "base_datos": "ServiceDesk",
+    "autenticacion_windows": true,
+    "usuario": "",
+    "password": "",
+    "encriptar": true,
+    "confiar_certificado": true,
+    "timeout": 60
+  },
+  "carga": {
+    "fecha_inicial": "2025-01-01T00:00:00",
+    "dias_solape": 3,
+    "tam_lote": 1000
+  },
+  "_mapeo": "Izquierda = columna de stg.Tickets. Derecha = nombre EXACTO del campo en el JSON de la API. Si un campo no existe en tu consulta, déjalo con cadena vacía y quedará NULL.",
+  "mapeo": {
+    "CodigoTicket": "Código",
+    "TipoTicket": "Tipo",
+    "Titulo": "Título",
+    "Descripcion": "Descripción",
+    "SolucionUsuario": "Solución para el usuario",
+    "Estado": "Estado",
+    "Prioridad": "Prioridad",
+    "Impacto": "Impacto",
+    "Urgencia": "Urgencia",
+    "Categoria": "Categoría",
+    "C1": "C1",
+    "C2": "C2",
+    "C3": "C3",
+    "Servicio": "Servicio",
+    "Sucursal": "Sucursal",
+    "NotificadoPor": "Notificado por",
+    "UsuarioAfectado": "Usuario afectado",
+    "TecnicoAsignado": "Técnico asignado",
+    "GrupoAsignado": "Grupo asignado",
+    "Origen": "Origen",
+    "FechaRegistro": "Fecha de registro",
+    "FechaAsignacion": "Fecha de asignación",
+    "FechaResolucion": "Fecha de resolución",
+    "FechaCierre": "Fecha de cierre",
+    "FechaUltimaModificacion": "Fecha de última modificación",
+    "CumpleSLA": "Cumple SLA",
+    "TiempoResolucionMin": "Tiempo de resolución"
+  }
+}

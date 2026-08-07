@@ -1507,3 +1507,1530 @@ RuntimeError: HTTP 400 en la página 1 del reporte 'incremental' tras 1s. Inicio
 2026-07-30 16:17:43,792 [INFO] Filas en staging: 6527
 2026-07-30 16:17:45,677 [INFO] UPSERT terminado -> insertados: 59 | actualizados: 117
 2026-07-30 16:17:45,687 [INFO] === Carga finalizada correctamente en 0:00:27.013912 ===
+2026-07-31 10:03:51,240 [INFO] === Inicio de carga | lote 4be1f81d-4df2-4f87-9dc0-3c74a8746a5a | modo incremental ===
+2026-07-31 10:03:51,459 [INFO] Usando reporte INCREMENTAL (últimos días).
+2026-07-31 10:03:57,458 [INFO] [incremental] Página 1: 1000 registros (1000 nuevos) (6s)
+2026-07-31 10:03:59,706 [INFO] [incremental] Página 2: 1000 registros (1000 nuevos) (2s)
+2026-07-31 10:04:02,142 [INFO] [incremental] Página 3: 1000 registros (1000 nuevos) (2s)
+2026-07-31 10:04:04,626 [INFO] [incremental] Página 4: 1000 registros (1000 nuevos) (2s)
+2026-07-31 10:04:07,320 [INFO] [incremental] Página 5: 1000 registros (1000 nuevos) (3s)
+2026-07-31 10:04:09,969 [INFO] [incremental] Página 6: 1000 registros (1000 nuevos) (3s)
+2026-07-31 10:04:11,691 [INFO] [incremental] Página 7: 572 registros (572 nuevos) (2s)
+2026-07-31 10:04:11,698 [INFO] Total de registros descargados de la API (incremental): 6572
+2026-07-31 10:04:12,265 [INFO] Staging: 1000 / 6572 filas
+2026-07-31 10:04:12,392 [INFO] Staging: 2000 / 6572 filas
+2026-07-31 10:04:12,518 [INFO] Staging: 3000 / 6572 filas
+2026-07-31 10:04:12,686 [INFO] Staging: 4000 / 6572 filas
+2026-07-31 10:04:12,817 [INFO] Staging: 5000 / 6572 filas
+2026-07-31 10:04:12,962 [INFO] Staging: 6000 / 6572 filas
+2026-07-31 10:04:13,055 [INFO] Staging: 6572 / 6572 filas
+2026-07-31 10:04:13,066 [INFO] Filas en staging: 6572
+2026-07-31 10:04:18,548 [INFO] UPSERT terminado -> insertados: 597 | actualizados: 1011
+2026-07-31 10:04:18,562 [INFO] === Carga finalizada correctamente en 0:00:27.322347 ===
+2026-08-02 16:25:18,924 [INFO] === Inicio de carga | lote b7ae6e94-6bb7-493b-a51b-19864857b438 | modo incremental ===
+2026-08-02 16:25:19,103 [INFO] Usando reporte INCREMENTAL (últimos días).
+2026-08-02 16:25:22,522 [INFO] [incremental] Página 1: 1000 registros (1000 nuevos) (3s)
+2026-08-02 16:25:24,325 [INFO] [incremental] Página 2: 1000 registros (1000 nuevos) (2s)
+2026-08-02 16:25:26,411 [INFO] [incremental] Página 3: 1000 registros (1000 nuevos) (2s)
+2026-08-02 16:25:28,580 [INFO] [incremental] Página 4: 1000 registros (1000 nuevos) (2s)
+2026-08-02 16:25:29,856 [INFO] [incremental] Página 5: 469 registros (469 nuevos) (1s)
+2026-08-02 16:25:29,862 [INFO] Total de registros descargados de la API (incremental): 4469
+2026-08-02 16:25:30,775 [INFO] Staging: 1000 / 4469 filas
+2026-08-02 16:25:30,900 [INFO] Staging: 2000 / 4469 filas
+2026-08-02 16:25:31,042 [INFO] Staging: 3000 / 4469 filas
+2026-08-02 16:25:31,184 [INFO] Staging: 4000 / 4469 filas
+2026-08-02 16:25:31,248 [INFO] Staging: 4469 / 4469 filas
+2026-08-02 16:25:31,255 [INFO] Filas en staging: 4469
+2026-08-02 16:25:34,584 [INFO] UPSERT terminado -> insertados: 1666 | actualizados: 1636
+2026-08-02 16:25:34,593 [INFO] === Carga finalizada correctamente en 0:00:15.668728 ===
+2026-08-03 11:01:48,439 [INFO] === Inicio de carga | lote ab0625ed-a08a-4630-8dff-6560d247d4e5 | modo incremental ===
+2026-08-03 11:01:48,739 [INFO] Usando reporte INCREMENTAL (últimos días).
+2026-08-03 11:01:58,687 [INFO] [incremental] Página 1: 1000 registros (1000 nuevos) (10s)
+2026-08-03 11:02:00,594 [INFO] [incremental] Página 2: 1000 registros (1000 nuevos) (2s)
+2026-08-03 11:02:02,767 [INFO] [incremental] Página 3: 1000 registros (1000 nuevos) (2s)
+2026-08-03 11:02:04,697 [INFO] [incremental] Página 4: 912 registros (912 nuevos) (2s)
+2026-08-03 11:02:04,702 [INFO] Total de registros descargados de la API (incremental): 3912
+2026-08-03 11:02:05,210 [INFO] Staging: 1000 / 3912 filas
+2026-08-03 11:02:05,337 [INFO] Staging: 2000 / 3912 filas
+2026-08-03 11:02:05,472 [INFO] Staging: 3000 / 3912 filas
+2026-08-03 11:02:05,596 [INFO] Staging: 3912 / 3912 filas
+2026-08-03 11:02:05,610 [INFO] Filas en staging: 3912
+2026-08-03 11:02:09,654 [INFO] UPSERT terminado -> insertados: 361 | actualizados: 980
+2026-08-03 11:02:09,669 [INFO] === Carga finalizada correctamente en 0:00:21.229453 ===
+2026-08-04 12:46:25,819 [INFO] === Inicio de carga | lote 59c1f849-ec5b-467f-8a1d-fcb48c6d2c1a | modo incremental ===
+2026-08-04 12:46:25,997 [INFO] Usando reporte INCREMENTAL (últimos días).
+2026-08-04 12:48:03,267 [INFO] [incremental] Página 1: 1000 registros (1000 nuevos) (97s)
+2026-08-04 12:49:31,441 [INFO] [incremental] Página 2: 1000 registros (989 nuevos) (2s)
+2026-08-04 12:49:34,142 [INFO] [incremental] Página 3: 1000 registros (1000 nuevos) (3s)
+2026-08-04 12:49:36,878 [INFO] [incremental] Página 4: 1000 registros (1000 nuevos) (3s)
+2026-08-04 12:49:39,487 [INFO] [incremental] Página 5: 816 registros (816 nuevos) (3s)
+2026-08-04 12:49:39,492 [INFO] Total de registros descargados de la API (incremental): 4805
+2026-08-04 12:49:40,117 [INFO] Staging: 1000 / 4805 filas
+2026-08-04 12:49:40,261 [INFO] Staging: 2000 / 4805 filas
+2026-08-04 12:49:40,401 [INFO] Staging: 3000 / 4805 filas
+2026-08-04 12:49:40,547 [INFO] Staging: 4000 / 4805 filas
+2026-08-04 12:49:40,678 [INFO] Staging: 4805 / 4805 filas
+2026-08-04 12:49:40,687 [INFO] Filas en staging: 4805
+2026-08-04 12:49:42,419 [INFO] UPSERT terminado -> insertados: 1385 | actualizados: 2180
+2026-08-04 12:49:42,435 [INFO] === Carga finalizada correctamente en 0:03:16.616033 ===
+2026-08-04 13:58:37,316 [INFO] === Inicio de carga | lote 27e60e01-9f2b-4118-a6f3-d1d6dde7e431 | modo completa ===
+2026-08-04 13:58:37,317 [INFO] Usando reporte(s) COMPLETO(s) (carga inicial).
+2026-08-04 13:59:32,417 [INFO] [Total] Página 1: 1000 registros (1000 nuevos) (55s)
+2026-08-04 14:00:25,860 [INFO] [Total] Página 2: 1000 registros (1000 nuevos) (53s)
+2026-08-04 14:01:16,900 [INFO] [Total] Página 3: 1000 registros (1000 nuevos) (51s)
+2026-08-04 14:02:08,622 [INFO] [Total] Página 4: 1000 registros (1000 nuevos) (52s)
+2026-08-04 14:03:14,568 [INFO] [Total] Página 5: 1000 registros (1000 nuevos) (66s)
+2026-08-04 14:04:14,154 [INFO] [Total] Página 6: 1000 registros (1000 nuevos) (60s)
+2026-08-04 14:05:14,148 [INFO] [Total] Página 7: 1000 registros (1000 nuevos) (60s)
+2026-08-04 14:06:04,376 [INFO] [Total] Página 8: 1000 registros (1000 nuevos) (50s)
+2026-08-04 14:06:54,835 [INFO] [Total] Página 9: 1000 registros (1000 nuevos) (50s)
+2026-08-04 14:07:50,108 [INFO] [Total] Página 10: 1000 registros (1000 nuevos) (55s)
+2026-08-04 14:08:49,266 [INFO] [Total] Página 11: 1000 registros (1000 nuevos) (59s)
+2026-08-04 14:09:40,592 [INFO] [Total] Página 12: 1000 registros (1000 nuevos) (51s)
+2026-08-04 14:10:34,020 [INFO] [Total] Página 13: 1000 registros (1000 nuevos) (53s)
+2026-08-04 14:11:25,602 [INFO] [Total] Página 14: 1000 registros (1000 nuevos) (52s)
+2026-08-04 14:12:17,106 [INFO] [Total] Página 15: 1000 registros (1000 nuevos) (51s)
+2026-08-04 14:13:15,030 [INFO] [Total] Página 16: 1000 registros (1000 nuevos) (58s)
+2026-08-04 14:14:11,654 [INFO] [Total] Página 17: 1000 registros (1000 nuevos) (57s)
+2026-08-04 14:15:06,518 [INFO] [Total] Página 18: 1000 registros (1000 nuevos) (55s)
+2026-08-04 14:16:00,328 [INFO] [Total] Página 19: 1000 registros (1000 nuevos) (54s)
+2026-08-04 14:16:55,376 [INFO] [Total] Página 20: 1000 registros (1000 nuevos) (55s)
+2026-08-04 14:17:55,291 [INFO] [Total] Página 21: 1000 registros (1000 nuevos) (60s)
+2026-08-04 14:18:52,756 [INFO] [Total] Página 22: 1000 registros (1000 nuevos) (57s)
+2026-08-04 14:19:50,703 [INFO] [Total] Página 23: 1000 registros (1000 nuevos) (58s)
+2026-08-04 14:20:50,584 [INFO] [Total] Página 24: 1000 registros (1000 nuevos) (60s)
+2026-08-04 14:21:49,198 [INFO] [Total] Página 25: 1000 registros (1000 nuevos) (59s)
+2026-08-04 14:22:47,688 [INFO] [Total] Página 26: 1000 registros (1000 nuevos) (58s)
+2026-08-04 14:23:51,219 [INFO] [Total] Página 27: 1000 registros (1000 nuevos) (63s)
+2026-08-04 14:24:50,184 [INFO] [Total] Página 28: 1000 registros (1000 nuevos) (59s)
+2026-08-04 14:25:49,141 [INFO] [Total] Página 29: 1000 registros (1000 nuevos) (59s)
+2026-08-04 14:26:44,745 [INFO] [Total] Página 30: 1000 registros (1000 nuevos) (56s)
+2026-08-04 14:27:41,804 [INFO] [Total] Página 31: 1000 registros (1000 nuevos) (57s)
+2026-08-04 14:28:39,641 [INFO] [Total] Página 32: 1000 registros (1000 nuevos) (58s)
+2026-08-04 14:29:34,601 [INFO] [Total] Página 33: 1000 registros (1000 nuevos) (55s)
+2026-08-04 14:30:29,800 [INFO] [Total] Página 34: 1000 registros (1000 nuevos) (55s)
+2026-08-04 14:31:24,123 [INFO] [Total] Página 35: 1000 registros (1000 nuevos) (54s)
+2026-08-04 14:32:20,901 [INFO] [Total] Página 36: 1000 registros (1000 nuevos) (57s)
+2026-08-04 14:33:22,849 [INFO] [Total] Página 37: 1000 registros (1000 nuevos) (62s)
+2026-08-04 14:34:18,877 [INFO] [Total] Página 38: 1000 registros (1000 nuevos) (56s)
+2026-08-04 14:35:16,602 [INFO] [Total] Página 39: 1000 registros (1000 nuevos) (58s)
+2026-08-04 14:36:11,182 [INFO] [Total] Página 40: 1000 registros (1000 nuevos) (55s)
+2026-08-04 14:37:03,777 [INFO] [Total] Página 41: 1000 registros (1000 nuevos) (53s)
+2026-08-04 14:37:58,994 [INFO] [Total] Página 42: 1000 registros (1000 nuevos) (55s)
+2026-08-04 14:38:51,388 [INFO] [Total] Página 43: 1000 registros (1000 nuevos) (52s)
+2026-08-04 14:39:45,765 [INFO] [Total] Página 44: 1000 registros (1000 nuevos) (54s)
+2026-08-04 14:40:41,681 [INFO] [Total] Página 45: 1000 registros (1000 nuevos) (56s)
+2026-08-04 14:41:35,366 [INFO] [Total] Página 46: 1000 registros (1000 nuevos) (54s)
+2026-08-04 14:42:29,977 [INFO] [Total] Página 47: 1000 registros (1000 nuevos) (55s)
+2026-08-04 14:43:36,267 [INFO] [Total] Página 48: 1000 registros (1000 nuevos) (66s)
+2026-08-04 14:44:28,028 [INFO] [Total] Página 49: 1000 registros (1000 nuevos) (52s)
+2026-08-04 14:45:25,761 [INFO] [Total] Página 50: 1000 registros (1000 nuevos) (58s)
+2026-08-04 14:46:21,406 [INFO] [Total] Página 51: 1000 registros (1000 nuevos) (56s)
+2026-08-04 14:47:13,728 [INFO] [Total] Página 52: 1000 registros (1000 nuevos) (52s)
+2026-08-04 14:48:11,999 [INFO] [Total] Página 53: 1000 registros (1000 nuevos) (58s)
+2026-08-04 14:49:02,192 [INFO] [Total] Página 54: 1000 registros (1000 nuevos) (50s)
+2026-08-04 14:49:52,016 [INFO] [Total] Página 55: 1000 registros (1000 nuevos) (50s)
+2026-08-04 14:50:42,458 [INFO] [Total] Página 56: 1000 registros (1000 nuevos) (50s)
+2026-08-04 14:51:32,924 [INFO] [Total] Página 57: 1000 registros (1000 nuevos) (50s)
+2026-08-04 14:52:24,783 [INFO] [Total] Página 58: 1000 registros (1000 nuevos) (52s)
+2026-08-04 14:53:18,751 [INFO] [Total] Página 59: 1000 registros (1000 nuevos) (54s)
+2026-08-04 14:54:09,341 [INFO] [Total] Página 60: 1000 registros (1000 nuevos) (51s)
+2026-08-04 14:54:59,719 [INFO] [Total] Página 61: 1000 registros (1000 nuevos) (50s)
+2026-08-04 14:55:50,049 [INFO] [Total] Página 62: 1000 registros (1000 nuevos) (50s)
+2026-08-04 14:56:40,871 [INFO] [Total] Página 63: 1000 registros (1000 nuevos) (51s)
+2026-08-04 14:57:35,927 [INFO] [Total] Página 64: 1000 registros (1000 nuevos) (55s)
+2026-08-04 14:58:29,575 [INFO] [Total] Página 65: 1000 registros (1000 nuevos) (54s)
+2026-08-04 14:59:19,673 [INFO] [Total] Página 66: 1000 registros (1000 nuevos) (50s)
+2026-08-04 15:00:09,872 [INFO] [Total] Página 67: 1000 registros (1000 nuevos) (50s)
+2026-08-04 15:01:02,072 [INFO] [Total] Página 68: 1000 registros (1000 nuevos) (52s)
+2026-08-04 15:01:56,366 [INFO] [Total] Página 69: 1000 registros (1000 nuevos) (54s)
+2026-08-04 15:02:59,878 [INFO] [Total] Página 70: 1000 registros (1000 nuevos) (63s)
+2026-08-04 15:03:51,431 [INFO] [Total] Página 71: 1000 registros (1000 nuevos) (52s)
+2026-08-04 15:04:41,732 [INFO] [Total] Página 72: 1000 registros (1000 nuevos) (50s)
+2026-08-04 15:05:41,122 [INFO] [Total] Página 73: 1000 registros (1000 nuevos) (59s)
+2026-08-04 15:06:33,655 [INFO] [Total] Página 74: 1000 registros (1000 nuevos) (52s)
+2026-08-04 15:07:25,333 [INFO] [Total] Página 75: 1000 registros (1000 nuevos) (52s)
+2026-08-04 15:08:23,326 [INFO] [Total] Página 76: 1000 registros (1000 nuevos) (58s)
+2026-08-04 15:09:20,535 [INFO] [Total] Página 77: 1000 registros (1000 nuevos) (57s)
+2026-08-04 15:10:13,133 [INFO] [Total] Página 78: 1000 registros (1000 nuevos) (53s)
+2026-08-04 15:11:03,695 [INFO] [Total] Página 79: 1000 registros (1000 nuevos) (51s)
+2026-08-04 15:11:55,112 [INFO] [Total] Página 80: 1000 registros (1000 nuevos) (51s)
+2026-08-04 15:13:01,445 [INFO] [Total] Página 81: 1000 registros (1000 nuevos) (66s)
+2026-08-04 15:13:53,607 [INFO] [Total] Página 82: 1000 registros (1000 nuevos) (52s)
+2026-08-04 15:14:43,706 [INFO] [Total] Página 83: 1000 registros (1000 nuevos) (50s)
+2026-08-04 15:15:34,827 [INFO] [Total] Página 84: 1000 registros (1000 nuevos) (51s)
+2026-08-04 15:16:28,194 [INFO] [Total] Página 85: 1000 registros (1000 nuevos) (53s)
+2026-08-04 15:17:21,147 [INFO] [Total] Página 86: 1000 registros (1000 nuevos) (53s)
+2026-08-04 15:18:21,658 [INFO] [Total] Página 87: 1000 registros (1000 nuevos) (60s)
+2026-08-04 15:19:14,985 [INFO] [Total] Página 88: 1000 registros (1000 nuevos) (53s)
+2026-08-04 15:20:09,630 [INFO] [Total] Página 89: 1000 registros (1000 nuevos) (55s)
+2026-08-04 15:21:07,603 [INFO] [Total] Página 90: 1000 registros (1000 nuevos) (58s)
+2026-08-04 15:22:01,869 [INFO] [Total] Página 91: 1000 registros (1000 nuevos) (54s)
+2026-08-04 15:23:02,542 [INFO] [Total] Página 92: 1000 registros (1000 nuevos) (61s)
+2026-08-04 15:23:57,168 [INFO] [Total] Página 93: 1000 registros (1000 nuevos) (55s)
+2026-08-04 15:24:50,429 [INFO] [Total] Página 94: 1000 registros (1000 nuevos) (53s)
+2026-08-04 15:25:43,682 [INFO] [Total] Página 95: 1000 registros (1000 nuevos) (53s)
+2026-08-04 15:26:36,121 [INFO] [Total] Página 96: 1000 registros (1000 nuevos) (52s)
+2026-08-04 15:27:36,267 [INFO] [Total] Página 97: 1000 registros (1000 nuevos) (60s)
+2026-08-04 15:28:45,041 [INFO] [Total] Página 98: 1000 registros (1000 nuevos) (69s)
+2026-08-04 15:29:38,993 [INFO] [Total] Página 99: 1000 registros (1000 nuevos) (54s)
+2026-08-04 15:30:31,645 [INFO] [Total] Página 100: 1000 registros (1000 nuevos) (53s)
+2026-08-04 15:55:36,559 [INFO] === Inicio de carga | lote 37d9e9cc-3872-40d3-8a44-bbb5ed467b8e | modo completa ===
+2026-08-04 15:55:36,560 [INFO] Usando reporte(s) COMPLETO(s) (carga inicial).
+2026-08-04 15:56:29,144 [INFO] [Total] Página 1: 1000 registros (1000 nuevos) (53s)
+2026-08-04 15:57:21,226 [INFO] [Total] Página 2: 1000 registros (1000 nuevos) (52s)
+2026-08-04 15:58:19,774 [INFO] [Total] Página 3: 1000 registros (1000 nuevos) (58s)
+2026-08-04 15:59:12,073 [INFO] [Total] Página 4: 1000 registros (1000 nuevos) (52s)
+2026-08-04 16:00:04,881 [INFO] [Total] Página 5: 1000 registros (1000 nuevos) (53s)
+2026-08-04 16:00:57,243 [INFO] [Total] Página 6: 1000 registros (1000 nuevos) (52s)
+2026-08-04 16:03:58,572 [INFO] [Total] Página 7: 1000 registros (1000 nuevos) (55s)
+2026-08-04 16:04:50,749 [INFO] [Total] Página 8: 1000 registros (1000 nuevos) (52s)
+2026-08-04 16:05:43,148 [INFO] [Total] Página 9: 1000 registros (1000 nuevos) (52s)
+2026-08-04 16:06:37,176 [INFO] [Total] Página 10: 1000 registros (1000 nuevos) (54s)
+2026-08-04 16:07:31,276 [INFO] [Total] Página 11: 1000 registros (1000 nuevos) (54s)
+2026-08-04 16:08:25,026 [INFO] [Total] Página 12: 1000 registros (1000 nuevos) (54s)
+2026-08-04 16:09:24,801 [INFO] [Total] Página 13: 1000 registros (1000 nuevos) (60s)
+2026-08-04 16:10:23,783 [INFO] [Total] Página 14: 1000 registros (1000 nuevos) (59s)
+2026-08-04 16:11:18,545 [INFO] [Total] Página 15: 1000 registros (1000 nuevos) (55s)
+2026-08-04 16:12:10,163 [INFO] [Total] Página 16: 1000 registros (1000 nuevos) (52s)
+2026-08-04 16:13:10,353 [INFO] [Total] Página 17: 1000 registros (1000 nuevos) (60s)
+2026-08-04 16:14:02,542 [INFO] [Total] Página 18: 1000 registros (1000 nuevos) (52s)
+2026-08-04 16:15:00,065 [INFO] [Total] Página 19: 1000 registros (1000 nuevos) (57s)
+2026-08-04 16:15:50,375 [INFO] [Total] Página 20: 1000 registros (1000 nuevos) (50s)
+2026-08-04 16:16:39,979 [INFO] [Total] Página 21: 1000 registros (1000 nuevos) (50s)
+2026-08-04 16:17:36,531 [INFO] [Total] Página 22: 1000 registros (1000 nuevos) (57s)
+2026-08-04 16:18:29,599 [INFO] [Total] Página 23: 1000 registros (1000 nuevos) (53s)
+2026-08-04 16:19:21,670 [INFO] [Total] Página 24: 1000 registros (1000 nuevos) (52s)
+2026-08-04 16:36:22,647 [INFO] [Total] Página 25: 1000 registros (1000 nuevos) (51s)
+2026-08-04 16:37:13,927 [INFO] [Total] Página 26: 1000 registros (1000 nuevos) (51s)
+2026-08-04 16:38:11,590 [INFO] [Total] Página 27: 1000 registros (1000 nuevos) (58s)
+2026-08-04 16:39:01,712 [INFO] [Total] Página 28: 1000 registros (1000 nuevos) (50s)
+2026-08-04 16:39:52,650 [INFO] [Total] Página 29: 1000 registros (1000 nuevos) (51s)
+2026-08-04 16:40:44,007 [INFO] [Total] Página 30: 1000 registros (1000 nuevos) (51s)
+2026-08-04 16:41:35,160 [INFO] [Total] Página 31: 1000 registros (1000 nuevos) (51s)
+2026-08-04 16:42:32,370 [INFO] [Total] Página 32: 1000 registros (1000 nuevos) (57s)
+2026-08-04 16:43:30,311 [INFO] [Total] Página 33: 1000 registros (1000 nuevos) (58s)
+2026-08-04 16:44:23,316 [INFO] [Total] Página 34: 1000 registros (1000 nuevos) (53s)
+2026-08-04 16:45:17,448 [INFO] [Total] Página 35: 1000 registros (1000 nuevos) (54s)
+2026-08-04 16:46:11,589 [INFO] [Total] Página 36: 1000 registros (1000 nuevos) (54s)
+2026-08-04 16:47:02,587 [INFO] [Total] Página 37: 1000 registros (1000 nuevos) (51s)
+2026-08-04 16:47:57,224 [INFO] [Total] Página 38: 1000 registros (1000 nuevos) (55s)
+2026-08-04 16:48:48,854 [INFO] [Total] Página 39: 1000 registros (1000 nuevos) (52s)
+2026-08-04 16:49:38,959 [INFO] [Total] Página 40: 1000 registros (1000 nuevos) (50s)
+2026-08-04 16:50:29,787 [INFO] [Total] Página 41: 1000 registros (1000 nuevos) (51s)
+2026-08-04 16:51:22,223 [INFO] [Total] Página 42: 1000 registros (1000 nuevos) (52s)
+2026-08-04 16:52:14,297 [INFO] [Total] Página 43: 1000 registros (1000 nuevos) (52s)
+2026-08-04 16:53:09,069 [INFO] [Total] Página 44: 1000 registros (1000 nuevos) (55s)
+2026-08-04 16:54:00,290 [INFO] [Total] Página 45: 1000 registros (1000 nuevos) (51s)
+2026-08-04 16:54:52,205 [INFO] [Total] Página 46: 1000 registros (1000 nuevos) (52s)
+2026-08-04 16:55:44,414 [INFO] [Total] Página 47: 1000 registros (1000 nuevos) (52s)
+2026-08-04 16:56:46,666 [INFO] [Total] Página 48: 1000 registros (1000 nuevos) (62s)
+2026-08-04 16:57:38,538 [INFO] [Total] Página 49: 1000 registros (1000 nuevos) (52s)
+2026-08-04 16:58:32,489 [INFO] [Total] Página 50: 1000 registros (1000 nuevos) (54s)
+2026-08-04 16:59:24,333 [INFO] [Total] Página 51: 1000 registros (1000 nuevos) (52s)
+2026-08-04 17:00:15,808 [INFO] [Total] Página 52: 1000 registros (1000 nuevos) (51s)
+2026-08-04 17:01:09,992 [INFO] [Total] Página 53: 1000 registros (1000 nuevos) (54s)
+2026-08-04 17:02:02,248 [INFO] [Total] Página 54: 1000 registros (1000 nuevos) (52s)
+2026-08-04 17:02:56,364 [INFO] [Total] Página 55: 1000 registros (1000 nuevos) (54s)
+2026-08-04 17:03:50,667 [INFO] [Total] Página 56: 1000 registros (1000 nuevos) (54s)
+2026-08-04 17:04:47,723 [INFO] [Total] Página 57: 1000 registros (1000 nuevos) (57s)
+2026-08-04 17:05:40,913 [INFO] [Total] Página 58: 1000 registros (1000 nuevos) (51s)
+2026-08-04 17:06:34,540 [INFO] [Total] Página 59: 1000 registros (1000 nuevos) (54s)
+2026-08-04 17:07:29,425 [INFO] [Total] Página 60: 1000 registros (1000 nuevos) (55s)
+2026-08-04 17:08:36,568 [INFO] [Total] Página 61: 1000 registros (1000 nuevos) (67s)
+2026-08-04 17:09:33,629 [INFO] [Total] Página 62: 1000 registros (1000 nuevos) (57s)
+2026-08-04 17:10:25,784 [INFO] [Total] Página 63: 1000 registros (1000 nuevos) (52s)
+2026-08-04 17:11:18,240 [INFO] [Total] Página 64: 1000 registros (1000 nuevos) (52s)
+2026-08-04 17:12:16,968 [INFO] [Total] Página 65: 1000 registros (1000 nuevos) (59s)
+2026-08-04 17:13:14,513 [INFO] [Total] Página 66: 1000 registros (1000 nuevos) (58s)
+2026-08-04 17:14:06,853 [INFO] [Total] Página 67: 1000 registros (1000 nuevos) (52s)
+2026-08-04 17:22:08,954 [INFO] [Total] Página 68: 1000 registros (1000 nuevos) (53s)
+2026-08-04 17:23:03,023 [INFO] [Total] Página 69: 1000 registros (1000 nuevos) (54s)
+2026-08-04 17:23:56,174 [INFO] [Total] Página 70: 1000 registros (1000 nuevos) (53s)
+2026-08-04 17:24:50,061 [INFO] [Total] Página 71: 1000 registros (1000 nuevos) (54s)
+2026-08-04 17:25:42,581 [INFO] [Total] Página 72: 1000 registros (1000 nuevos) (52s)
+2026-08-04 17:26:37,317 [INFO] [Total] Página 73: 1000 registros (1000 nuevos) (55s)
+2026-08-04 17:27:30,602 [INFO] [Total] Página 74: 1000 registros (1000 nuevos) (53s)
+2026-08-04 17:28:25,637 [INFO] [Total] Página 75: 1000 registros (1000 nuevos) (55s)
+2026-08-04 17:29:17,634 [INFO] [Total] Página 76: 1000 registros (1000 nuevos) (52s)
+2026-08-04 17:30:09,601 [INFO] [Total] Página 77: 1000 registros (1000 nuevos) (52s)
+2026-08-04 17:31:08,793 [INFO] [Total] Página 78: 1000 registros (1000 nuevos) (59s)
+2026-08-04 17:32:19,045 [INFO] [Total] Página 79: 1000 registros (1000 nuevos) (70s)
+2026-08-04 17:33:14,558 [INFO] [Total] Página 80: 1000 registros (1000 nuevos) (55s)
+2026-08-04 17:34:08,944 [INFO] [Total] Página 81: 1000 registros (1000 nuevos) (54s)
+2026-08-04 17:35:01,264 [INFO] [Total] Página 82: 1000 registros (1000 nuevos) (52s)
+2026-08-04 17:35:52,252 [INFO] [Total] Página 83: 1000 registros (1000 nuevos) (51s)
+2026-08-04 17:36:45,824 [INFO] [Total] Página 84: 1000 registros (1000 nuevos) (54s)
+2026-08-04 17:37:38,812 [INFO] [Total] Página 85: 1000 registros (1000 nuevos) (53s)
+2026-08-04 17:38:33,338 [INFO] [Total] Página 86: 1000 registros (1000 nuevos) (54s)
+2026-08-04 17:39:27,028 [INFO] [Total] Página 87: 1000 registros (1000 nuevos) (54s)
+2026-08-04 17:40:19,223 [INFO] [Total] Página 88: 1000 registros (1000 nuevos) (52s)
+2026-08-04 17:41:11,379 [INFO] [Total] Página 89: 1000 registros (1000 nuevos) (52s)
+2026-08-04 17:42:04,294 [INFO] [Total] Página 90: 1000 registros (1000 nuevos) (53s)
+2026-08-04 17:43:01,235 [INFO] [Total] Página 91: 1000 registros (1000 nuevos) (57s)
+2026-08-04 17:43:54,607 [INFO] [Total] Página 92: 1000 registros (1000 nuevos) (53s)
+2026-08-04 17:44:45,689 [INFO] [Total] Página 93: 1000 registros (1000 nuevos) (51s)
+2026-08-04 17:45:36,633 [INFO] [Total] Página 94: 1000 registros (1000 nuevos) (51s)
+2026-08-04 17:46:29,047 [INFO] [Total] Página 95: 1000 registros (1000 nuevos) (52s)
+2026-08-04 17:58:04,020 [INFO] [Total] Página 96: 1000 registros (1000 nuevos) (55s)
+2026-08-04 17:59:00,118 [INFO] [Total] Página 97: 1000 registros (1000 nuevos) (56s)
+2026-08-04 17:59:52,186 [INFO] [Total] Página 98: 1000 registros (1000 nuevos) (52s)
+2026-08-04 18:00:47,139 [INFO] [Total] Página 99: 1000 registros (1000 nuevos) (55s)
+2026-08-04 18:01:41,592 [INFO] [Total] Página 100: 1000 registros (1000 nuevos) (54s)
+2026-08-04 18:02:34,781 [INFO] [Total] Página 101: 1000 registros (1000 nuevos) (53s)
+2026-08-04 18:03:30,171 [INFO] [Total] Página 102: 1000 registros (1000 nuevos) (55s)
+2026-08-04 18:04:22,533 [INFO] [Total] Página 103: 1000 registros (1000 nuevos) (52s)
+2026-08-04 18:05:14,418 [INFO] [Total] Página 104: 1000 registros (1000 nuevos) (52s)
+2026-08-04 18:06:07,036 [INFO] [Total] Página 105: 1000 registros (1000 nuevos) (53s)
+2026-08-04 18:06:57,323 [INFO] [Total] Página 106: 1000 registros (1000 nuevos) (50s)
+2026-08-04 18:07:55,727 [INFO] [Total] Página 107: 1000 registros (1000 nuevos) (58s)
+2026-08-04 18:08:47,822 [INFO] [Total] Página 108: 1000 registros (1000 nuevos) (52s)
+2026-08-04 18:09:38,481 [INFO] [Total] Página 109: 1000 registros (1000 nuevos) (51s)
+2026-08-04 18:10:32,703 [INFO] [Total] Página 110: 1000 registros (1000 nuevos) (54s)
+2026-08-04 18:11:30,811 [INFO] [Total] Página 111: 1000 registros (1000 nuevos) (58s)
+2026-08-04 18:12:23,289 [INFO] [Total] Página 112: 1000 registros (1000 nuevos) (52s)
+2026-08-04 18:13:18,895 [INFO] [Total] Página 113: 1000 registros (1000 nuevos) (56s)
+2026-08-04 18:14:11,278 [INFO] [Total] Página 114: 1000 registros (1000 nuevos) (52s)
+2026-08-04 18:15:03,072 [INFO] [Total] Página 115: 1000 registros (1000 nuevos) (52s)
+2026-08-04 18:15:54,918 [INFO] [Total] Página 116: 1000 registros (1000 nuevos) (52s)
+2026-08-04 18:16:45,603 [INFO] [Total] Página 117: 1000 registros (1000 nuevos) (51s)
+2026-08-04 18:17:36,958 [INFO] [Total] Página 118: 1000 registros (1000 nuevos) (51s)
+2026-08-04 18:18:28,705 [INFO] [Total] Página 119: 1000 registros (1000 nuevos) (52s)
+2026-08-04 18:19:18,388 [INFO] [Total] Página 120: 1000 registros (1000 nuevos) (50s)
+2026-08-04 18:20:10,936 [INFO] [Total] Página 121: 1000 registros (1000 nuevos) (52s)
+2026-08-04 18:21:03,278 [INFO] [Total] Página 122: 1000 registros (1000 nuevos) (52s)
+2026-08-04 18:21:55,298 [INFO] [Total] Página 123: 1000 registros (1000 nuevos) (52s)
+2026-08-04 18:22:54,211 [INFO] [Total] Página 124: 1000 registros (1000 nuevos) (59s)
+2026-08-04 18:23:46,814 [INFO] [Total] Página 125: 1000 registros (1000 nuevos) (53s)
+2026-08-04 18:24:39,647 [INFO] [Total] Página 126: 1000 registros (1000 nuevos) (53s)
+2026-08-04 18:25:29,838 [INFO] [Total] Página 127: 1000 registros (1000 nuevos) (50s)
+2026-08-04 18:26:21,161 [INFO] [Total] Página 128: 1000 registros (1000 nuevos) (51s)
+2026-08-04 18:32:57,314 [INFO] [Total] Página 129: 1000 registros (1000 nuevos) (55s)
+2026-08-04 18:37:01,343 [INFO] [Total] Página 130: 1000 registros (1000 nuevos) (52s)
+2026-08-04 18:37:54,374 [INFO] [Total] Página 131: 1000 registros (1000 nuevos) (53s)
+2026-08-04 18:38:46,749 [INFO] [Total] Página 132: 1000 registros (1000 nuevos) (52s)
+2026-08-04 18:39:36,122 [INFO] [Total] Página 133: 1000 registros (1000 nuevos) (49s)
+2026-08-04 18:40:25,773 [INFO] [Total] Página 134: 1000 registros (1000 nuevos) (50s)
+2026-08-04 18:41:15,628 [INFO] [Total] Página 135: 1000 registros (1000 nuevos) (50s)
+2026-08-04 18:42:05,208 [INFO] [Total] Página 136: 1000 registros (1000 nuevos) (50s)
+2026-08-04 18:43:01,500 [INFO] [Total] Página 137: 1000 registros (1000 nuevos) (56s)
+2026-08-04 18:43:51,773 [INFO] [Total] Página 138: 1000 registros (1000 nuevos) (50s)
+2026-08-04 18:44:42,717 [INFO] [Total] Página 139: 1000 registros (1000 nuevos) (51s)
+2026-08-04 18:45:33,936 [INFO] [Total] Página 140: 1000 registros (1000 nuevos) (51s)
+2026-08-04 18:46:24,203 [INFO] [Total] Página 141: 1000 registros (1000 nuevos) (50s)
+2026-08-04 18:47:21,083 [INFO] [Total] Página 142: 1000 registros (1000 nuevos) (57s)
+2026-08-04 18:48:17,171 [INFO] [Total] Página 143: 1000 registros (1000 nuevos) (56s)
+2026-08-04 18:49:09,126 [INFO] [Total] Página 144: 1000 registros (1000 nuevos) (52s)
+2026-08-04 18:50:00,708 [INFO] [Total] Página 145: 1000 registros (1000 nuevos) (52s)
+2026-08-04 18:50:52,937 [INFO] [Total] Página 146: 1000 registros (1000 nuevos) (52s)
+2026-08-04 18:51:44,721 [INFO] [Total] Página 147: 1000 registros (1000 nuevos) (52s)
+2026-08-04 18:52:37,301 [INFO] [Total] Página 148: 1000 registros (1000 nuevos) (53s)
+2026-08-04 18:53:34,053 [INFO] [Total] Página 149: 1000 registros (1000 nuevos) (57s)
+2026-08-04 18:54:24,834 [INFO] [Total] Página 150: 1000 registros (1000 nuevos) (51s)
+2026-08-04 18:55:15,594 [INFO] [Total] Página 151: 1000 registros (1000 nuevos) (51s)
+2026-08-04 18:56:05,981 [INFO] [Total] Página 152: 1000 registros (1000 nuevos) (50s)
+2026-08-04 18:56:56,332 [INFO] [Total] Página 153: 1000 registros (1000 nuevos) (50s)
+2026-08-04 18:57:49,113 [INFO] [Total] Página 154: 1000 registros (1000 nuevos) (53s)
+2026-08-04 18:58:39,109 [INFO] [Total] Página 155: 1000 registros (1000 nuevos) (50s)
+2026-08-04 18:59:28,735 [INFO] [Total] Página 156: 1000 registros (1000 nuevos) (50s)
+2026-08-04 19:00:18,511 [INFO] [Total] Página 157: 1000 registros (1000 nuevos) (50s)
+2026-08-04 19:01:08,134 [INFO] [Total] Página 158: 1000 registros (1000 nuevos) (50s)
+2026-08-04 19:01:58,829 [INFO] [Total] Página 159: 1000 registros (1000 nuevos) (51s)
+2026-08-04 19:02:53,246 [INFO] [Total] Página 160: 1000 registros (1000 nuevos) (54s)
+2026-08-04 19:03:44,930 [INFO] [Total] Página 161: 1000 registros (1000 nuevos) (52s)
+2026-08-04 19:04:35,414 [INFO] [Total] Página 162: 1000 registros (1000 nuevos) (50s)
+2026-08-04 19:05:25,936 [INFO] [Total] Página 163: 1000 registros (1000 nuevos) (50s)
+2026-08-04 19:06:16,046 [INFO] [Total] Página 164: 1000 registros (1000 nuevos) (50s)
+2026-08-04 19:07:06,024 [INFO] [Total] Página 165: 1000 registros (1000 nuevos) (50s)
+2026-08-04 19:07:58,672 [INFO] [Total] Página 166: 1000 registros (1000 nuevos) (53s)
+2026-08-04 19:08:48,672 [INFO] [Total] Página 167: 1000 registros (1000 nuevos) (50s)
+2026-08-04 19:09:37,383 [INFO] [Total] Página 168: 1000 registros (1000 nuevos) (49s)
+2026-08-04 19:10:27,236 [INFO] [Total] Página 169: 1000 registros (1000 nuevos) (50s)
+2026-08-04 19:11:17,257 [INFO] [Total] Página 170: 1000 registros (1000 nuevos) (50s)
+2026-08-04 19:12:06,385 [INFO] [Total] Página 171: 1000 registros (1000 nuevos) (49s)
+2026-08-04 19:13:08,743 [INFO] [Total] Página 172: 1000 registros (1000 nuevos) (62s)
+2026-08-04 19:13:59,916 [INFO] [Total] Página 173: 1000 registros (1000 nuevos) (51s)
+2026-08-04 19:14:52,581 [INFO] [Total] Página 174: 1000 registros (1000 nuevos) (53s)
+2026-08-04 19:15:43,134 [INFO] [Total] Página 175: 1000 registros (1000 nuevos) (51s)
+2026-08-04 19:16:34,301 [INFO] [Total] Página 176: 1000 registros (1000 nuevos) (51s)
+2026-08-04 19:17:25,875 [INFO] [Total] Página 177: 1000 registros (1000 nuevos) (52s)
+2026-08-04 19:18:17,980 [INFO] [Total] Página 178: 1000 registros (1000 nuevos) (52s)
+2026-08-04 19:19:07,829 [INFO] [Total] Página 179: 1000 registros (1000 nuevos) (50s)
+2026-08-04 19:19:57,108 [INFO] [Total] Página 180: 1000 registros (1000 nuevos) (49s)
+2026-08-04 19:20:47,147 [INFO] [Total] Página 181: 1000 registros (1000 nuevos) (50s)
+2026-08-04 19:21:36,891 [INFO] [Total] Página 182: 1000 registros (1000 nuevos) (50s)
+2026-08-04 19:22:31,405 [INFO] [Total] Página 183: 1000 registros (1000 nuevos) (54s)
+2026-08-04 19:23:25,648 [INFO] [Total] Página 184: 1000 registros (1000 nuevos) (54s)
+2026-08-04 19:24:18,012 [INFO] [Total] Página 185: 1000 registros (1000 nuevos) (52s)
+2026-08-04 19:25:10,029 [INFO] [Total] Página 186: 1000 registros (1000 nuevos) (52s)
+2026-08-04 19:26:01,269 [INFO] [Total] Página 187: 1000 registros (1000 nuevos) (51s)
+2026-08-04 19:26:52,040 [INFO] [Total] Página 188: 1000 registros (1000 nuevos) (51s)
+2026-08-04 19:27:44,651 [INFO] [Total] Página 189: 1000 registros (1000 nuevos) (53s)
+2026-08-04 19:28:35,675 [INFO] [Total] Página 190: 1000 registros (1000 nuevos) (51s)
+2026-08-04 19:29:25,749 [INFO] [Total] Página 191: 1000 registros (1000 nuevos) (50s)
+2026-08-04 19:30:16,480 [INFO] [Total] Página 192: 1000 registros (1000 nuevos) (51s)
+2026-08-04 19:31:07,236 [INFO] [Total] Página 193: 1000 registros (1000 nuevos) (51s)
+2026-08-04 19:31:57,854 [INFO] [Total] Página 194: 1000 registros (1000 nuevos) (51s)
+2026-08-04 19:32:50,832 [INFO] [Total] Página 195: 1000 registros (1000 nuevos) (53s)
+2026-08-04 19:33:41,353 [INFO] [Total] Página 196: 1000 registros (1000 nuevos) (50s)
+2026-08-04 19:34:30,641 [INFO] [Total] Página 197: 1000 registros (1000 nuevos) (49s)
+2026-08-04 19:35:19,792 [INFO] [Total] Página 198: 1000 registros (1000 nuevos) (49s)
+2026-08-04 19:36:09,094 [INFO] [Total] Página 199: 1000 registros (1000 nuevos) (49s)
+2026-08-04 19:36:57,041 [INFO] [Total] Página 200: 1000 registros (1000 nuevos) (48s)
+2026-08-04 19:37:51,529 [INFO] [Total] Página 201: 1000 registros (1000 nuevos) (54s)
+2026-08-04 19:38:43,061 [INFO] [Total] Página 202: 1000 registros (1000 nuevos) (51s)
+2026-08-04 19:39:35,581 [INFO] [Total] Página 203: 1000 registros (1000 nuevos) (52s)
+2026-08-04 19:40:25,804 [INFO] [Total] Página 204: 1000 registros (1000 nuevos) (50s)
+2026-08-04 19:41:16,262 [INFO] [Total] Página 205: 1000 registros (1000 nuevos) (50s)
+2026-08-04 19:42:07,637 [INFO] [Total] Página 206: 1000 registros (1000 nuevos) (51s)
+2026-08-04 19:43:03,254 [INFO] [Total] Página 207: 1000 registros (1000 nuevos) (56s)
+2026-08-04 19:43:53,526 [INFO] [Total] Página 208: 1000 registros (1000 nuevos) (50s)
+2026-08-04 19:44:43,546 [INFO] [Total] Página 209: 1000 registros (1000 nuevos) (50s)
+2026-08-04 19:45:33,385 [INFO] [Total] Página 210: 1000 registros (1000 nuevos) (50s)
+2026-08-04 19:46:22,947 [INFO] [Total] Página 211: 1000 registros (1000 nuevos) (50s)
+2026-08-04 19:47:11,854 [INFO] [Total] Página 212: 1000 registros (1000 nuevos) (49s)
+2026-08-04 19:48:04,611 [INFO] [Total] Página 213: 1000 registros (1000 nuevos) (53s)
+2026-08-04 19:48:54,234 [INFO] [Total] Página 214: 1000 registros (1000 nuevos) (50s)
+2026-08-04 21:25:31,834 [INFO] === Inicio de carga | lote c7c583bd-9434-4f4c-8f7b-484ee7862355 | modo completa ===
+2026-08-04 21:25:31,835 [INFO] Usando reporte(s) COMPLETO(s) (carga inicial).
+2026-08-04 21:26:21,744 [INFO] [Total] Página 1: 1000 registros (1000 nuevos) (50s)
+2026-08-04 21:27:10,867 [INFO] [Total] Página 2: 1000 registros (1000 nuevos) (49s)
+2026-08-04 21:28:02,680 [INFO] [Total] Página 3: 1000 registros (1000 nuevos) (52s)
+2026-08-04 21:28:51,166 [INFO] [Total] Página 4: 1000 registros (1000 nuevos) (48s)
+2026-08-04 21:29:39,259 [INFO] [Total] Página 5: 1000 registros (1000 nuevos) (48s)
+2026-08-04 21:30:28,125 [INFO] [Total] Página 6: 1000 registros (1000 nuevos) (49s)
+2026-08-04 21:31:19,019 [INFO] [Total] Página 7: 1000 registros (1000 nuevos) (51s)
+2026-08-04 21:32:11,500 [INFO] [Total] Página 8: 1000 registros (1000 nuevos) (52s)
+2026-08-04 21:33:05,357 [INFO] [Total] Página 9: 1000 registros (1000 nuevos) (54s)
+2026-08-04 21:33:56,929 [INFO] [Total] Página 10: 1000 registros (1000 nuevos) (52s)
+2026-08-04 21:34:48,312 [INFO] [Total] Página 11: 1000 registros (1000 nuevos) (51s)
+2026-08-04 21:35:38,326 [INFO] [Total] Página 12: 1000 registros (1000 nuevos) (50s)
+2026-08-04 21:36:26,729 [INFO] [Total] Página 13: 1000 registros (1000 nuevos) (48s)
+2026-08-04 21:37:15,204 [INFO] [Total] Página 14: 1000 registros (1000 nuevos) (48s)
+2026-08-04 21:38:08,358 [INFO] [Total] Página 15: 1000 registros (1000 nuevos) (53s)
+2026-08-04 21:38:57,804 [INFO] [Total] Página 16: 1000 registros (1000 nuevos) (49s)
+2026-08-04 21:39:48,356 [INFO] [Total] Página 17: 1000 registros (1000 nuevos) (51s)
+2026-08-04 21:40:37,525 [INFO] [Total] Página 18: 1000 registros (1000 nuevos) (49s)
+2026-08-04 21:41:26,395 [INFO] [Total] Página 19: 1000 registros (1000 nuevos) (49s)
+2026-08-04 21:42:17,360 [INFO] [Total] Página 20: 1000 registros (1000 nuevos) (51s)
+2026-08-04 21:43:12,119 [INFO] [Total] Página 21: 1000 registros (1000 nuevos) (55s)
+2026-08-04 21:44:02,274 [INFO] [Total] Página 22: 1000 registros (1000 nuevos) (50s)
+2026-08-04 21:44:53,671 [INFO] [Total] Página 23: 1000 registros (1000 nuevos) (51s)
+2026-08-04 21:45:43,643 [INFO] [Total] Página 24: 1000 registros (1000 nuevos) (50s)
+2026-08-04 21:46:35,172 [INFO] [Total] Página 25: 1000 registros (1000 nuevos) (51s)
+2026-08-04 21:47:26,981 [INFO] [Total] Página 26: 1000 registros (1000 nuevos) (52s)
+2026-08-04 21:48:19,737 [INFO] [Total] Página 27: 1000 registros (1000 nuevos) (53s)
+2026-08-04 21:49:10,451 [INFO] [Total] Página 28: 1000 registros (1000 nuevos) (51s)
+2026-08-04 21:50:00,473 [INFO] [Total] Página 29: 1000 registros (1000 nuevos) (50s)
+2026-08-04 21:50:51,404 [INFO] [Total] Página 30: 1000 registros (1000 nuevos) (51s)
+2026-08-04 21:51:42,475 [INFO] [Total] Página 31: 1000 registros (1000 nuevos) (51s)
+2026-08-04 21:52:36,294 [INFO] [Total] Página 32: 1000 registros (1000 nuevos) (54s)
+2026-08-04 21:53:29,004 [INFO] [Total] Página 33: 1000 registros (1000 nuevos) (53s)
+2026-08-04 21:54:21,813 [INFO] [Total] Página 34: 1000 registros (1000 nuevos) (53s)
+2026-08-04 21:55:14,459 [INFO] [Total] Página 35: 1000 registros (1000 nuevos) (53s)
+2026-08-04 21:56:05,836 [INFO] [Total] Página 36: 1000 registros (1000 nuevos) (51s)
+2026-08-04 21:56:57,163 [INFO] [Total] Página 37: 1000 registros (1000 nuevos) (51s)
+2026-08-04 21:57:50,330 [INFO] [Total] Página 38: 1000 registros (1000 nuevos) (53s)
+2026-08-04 21:58:41,914 [INFO] [Total] Página 39: 1000 registros (1000 nuevos) (52s)
+2026-08-04 21:59:32,567 [INFO] [Total] Página 40: 1000 registros (1000 nuevos) (51s)
+2026-08-04 22:00:23,449 [INFO] [Total] Página 41: 1000 registros (1000 nuevos) (51s)
+2026-08-04 22:01:13,821 [INFO] [Total] Página 42: 1000 registros (1000 nuevos) (50s)
+2026-08-04 22:02:04,865 [INFO] [Total] Página 43: 1000 registros (1000 nuevos) (51s)
+2026-08-04 22:03:00,788 [INFO] [Total] Página 44: 1000 registros (1000 nuevos) (56s)
+2026-08-04 22:03:52,375 [INFO] [Total] Página 45: 1000 registros (1000 nuevos) (52s)
+2026-08-04 22:04:41,762 [INFO] [Total] Página 46: 1000 registros (1000 nuevos) (49s)
+2026-08-04 22:05:31,243 [INFO] [Total] Página 47: 1000 registros (1000 nuevos) (49s)
+2026-08-04 22:06:21,088 [INFO] [Total] Página 48: 1000 registros (1000 nuevos) (50s)
+2026-08-04 22:07:11,630 [INFO] [Total] Página 49: 1000 registros (1000 nuevos) (50s)
+2026-08-04 22:08:03,377 [INFO] [Total] Página 50: 1000 registros (1000 nuevos) (52s)
+2026-08-04 22:08:53,692 [INFO] [Total] Página 51: 1000 registros (1000 nuevos) (50s)
+2026-08-04 22:09:47,849 [INFO] [Total] Página 52: 1000 registros (1000 nuevos) (54s)
+2026-08-04 22:10:42,125 [INFO] [Total] Página 53: 1000 registros (1000 nuevos) (54s)
+2026-08-04 22:11:35,243 [INFO] [Total] Página 54: 1000 registros (1000 nuevos) (53s)
+2026-08-04 22:12:29,026 [INFO] [Total] Página 55: 1000 registros (1000 nuevos) (54s)
+2026-08-04 22:13:25,254 [INFO] [Total] Página 56: 1000 registros (1000 nuevos) (56s)
+2026-08-04 22:14:17,899 [INFO] [Total] Página 57: 1000 registros (1000 nuevos) (53s)
+2026-08-04 22:15:09,057 [INFO] [Total] Página 58: 1000 registros (1000 nuevos) (51s)
+2026-08-04 22:15:59,848 [INFO] [Total] Página 59: 1000 registros (1000 nuevos) (51s)
+2026-08-04 22:16:50,352 [INFO] [Total] Página 60: 1000 registros (1000 nuevos) (50s)
+2026-08-04 22:17:42,541 [INFO] [Total] Página 61: 1000 registros (1000 nuevos) (52s)
+2026-08-04 22:18:33,213 [INFO] [Total] Página 62: 1000 registros (1000 nuevos) (51s)
+2026-08-04 22:19:22,444 [INFO] [Total] Página 63: 1000 registros (1000 nuevos) (49s)
+2026-08-04 22:20:11,253 [INFO] [Total] Página 64: 1000 registros (1000 nuevos) (49s)
+2026-08-04 22:21:00,142 [INFO] [Total] Página 65: 1000 registros (1000 nuevos) (49s)
+2026-08-04 22:21:49,852 [INFO] [Total] Página 66: 1000 registros (1000 nuevos) (50s)
+2026-08-04 22:22:41,339 [INFO] [Total] Página 67: 1000 registros (1000 nuevos) (51s)
+2026-08-04 22:23:31,626 [INFO] [Total] Página 68: 1000 registros (1000 nuevos) (50s)
+2026-08-04 22:24:20,916 [INFO] [Total] Página 69: 1000 registros (1000 nuevos) (49s)
+2026-08-04 22:25:10,563 [INFO] [Total] Página 70: 1000 registros (1000 nuevos) (50s)
+2026-08-04 22:26:00,468 [INFO] [Total] Página 71: 1000 registros (1000 nuevos) (50s)
+2026-08-04 22:26:50,710 [INFO] [Total] Página 72: 1000 registros (1000 nuevos) (50s)
+2026-08-04 22:27:43,399 [INFO] [Total] Página 73: 1000 registros (1000 nuevos) (53s)
+2026-08-04 22:28:32,740 [INFO] [Total] Página 74: 1000 registros (1000 nuevos) (49s)
+2026-08-04 22:29:23,215 [INFO] [Total] Página 75: 1000 registros (1000 nuevos) (50s)
+2026-08-04 22:30:15,267 [INFO] [Total] Página 76: 1000 registros (1000 nuevos) (52s)
+2026-08-04 22:31:06,993 [INFO] [Total] Página 77: 1000 registros (1000 nuevos) (52s)
+2026-08-04 22:31:57,466 [INFO] [Total] Página 78: 1000 registros (1000 nuevos) (50s)
+2026-08-04 22:32:50,943 [INFO] [Total] Página 79: 1000 registros (1000 nuevos) (53s)
+2026-08-04 22:33:41,672 [INFO] [Total] Página 80: 1000 registros (1000 nuevos) (51s)
+2026-08-04 22:34:31,147 [INFO] [Total] Página 81: 1000 registros (1000 nuevos) (49s)
+2026-08-04 22:35:20,546 [INFO] [Total] Página 82: 1000 registros (1000 nuevos) (49s)
+2026-08-04 22:36:10,123 [INFO] [Total] Página 83: 1000 registros (1000 nuevos) (50s)
+2026-08-04 22:36:59,244 [INFO] [Total] Página 84: 1000 registros (1000 nuevos) (49s)
+2026-08-04 22:37:50,722 [INFO] [Total] Página 85: 1000 registros (1000 nuevos) (51s)
+2026-08-04 22:38:43,445 [INFO] [Total] Página 86: 1000 registros (1000 nuevos) (53s)
+2026-08-04 22:39:37,244 [INFO] [Total] Página 87: 1000 registros (1000 nuevos) (54s)
+2026-08-04 22:40:29,444 [INFO] [Total] Página 88: 1000 registros (1000 nuevos) (52s)
+2026-08-04 22:41:19,876 [INFO] [Total] Página 89: 1000 registros (1000 nuevos) (50s)
+2026-08-04 22:42:11,384 [INFO] [Total] Página 90: 1000 registros (1000 nuevos) (51s)
+2026-08-04 22:43:05,737 [INFO] [Total] Página 91: 1000 registros (1000 nuevos) (54s)
+2026-08-04 22:44:00,282 [INFO] [Total] Página 92: 1000 registros (1000 nuevos) (54s)
+2026-08-04 22:44:52,013 [INFO] [Total] Página 93: 1000 registros (1000 nuevos) (52s)
+2026-08-04 22:45:44,771 [INFO] [Total] Página 94: 1000 registros (1000 nuevos) (53s)
+2026-08-04 22:46:35,614 [INFO] [Total] Página 95: 1000 registros (1000 nuevos) (51s)
+2026-08-04 22:47:31,415 [INFO] [Total] Página 96: 1000 registros (1000 nuevos) (56s)
+2026-08-04 22:48:26,369 [INFO] [Total] Página 97: 1000 registros (1000 nuevos) (55s)
+2026-08-04 22:49:19,104 [INFO] [Total] Página 98: 1000 registros (1000 nuevos) (53s)
+2026-08-04 22:50:10,335 [INFO] [Total] Página 99: 1000 registros (1000 nuevos) (51s)
+2026-08-04 22:51:01,206 [INFO] [Total] Página 100: 1000 registros (1000 nuevos) (51s)
+2026-08-04 22:51:50,861 [INFO] [Total] Página 101: 1000 registros (1000 nuevos) (50s)
+2026-08-04 22:52:46,035 [INFO] [Total] Página 102: 1000 registros (1000 nuevos) (55s)
+2026-08-04 22:53:37,419 [INFO] [Total] Página 103: 1000 registros (1000 nuevos) (51s)
+2026-08-04 22:54:27,901 [INFO] [Total] Página 104: 1000 registros (1000 nuevos) (50s)
+2026-08-04 22:55:17,737 [INFO] [Total] Página 105: 1000 registros (1000 nuevos) (50s)
+2026-08-04 22:56:08,789 [INFO] [Total] Página 106: 1000 registros (1000 nuevos) (51s)
+2026-08-04 22:57:01,318 [INFO] [Total] Página 107: 1000 registros (1000 nuevos) (52s)
+2026-08-04 22:57:57,042 [INFO] [Total] Página 108: 1000 registros (1000 nuevos) (56s)
+2026-08-04 22:58:48,784 [INFO] [Total] Página 109: 1000 registros (1000 nuevos) (52s)
+2026-08-04 22:59:42,478 [INFO] [Total] Página 110: 1000 registros (1000 nuevos) (54s)
+2026-08-04 23:00:34,087 [INFO] [Total] Página 111: 1000 registros (1000 nuevos) (52s)
+2026-08-04 23:01:25,192 [INFO] [Total] Página 112: 1000 registros (1000 nuevos) (51s)
+2026-08-04 23:02:16,906 [INFO] [Total] Página 113: 1000 registros (1000 nuevos) (52s)
+2026-08-04 23:03:09,587 [INFO] [Total] Página 114: 1000 registros (1000 nuevos) (53s)
+2026-08-04 23:03:59,311 [INFO] [Total] Página 115: 1000 registros (1000 nuevos) (50s)
+2026-08-04 23:04:49,147 [INFO] [Total] Página 116: 1000 registros (1000 nuevos) (50s)
+2026-08-04 23:05:40,245 [INFO] [Total] Página 117: 1000 registros (1000 nuevos) (51s)
+2026-08-04 23:06:29,450 [INFO] [Total] Página 118: 1000 registros (1000 nuevos) (49s)
+2026-08-04 23:07:19,575 [INFO] [Total] Página 119: 1000 registros (1000 nuevos) (50s)
+2026-08-04 23:08:16,085 [INFO] [Total] Página 120: 1000 registros (1000 nuevos) (56s)
+2026-08-04 23:09:09,522 [INFO] [Total] Página 121: 1000 registros (1000 nuevos) (53s)
+2026-08-04 23:10:00,719 [INFO] [Total] Página 122: 1000 registros (1000 nuevos) (51s)
+2026-08-04 23:10:53,388 [INFO] [Total] Página 123: 1000 registros (1000 nuevos) (53s)
+2026-08-04 23:11:46,275 [INFO] [Total] Página 124: 1000 registros (1000 nuevos) (53s)
+2026-08-04 23:12:37,997 [INFO] [Total] Página 125: 1000 registros (1000 nuevos) (52s)
+2026-08-04 23:13:30,805 [INFO] [Total] Página 126: 1000 registros (1000 nuevos) (53s)
+2026-08-04 23:14:23,437 [INFO] [Total] Página 127: 1000 registros (1000 nuevos) (53s)
+2026-08-04 23:15:14,219 [INFO] [Total] Página 128: 1000 registros (1000 nuevos) (51s)
+2026-08-04 23:16:03,909 [INFO] [Total] Página 129: 1000 registros (1000 nuevos) (50s)
+2026-08-04 23:16:55,027 [INFO] [Total] Página 130: 1000 registros (1000 nuevos) (51s)
+2026-08-04 23:17:47,626 [INFO] [Total] Página 131: 1000 registros (1000 nuevos) (53s)
+2026-08-04 23:18:41,859 [INFO] [Total] Página 132: 1000 registros (1000 nuevos) (54s)
+2026-08-04 23:19:34,525 [INFO] [Total] Página 133: 1000 registros (1000 nuevos) (53s)
+2026-08-04 23:20:25,377 [INFO] [Total] Página 134: 1000 registros (1000 nuevos) (51s)
+2026-08-04 23:21:16,410 [INFO] [Total] Página 135: 1000 registros (1000 nuevos) (51s)
+2026-08-04 23:22:08,014 [INFO] [Total] Página 136: 1000 registros (1000 nuevos) (52s)
+2026-08-04 23:23:02,389 [INFO] [Total] Página 137: 1000 registros (1000 nuevos) (54s)
+2026-08-04 23:23:52,880 [INFO] [Total] Página 138: 1000 registros (1000 nuevos) (50s)
+2026-08-04 23:24:42,602 [INFO] [Total] Página 139: 1000 registros (1000 nuevos) (50s)
+2026-08-04 23:30:01,563 [INFO] [Total] Página 140: 1000 registros (1000 nuevos) (49s)
+2026-08-04 23:30:51,889 [INFO] [Total] Página 141: 1000 registros (1000 nuevos) (50s)
+2026-08-04 23:31:42,345 [INFO] [Total] Página 142: 1000 registros (1000 nuevos) (50s)
+2026-08-04 23:32:34,659 [INFO] [Total] Página 143: 1000 registros (1000 nuevos) (52s)
+2026-08-04 23:33:25,306 [INFO] [Total] Página 144: 1000 registros (1000 nuevos) (51s)
+2026-08-04 23:34:15,147 [INFO] [Total] Página 145: 1000 registros (1000 nuevos) (50s)
+2026-08-04 23:35:03,930 [INFO] [Total] Página 146: 1000 registros (1000 nuevos) (49s)
+2026-08-04 23:35:52,000 [INFO] [Total] Página 147: 1000 registros (1000 nuevos) (48s)
+2026-08-04 23:36:39,636 [INFO] [Total] Página 148: 1000 registros (1000 nuevos) (48s)
+2026-08-04 23:37:29,538 [INFO] [Total] Página 149: 1000 registros (1000 nuevos) (50s)
+2026-08-04 23:38:18,446 [INFO] [Total] Página 150: 1000 registros (1000 nuevos) (49s)
+2026-08-04 23:39:05,552 [INFO] [Total] Página 151: 1000 registros (1000 nuevos) (47s)
+2026-08-04 23:39:53,619 [INFO] [Total] Página 152: 1000 registros (1000 nuevos) (48s)
+2026-08-04 23:40:41,808 [INFO] [Total] Página 153: 1000 registros (1000 nuevos) (48s)
+2026-08-04 23:41:31,472 [INFO] [Total] Página 154: 1000 registros (1000 nuevos) (50s)
+2026-08-04 23:42:23,771 [INFO] [Total] Página 155: 1000 registros (1000 nuevos) (52s)
+2026-08-04 23:43:14,899 [INFO] [Total] Página 156: 1000 registros (1000 nuevos) (51s)
+2026-08-04 23:44:03,615 [INFO] [Total] Página 157: 1000 registros (1000 nuevos) (49s)
+2026-08-04 23:44:52,879 [INFO] [Total] Página 158: 1000 registros (1000 nuevos) (49s)
+2026-08-04 23:45:42,807 [INFO] [Total] Página 159: 1000 registros (1000 nuevos) (50s)
+2026-08-04 23:46:33,097 [INFO] [Total] Página 160: 1000 registros (1000 nuevos) (50s)
+2026-08-04 23:47:23,539 [INFO] [Total] Página 161: 1000 registros (1000 nuevos) (50s)
+2026-08-04 23:48:14,865 [INFO] [Total] Página 162: 1000 registros (1000 nuevos) (51s)
+2026-08-04 23:49:03,906 [INFO] [Total] Página 163: 1000 registros (1000 nuevos) (49s)
+2026-08-04 23:49:51,976 [INFO] [Total] Página 164: 1000 registros (1000 nuevos) (48s)
+2026-08-04 23:50:39,770 [INFO] [Total] Página 165: 1000 registros (1000 nuevos) (48s)
+2026-08-04 23:51:27,394 [INFO] [Total] Página 166: 1000 registros (1000 nuevos) (48s)
+2026-08-04 23:52:15,343 [INFO] [Total] Página 167: 1000 registros (1000 nuevos) (48s)
+2026-08-04 23:53:07,015 [INFO] [Total] Página 168: 1000 registros (1000 nuevos) (52s)
+2026-08-04 23:53:56,652 [INFO] [Total] Página 169: 1000 registros (1000 nuevos) (50s)
+2026-08-04 23:54:46,907 [INFO] [Total] Página 170: 1000 registros (1000 nuevos) (50s)
+2026-08-04 23:55:38,216 [INFO] [Total] Página 171: 1000 registros (1000 nuevos) (51s)
+2026-08-04 23:56:28,345 [INFO] [Total] Página 172: 1000 registros (1000 nuevos) (50s)
+2026-08-04 23:57:18,872 [INFO] [Total] Página 173: 1000 registros (1000 nuevos) (50s)
+2026-08-04 23:58:12,760 [INFO] [Total] Página 174: 1000 registros (1000 nuevos) (54s)
+2026-08-04 23:59:02,885 [INFO] [Total] Página 175: 1000 registros (1000 nuevos) (50s)
+2026-08-04 23:59:50,685 [INFO] [Total] Página 176: 1000 registros (1000 nuevos) (48s)
+2026-08-05 00:00:38,434 [INFO] [Total] Página 177: 1000 registros (1000 nuevos) (48s)
+2026-08-05 00:01:26,379 [INFO] [Total] Página 178: 1000 registros (1000 nuevos) (48s)
+2026-08-05 00:02:16,977 [INFO] [Total] Página 179: 1000 registros (1000 nuevos) (51s)
+2026-08-05 00:03:09,159 [INFO] [Total] Página 180: 1000 registros (1000 nuevos) (52s)
+2026-08-05 00:03:58,753 [INFO] [Total] Página 181: 1000 registros (1000 nuevos) (50s)
+2026-08-05 00:04:50,229 [INFO] [Total] Página 182: 1000 registros (1000 nuevos) (51s)
+2026-08-05 00:05:42,793 [INFO] [Total] Página 183: 1000 registros (1000 nuevos) (53s)
+2026-08-05 00:06:34,569 [INFO] [Total] Página 184: 1000 registros (1000 nuevos) (52s)
+2026-08-05 00:07:30,086 [INFO] [Total] Página 185: 1000 registros (1000 nuevos) (55s)
+2026-08-05 00:08:23,189 [INFO] [Total] Página 186: 1000 registros (1000 nuevos) (53s)
+2026-08-05 00:09:13,416 [INFO] [Total] Página 187: 1000 registros (1000 nuevos) (50s)
+2026-08-05 00:10:04,064 [INFO] [Total] Página 188: 1000 registros (1000 nuevos) (51s)
+2026-08-05 00:10:54,611 [INFO] [Total] Página 189: 1000 registros (1000 nuevos) (51s)
+2026-08-05 00:11:46,311 [INFO] [Total] Página 190: 1000 registros (1000 nuevos) (52s)
+2026-08-05 00:12:40,091 [INFO] [Total] Página 191: 1000 registros (1000 nuevos) (54s)
+2026-08-05 00:13:31,615 [INFO] [Total] Página 192: 1000 registros (1000 nuevos) (51s)
+2026-08-05 00:14:22,805 [INFO] [Total] Página 193: 1000 registros (1000 nuevos) (51s)
+2026-08-05 00:15:13,733 [INFO] [Total] Página 194: 1000 registros (1000 nuevos) (51s)
+2026-08-05 00:16:03,756 [INFO] [Total] Página 195: 1000 registros (1000 nuevos) (50s)
+2026-08-05 00:16:52,982 [INFO] [Total] Página 196: 1000 registros (1000 nuevos) (49s)
+2026-08-05 00:17:44,560 [INFO] [Total] Página 197: 1000 registros (1000 nuevos) (52s)
+2026-08-05 00:18:34,630 [INFO] [Total] Página 198: 1000 registros (1000 nuevos) (50s)
+2026-08-05 00:19:24,014 [INFO] [Total] Página 199: 1000 registros (1000 nuevos) (49s)
+2026-08-05 00:20:13,569 [INFO] [Total] Página 200: 1000 registros (1000 nuevos) (50s)
+2026-08-05 00:21:03,568 [INFO] [Total] Página 201: 1000 registros (1000 nuevos) (50s)
+2026-08-05 00:21:53,841 [INFO] [Total] Página 202: 1000 registros (1000 nuevos) (50s)
+2026-08-05 00:22:47,215 [INFO] [Total] Página 203: 1000 registros (1000 nuevos) (53s)
+2026-08-05 00:23:38,997 [INFO] [Total] Página 204: 1000 registros (1000 nuevos) (52s)
+2026-08-05 00:24:28,619 [INFO] [Total] Página 205: 1000 registros (1000 nuevos) (50s)
+2026-08-05 00:25:18,433 [INFO] [Total] Página 206: 1000 registros (1000 nuevos) (50s)
+2026-08-05 00:26:07,953 [INFO] [Total] Página 207: 1000 registros (1000 nuevos) (49s)
+2026-08-05 00:26:58,648 [INFO] [Total] Página 208: 1000 registros (1000 nuevos) (51s)
+2026-08-05 00:27:51,971 [INFO] [Total] Página 209: 1000 registros (1000 nuevos) (53s)
+2026-08-05 00:28:42,879 [INFO] [Total] Página 210: 1000 registros (1000 nuevos) (51s)
+2026-08-05 00:29:33,155 [INFO] [Total] Página 211: 1000 registros (1000 nuevos) (50s)
+2026-08-05 00:30:23,161 [INFO] [Total] Página 212: 1000 registros (1000 nuevos) (50s)
+2026-08-05 00:31:12,722 [INFO] [Total] Página 213: 1000 registros (1000 nuevos) (50s)
+2026-08-05 00:32:02,231 [INFO] [Total] Página 214: 1000 registros (1000 nuevos) (49s)
+2026-08-05 00:32:54,654 [INFO] [Total] Página 215: 1000 registros (1000 nuevos) (52s)
+2026-08-05 00:33:43,552 [INFO] [Total] Página 216: 1000 registros (1000 nuevos) (49s)
+2026-08-05 00:34:31,409 [INFO] [Total] Página 217: 1000 registros (1000 nuevos) (48s)
+2026-08-05 00:35:19,736 [INFO] [Total] Página 218: 1000 registros (1000 nuevos) (48s)
+2026-08-05 00:36:09,672 [INFO] [Total] Página 219: 1000 registros (1000 nuevos) (50s)
+2026-08-05 00:37:00,730 [INFO] [Total] Página 220: 1000 registros (1000 nuevos) (51s)
+2026-08-05 00:37:55,072 [INFO] [Total] Página 221: 1000 registros (1000 nuevos) (54s)
+2026-08-05 00:38:48,072 [INFO] [Total] Página 222: 1000 registros (1000 nuevos) (53s)
+2026-08-05 00:39:38,868 [INFO] [Total] Página 223: 1000 registros (1000 nuevos) (51s)
+2026-08-05 00:40:27,991 [INFO] [Total] Página 224: 1000 registros (1000 nuevos) (49s)
+2026-08-05 00:41:20,527 [INFO] [Total] Página 225: 1000 registros (1000 nuevos) (52s)
+2026-08-05 00:42:09,610 [INFO] [Total] Página 226: 1000 registros (1000 nuevos) (49s)
+2026-08-05 00:43:02,672 [INFO] [Total] Página 227: 1000 registros (1000 nuevos) (53s)
+2026-08-05 00:43:53,975 [INFO] [Total] Página 228: 1000 registros (1000 nuevos) (51s)
+2026-08-05 00:44:43,306 [INFO] [Total] Página 229: 1000 registros (1000 nuevos) (49s)
+2026-08-05 00:45:33,082 [INFO] [Total] Página 230: 1000 registros (1000 nuevos) (50s)
+2026-08-05 00:46:23,534 [INFO] [Total] Página 231: 1000 registros (1000 nuevos) (50s)
+2026-08-05 00:47:14,223 [INFO] [Total] Página 232: 1000 registros (1000 nuevos) (51s)
+2026-08-05 00:48:07,376 [INFO] [Total] Página 233: 1000 registros (1000 nuevos) (53s)
+2026-08-05 00:48:59,873 [INFO] [Total] Página 234: 1000 registros (1000 nuevos) (52s)
+2026-08-05 00:49:53,435 [INFO] [Total] Página 235: 1000 registros (1000 nuevos) (54s)
+2026-08-05 00:50:45,754 [INFO] [Total] Página 236: 1000 registros (1000 nuevos) (52s)
+2026-08-05 00:51:37,470 [INFO] [Total] Página 237: 1000 registros (1000 nuevos) (52s)
+2026-08-05 00:52:29,373 [INFO] [Total] Página 238: 1000 registros (1000 nuevos) (52s)
+2026-08-05 00:53:20,502 [INFO] [Total] Página 239: 1000 registros (1000 nuevos) (51s)
+2026-08-05 00:54:08,935 [INFO] [Total] Página 240: 1000 registros (1000 nuevos) (48s)
+2026-08-05 00:54:57,439 [INFO] [Total] Página 241: 1000 registros (1000 nuevos) (48s)
+2026-08-05 00:55:45,727 [INFO] [Total] Página 242: 1000 registros (1000 nuevos) (48s)
+2026-08-05 00:56:33,740 [INFO] [Total] Página 243: 1000 registros (1000 nuevos) (48s)
+2026-08-05 00:57:25,506 [INFO] [Total] Página 244: 1000 registros (1000 nuevos) (52s)
+2026-08-05 00:58:18,188 [INFO] [Total] Página 245: 1000 registros (1000 nuevos) (53s)
+2026-08-05 00:59:08,389 [INFO] [Total] Página 246: 1000 registros (1000 nuevos) (50s)
+2026-08-05 00:59:57,390 [INFO] [Total] Página 247: 1000 registros (1000 nuevos) (49s)
+2026-08-05 01:00:47,837 [INFO] [Total] Página 248: 1000 registros (1000 nuevos) (50s)
+2026-08-05 01:01:36,638 [INFO] [Total] Página 249: 1000 registros (1000 nuevos) (49s)
+2026-08-05 01:02:27,615 [INFO] [Total] Página 250: 1000 registros (1000 nuevos) (51s)
+2026-08-05 01:03:17,036 [INFO] [Total] Página 251: 1000 registros (1000 nuevos) (49s)
+2026-08-05 10:45:41,530 [INFO] === Inicio de carga | lote 97373465-7efa-4f83-b536-839489a1307b | modo completa ===
+2026-08-05 10:45:41,534 [INFO] Usando reporte(s) COMPLETO(s) (carga inicial).
+2026-08-05 10:46:05,575 [INFO] [Total 1/3] Página 1: 1000 registros (1000 nuevos) (24s)
+2026-08-05 10:46:26,236 [INFO] [Total 1/3] Página 2: 1000 registros (1000 nuevos) (21s)
+2026-08-05 10:46:47,024 [INFO] [Total 1/3] Página 3: 1000 registros (1000 nuevos) (21s)
+2026-08-05 10:47:07,847 [INFO] [Total 1/3] Página 4: 1000 registros (1000 nuevos) (21s)
+2026-08-05 10:47:28,455 [INFO] [Total 1/3] Página 5: 1000 registros (1000 nuevos) (21s)
+2026-08-05 10:47:59,254 [INFO] [Total 1/3] Página 6: 1000 registros (1000 nuevos) (31s)
+2026-08-05 10:48:21,969 [INFO] [Total 1/3] Página 7: 1000 registros (1000 nuevos) (23s)
+2026-08-05 10:48:53,594 [INFO] [Total 1/3] Página 8: 1000 registros (1000 nuevos) (32s)
+2026-08-05 10:49:14,380 [INFO] [Total 1/3] Página 9: 1000 registros (1000 nuevos) (21s)
+2026-08-05 10:49:39,508 [INFO] [Total 1/3] Página 10: 1000 registros (1000 nuevos) (25s)
+2026-08-05 10:50:00,779 [INFO] [Total 1/3] Página 11: 1000 registros (1000 nuevos) (21s)
+2026-08-05 10:50:23,564 [INFO] [Total 1/3] Página 12: 1000 registros (1000 nuevos) (23s)
+2026-08-05 10:50:44,749 [INFO] [Total 1/3] Página 13: 1000 registros (1000 nuevos) (21s)
+2026-08-05 10:51:10,537 [INFO] [Total 1/3] Página 14: 1000 registros (1000 nuevos) (26s)
+2026-08-05 10:51:32,903 [INFO] [Total 1/3] Página 15: 1000 registros (1000 nuevos) (22s)
+2026-08-05 10:51:56,343 [INFO] [Total 1/3] Página 16: 1000 registros (1000 nuevos) (23s)
+2026-08-05 10:52:17,798 [INFO] [Total 1/3] Página 17: 1000 registros (1000 nuevos) (21s)
+2026-08-05 10:52:43,183 [INFO] [Total 1/3] Página 18: 1000 registros (1000 nuevos) (25s)
+2026-08-05 10:53:04,404 [INFO] [Total 1/3] Página 19: 1000 registros (1000 nuevos) (21s)
+2026-08-05 10:53:25,969 [INFO] [Total 1/3] Página 20: 1000 registros (1000 nuevos) (22s)
+2026-08-05 10:53:46,105 [INFO] [Total 1/3] Página 21: 1000 registros (1000 nuevos) (20s)
+2026-08-05 10:54:08,939 [INFO] [Total 1/3] Página 22: 1000 registros (1000 nuevos) (23s)
+2026-08-05 10:54:29,297 [INFO] [Total 1/3] Página 23: 1000 registros (1000 nuevos) (20s)
+2026-08-05 10:54:49,776 [INFO] [Total 1/3] Página 24: 1000 registros (1000 nuevos) (20s)
+2026-08-05 10:55:09,664 [INFO] [Total 1/3] Página 25: 1000 registros (1000 nuevos) (20s)
+2026-08-05 10:55:31,635 [INFO] [Total 1/3] Página 26: 1000 registros (1000 nuevos) (22s)
+2026-08-05 10:55:52,731 [INFO] [Total 1/3] Página 27: 1000 registros (1000 nuevos) (21s)
+2026-08-05 10:56:12,538 [INFO] [Total 1/3] Página 28: 1000 registros (1000 nuevos) (20s)
+2026-08-05 10:56:33,453 [INFO] [Total 1/3] Página 29: 1000 registros (1000 nuevos) (21s)
+2026-08-05 10:56:54,007 [INFO] [Total 1/3] Página 30: 1000 registros (1000 nuevos) (21s)
+2026-08-05 10:57:14,216 [INFO] [Total 1/3] Página 31: 1000 registros (1000 nuevos) (20s)
+2026-08-05 10:57:36,511 [INFO] [Total 1/3] Página 32: 1000 registros (1000 nuevos) (22s)
+2026-08-05 10:58:02,366 [INFO] [Total 1/3] Página 33: 1000 registros (1000 nuevos) (26s)
+2026-08-05 10:58:27,115 [INFO] [Total 1/3] Página 34: 1000 registros (1000 nuevos) (25s)
+2026-08-05 10:58:48,765 [INFO] [Total 1/3] Página 35: 1000 registros (1000 nuevos) (22s)
+2026-08-05 10:59:10,883 [INFO] [Total 1/3] Página 36: 1000 registros (1000 nuevos) (22s)
+2026-08-05 10:59:33,422 [INFO] [Total 1/3] Página 37: 1000 registros (1000 nuevos) (22s)
+2026-08-05 10:59:55,433 [INFO] [Total 1/3] Página 38: 1000 registros (1000 nuevos) (21s)
+2026-08-05 11:32:51,716 [INFO] [Total 1/3] Página 39: 1000 registros (1000 nuevos) (22s)
+2026-08-05 11:33:18,918 [INFO] [Total 1/3] Página 40: 1000 registros (1000 nuevos) (27s)
+2026-08-05 11:33:42,236 [INFO] [Total 1/3] Página 41: 1000 registros (1000 nuevos) (23s)
+2026-08-05 11:34:06,353 [INFO] [Total 1/3] Página 42: 1000 registros (1000 nuevos) (24s)
+2026-08-05 11:34:32,880 [INFO] [Total 1/3] Página 43: 1000 registros (1000 nuevos) (26s)
+2026-08-05 11:34:53,542 [INFO] [Total 1/3] Página 44: 1000 registros (1000 nuevos) (21s)
+2026-08-05 11:35:16,919 [INFO] [Total 1/3] Página 45: 1000 registros (1000 nuevos) (23s)
+2026-08-05 11:35:41,978 [INFO] [Total 1/3] Página 46: 1000 registros (1000 nuevos) (25s)
+2026-08-05 11:36:02,804 [INFO] [Total 1/3] Página 47: 1000 registros (1000 nuevos) (21s)
+2026-08-05 11:36:23,582 [INFO] [Total 1/3] Página 48: 1000 registros (1000 nuevos) (21s)
+2026-08-05 11:36:45,334 [INFO] [Total 1/3] Página 49: 1000 registros (1000 nuevos) (22s)
+2026-08-05 11:37:31,853 [INFO] [Total 1/3] Página 50: 1000 registros (1000 nuevos) (46s)
+2026-08-05 11:37:56,156 [INFO] [Total 1/3] Página 51: 1000 registros (1000 nuevos) (24s)
+2026-08-05 11:38:19,272 [INFO] [Total 1/3] Página 52: 1000 registros (1000 nuevos) (23s)
+2026-08-05 11:38:51,054 [INFO] [Total 1/3] Página 53: 1000 registros (1000 nuevos) (32s)
+2026-08-05 11:39:11,300 [INFO] [Total 1/3] Página 54: 1000 registros (1000 nuevos) (20s)
+2026-08-05 11:39:32,079 [INFO] [Total 1/3] Página 55: 1000 registros (1000 nuevos) (21s)
+2026-08-05 11:39:52,743 [INFO] [Total 1/3] Página 56: 1000 registros (1000 nuevos) (21s)
+2026-08-05 11:40:14,685 [INFO] [Total 1/3] Página 57: 1000 registros (1000 nuevos) (22s)
+2026-08-05 11:40:34,825 [INFO] [Total 1/3] Página 58: 1000 registros (1000 nuevos) (20s)
+2026-08-05 11:40:55,493 [INFO] [Total 1/3] Página 59: 1000 registros (1000 nuevos) (21s)
+2026-08-05 11:41:16,051 [INFO] [Total 1/3] Página 60: 1000 registros (1000 nuevos) (21s)
+2026-08-05 11:41:36,654 [INFO] [Total 1/3] Página 61: 1000 registros (1000 nuevos) (21s)
+2026-08-05 11:41:57,504 [INFO] [Total 1/3] Página 62: 1000 registros (1000 nuevos) (21s)
+2026-08-05 11:42:20,550 [INFO] [Total 1/3] Página 63: 1000 registros (1000 nuevos) (23s)
+2026-08-05 11:42:43,783 [INFO] [Total 1/3] Página 64: 1000 registros (1000 nuevos) (23s)
+2026-08-05 11:43:04,822 [INFO] [Total 1/3] Página 65: 1000 registros (1000 nuevos) (21s)
+2026-08-05 11:43:25,915 [INFO] [Total 1/3] Página 66: 1000 registros (1000 nuevos) (21s)
+2026-08-05 11:43:45,785 [INFO] [Total 1/3] Página 67: 1000 registros (1000 nuevos) (20s)
+2026-08-05 11:44:05,825 [INFO] [Total 1/3] Página 68: 1000 registros (1000 nuevos) (20s)
+2026-08-05 11:44:26,099 [INFO] [Total 1/3] Página 69: 1000 registros (1000 nuevos) (20s)
+2026-08-05 11:44:49,146 [INFO] [Total 1/3] Página 70: 1000 registros (1000 nuevos) (23s)
+2026-08-05 11:45:10,611 [INFO] [Total 1/3] Página 71: 1000 registros (1000 nuevos) (21s)
+2026-08-05 11:45:30,773 [INFO] [Total 1/3] Página 72: 1000 registros (1000 nuevos) (20s)
+2026-08-05 11:45:53,016 [INFO] [Total 1/3] Página 73: 1000 registros (1000 nuevos) (22s)
+2026-08-05 11:46:13,358 [INFO] [Total 1/3] Página 74: 1000 registros (1000 nuevos) (20s)
+2026-08-05 11:46:33,372 [INFO] [Total 1/3] Página 75: 1000 registros (1000 nuevos) (20s)
+2026-08-05 11:46:53,866 [INFO] [Total 1/3] Página 76: 1000 registros (1000 nuevos) (20s)
+2026-08-05 11:47:14,338 [INFO] [Total 1/3] Página 77: 1000 registros (1000 nuevos) (20s)
+2026-08-05 11:47:50,021 [INFO] [Total 1/3] Página 78: 1000 registros (1000 nuevos) (36s)
+2026-08-05 11:48:11,402 [INFO] [Total 1/3] Página 79: 1000 registros (1000 nuevos) (21s)
+2026-08-05 11:48:34,411 [INFO] [Total 1/3] Página 80: 1000 registros (1000 nuevos) (23s)
+2026-08-05 11:48:54,812 [INFO] [Total 1/3] Página 81: 1000 registros (1000 nuevos) (20s)
+2026-08-05 11:49:15,992 [INFO] [Total 1/3] Página 82: 1000 registros (1000 nuevos) (21s)
+2026-08-05 11:49:35,868 [INFO] [Total 1/3] Página 83: 1000 registros (1000 nuevos) (20s)
+2026-08-05 11:49:56,445 [INFO] [Total 1/3] Página 84: 1000 registros (1000 nuevos) (21s)
+2026-08-05 11:50:16,848 [INFO] [Total 1/3] Página 85: 1000 registros (1000 nuevos) (20s)
+2026-08-05 11:50:38,806 [INFO] [Total 1/3] Página 86: 1000 registros (1000 nuevos) (22s)
+2026-08-05 11:51:01,893 [INFO] [Total 1/3] Página 87: 1000 registros (1000 nuevos) (23s)
+2026-08-05 11:51:21,735 [INFO] [Total 1/3] Página 88: 1000 registros (1000 nuevos) (20s)
+2026-08-05 11:51:42,063 [INFO] [Total 1/3] Página 89: 1000 registros (1000 nuevos) (20s)
+2026-08-05 11:52:02,051 [INFO] [Total 1/3] Página 90: 1000 registros (1000 nuevos) (20s)
+2026-08-05 11:52:22,466 [INFO] [Total 1/3] Página 91: 1000 registros (1000 nuevos) (20s)
+2026-08-05 11:52:48,157 [INFO] [Total 1/3] Página 92: 1000 registros (1000 nuevos) (26s)
+2026-08-05 11:53:10,475 [INFO] [Total 1/3] Página 93: 1000 registros (1000 nuevos) (22s)
+2026-08-05 11:53:30,497 [INFO] [Total 1/3] Página 94: 1000 registros (1000 nuevos) (20s)
+2026-08-05 11:53:50,880 [INFO] [Total 1/3] Página 95: 1000 registros (1000 nuevos) (20s)
+2026-08-05 11:54:11,422 [INFO] [Total 1/3] Página 96: 1000 registros (1000 nuevos) (20s)
+2026-08-05 11:54:31,338 [INFO] [Total 1/3] Página 97: 1000 registros (1000 nuevos) (20s)
+2026-08-05 11:54:50,624 [INFO] [Total 1/3] Página 98: 1000 registros (1000 nuevos) (19s)
+2026-08-05 11:55:09,813 [INFO] [Total 1/3] Página 99: 1000 registros (1000 nuevos) (19s)
+2026-08-05 11:55:30,055 [INFO] [Total 1/3] Página 100: 1000 registros (1000 nuevos) (20s)
+2026-08-05 11:55:49,590 [INFO] [Total 1/3] Página 101: 1000 registros (1000 nuevos) (19s)
+2026-08-05 11:56:09,150 [INFO] [Total 1/3] Página 102: 1000 registros (1000 nuevos) (20s)
+2026-08-05 11:56:28,963 [INFO] [Total 1/3] Página 103: 1000 registros (1000 nuevos) (20s)
+2026-08-05 11:56:50,139 [INFO] [Total 1/3] Página 104: 1000 registros (1000 nuevos) (21s)
+2026-08-05 11:57:10,266 [INFO] [Total 1/3] Página 105: 1000 registros (1000 nuevos) (20s)
+2026-08-05 11:57:31,246 [INFO] [Total 1/3] Página 106: 1000 registros (1000 nuevos) (21s)
+2026-08-05 11:57:57,160 [INFO] [Total 1/3] Página 107: 1000 registros (1000 nuevos) (26s)
+2026-08-05 11:58:19,242 [INFO] [Total 1/3] Página 108: 1000 registros (1000 nuevos) (22s)
+2026-08-05 11:58:40,591 [INFO] [Total 1/3] Página 109: 1000 registros (1000 nuevos) (21s)
+2026-08-05 11:59:01,689 [INFO] [Total 1/3] Página 110: 1000 registros (1000 nuevos) (21s)
+2026-08-05 11:59:22,237 [INFO] [Total 1/3] Página 111: 1000 registros (1000 nuevos) (21s)
+2026-08-05 11:59:42,714 [INFO] [Total 1/3] Página 112: 1000 registros (1000 nuevos) (20s)
+2026-08-05 12:00:03,205 [INFO] [Total 1/3] Página 113: 1000 registros (1000 nuevos) (20s)
+2026-08-05 12:00:24,704 [INFO] [Total 1/3] Página 114: 1000 registros (1000 nuevos) (21s)
+2026-08-05 12:00:51,599 [INFO] [Total 1/3] Página 115: 1000 registros (1000 nuevos) (27s)
+2026-08-05 12:01:15,166 [INFO] [Total 1/3] Página 116: 1000 registros (1000 nuevos) (24s)
+2026-08-05 12:01:37,982 [INFO] [Total 1/3] Página 117: 1000 registros (1000 nuevos) (23s)
+2026-08-05 12:01:58,417 [INFO] [Total 1/3] Página 118: 1000 registros (1000 nuevos) (20s)
+2026-08-05 12:02:19,280 [INFO] [Total 1/3] Página 119: 1000 registros (1000 nuevos) (21s)
+2026-08-05 12:02:40,600 [INFO] [Total 1/3] Página 120: 1000 registros (1000 nuevos) (21s)
+2026-08-05 12:03:02,544 [INFO] [Total 1/3] Página 121: 1000 registros (1000 nuevos) (22s)
+2026-08-05 12:03:22,494 [INFO] [Total 1/3] Página 122: 1000 registros (1000 nuevos) (20s)
+2026-08-05 12:03:43,117 [INFO] [Total 1/3] Página 123: 1000 registros (1000 nuevos) (21s)
+2026-08-05 12:04:03,429 [INFO] [Total 1/3] Página 124: 1000 registros (1000 nuevos) (20s)
+2026-08-05 12:04:24,145 [INFO] [Total 1/3] Página 125: 1000 registros (1000 nuevos) (21s)
+2026-08-05 12:04:44,772 [INFO] [Total 1/3] Página 126: 1000 registros (1000 nuevos) (21s)
+2026-08-05 12:05:05,020 [INFO] [Total 1/3] Página 127: 1000 registros (1000 nuevos) (20s)
+2026-08-05 12:05:25,857 [INFO] [Total 1/3] Página 128: 1000 registros (1000 nuevos) (21s)
+2026-08-05 12:05:46,413 [INFO] [Total 1/3] Página 129: 1000 registros (1000 nuevos) (20s)
+2026-08-05 12:06:06,930 [INFO] [Total 1/3] Página 130: 1000 registros (1000 nuevos) (20s)
+2026-08-05 12:06:27,689 [INFO] [Total 1/3] Página 131: 1000 registros (1000 nuevos) (21s)
+2026-08-05 12:06:48,334 [INFO] [Total 1/3] Página 132: 1000 registros (1000 nuevos) (21s)
+2026-08-05 12:07:09,238 [INFO] [Total 1/3] Página 133: 1000 registros (1000 nuevos) (21s)
+2026-08-05 12:07:32,723 [INFO] [Total 1/3] Página 134: 1000 registros (1000 nuevos) (23s)
+2026-08-05 12:08:06,168 [INFO] [Total 1/3] Página 135: 1000 registros (1000 nuevos) (33s)
+2026-08-05 12:08:29,954 [INFO] [Total 1/3] Página 136: 1000 registros (1000 nuevos) (24s)
+2026-08-05 12:08:56,160 [INFO] [Total 1/3] Página 137: 1000 registros (1000 nuevos) (26s)
+2026-08-05 12:09:21,065 [INFO] [Total 1/3] Página 138: 1000 registros (1000 nuevos) (25s)
+2026-08-05 12:09:41,958 [INFO] [Total 1/3] Página 139: 1000 registros (1000 nuevos) (21s)
+2026-08-05 12:10:02,021 [INFO] [Total 1/3] Página 140: 1000 registros (1000 nuevos) (20s)
+2026-08-05 12:10:21,899 [INFO] [Total 1/3] Página 141: 1000 registros (1000 nuevos) (20s)
+2026-08-05 12:10:43,081 [INFO] [Total 1/3] Página 142: 1000 registros (1000 nuevos) (21s)
+2026-08-05 12:11:03,458 [INFO] [Total 1/3] Página 143: 1000 registros (1000 nuevos) (20s)
+2026-08-05 12:11:23,917 [INFO] [Total 1/3] Página 144: 1000 registros (1000 nuevos) (20s)
+2026-08-05 12:11:44,445 [INFO] [Total 1/3] Página 145: 1000 registros (1000 nuevos) (20s)
+2026-08-05 12:12:05,710 [INFO] [Total 1/3] Página 146: 1000 registros (1000 nuevos) (21s)
+2026-08-05 12:12:27,709 [INFO] [Total 1/3] Página 147: 1000 registros (1000 nuevos) (22s)
+2026-08-05 12:12:49,538 [INFO] [Total 1/3] Página 148: 1000 registros (1000 nuevos) (22s)
+2026-08-05 12:13:14,799 [INFO] [Total 1/3] Página 149: 1000 registros (1000 nuevos) (25s)
+2026-08-05 12:13:34,733 [INFO] [Total 1/3] Página 150: 1000 registros (1000 nuevos) (20s)
+2026-08-05 12:13:58,328 [INFO] [Total 1/3] Página 151: 1000 registros (1000 nuevos) (24s)
+2026-08-05 12:14:18,672 [INFO] [Total 1/3] Página 152: 1000 registros (1000 nuevos) (20s)
+2026-08-05 12:14:39,326 [INFO] [Total 1/3] Página 153: 1000 registros (1000 nuevos) (21s)
+2026-08-05 12:14:59,592 [INFO] [Total 1/3] Página 154: 1000 registros (1000 nuevos) (20s)
+2026-08-05 12:15:20,263 [INFO] [Total 1/3] Página 155: 1000 registros (1000 nuevos) (21s)
+2026-08-05 12:15:42,986 [INFO] [Total 1/3] Página 156: 1000 registros (1000 nuevos) (23s)
+2026-08-05 12:16:07,013 [INFO] [Total 1/3] Página 157: 1000 registros (1000 nuevos) (24s)
+2026-08-05 12:16:30,828 [INFO] [Total 1/3] Página 158: 1000 registros (1000 nuevos) (24s)
+2026-08-05 12:16:54,417 [INFO] [Total 1/3] Página 159: 1000 registros (1000 nuevos) (24s)
+2026-08-05 12:17:17,957 [INFO] [Total 1/3] Página 160: 1000 registros (1000 nuevos) (23s)
+2026-08-05 12:17:40,950 [INFO] [Total 1/3] Página 161: 1000 registros (1000 nuevos) (23s)
+2026-08-05 12:18:02,429 [INFO] [Total 1/3] Página 162: 1000 registros (1000 nuevos) (21s)
+2026-08-05 12:18:27,038 [INFO] [Total 1/3] Página 163: 1000 registros (1000 nuevos) (25s)
+2026-08-05 12:18:47,185 [INFO] [Total 1/3] Página 164: 1000 registros (1000 nuevos) (20s)
+2026-08-05 12:19:10,731 [INFO] [Total 1/3] Página 165: 1000 registros (1000 nuevos) (23s)
+2026-08-05 12:19:30,772 [INFO] [Total 1/3] Página 166: 1000 registros (1000 nuevos) (20s)
+2026-08-05 12:19:51,305 [INFO] [Total 1/3] Página 167: 1000 registros (1000 nuevos) (20s)
+2026-08-05 12:20:10,970 [INFO] [Total 1/3] Página 168: 1000 registros (1000 nuevos) (20s)
+2026-08-05 12:20:30,733 [INFO] [Total 1/3] Página 169: 1000 registros (1000 nuevos) (20s)
+2026-08-05 12:20:52,892 [INFO] [Total 1/3] Página 170: 385 registros (385 nuevos) (22s)
+2026-08-05 12:21:16,488 [INFO] [Total 2/3] Página 1: 1000 registros (1000 nuevos) (23s)
+2026-08-05 12:21:38,007 [INFO] [Total 2/3] Página 2: 1000 registros (1000 nuevos) (21s)
+2026-08-05 12:22:00,381 [INFO] [Total 2/3] Página 3: 1000 registros (1000 nuevos) (22s)
+2026-08-05 12:22:27,638 [INFO] [Total 2/3] Página 4: 1000 registros (1000 nuevos) (27s)
+2026-08-05 12:22:56,959 [INFO] [Total 2/3] Página 5: 1000 registros (1000 nuevos) (29s)
+2026-08-05 12:23:35,098 [INFO] [Total 2/3] Página 6: 1000 registros (1000 nuevos) (38s)
+2026-08-05 12:24:17,031 [INFO] [Total 2/3] Página 7: 1000 registros (1000 nuevos) (42s)
+2026-08-05 12:24:49,632 [INFO] [Total 2/3] Página 8: 1000 registros (1000 nuevos) (33s)
+2026-08-05 12:25:15,885 [INFO] [Total 2/3] Página 9: 1000 registros (1000 nuevos) (26s)
+2026-08-05 12:25:36,718 [INFO] [Total 2/3] Página 10: 1000 registros (1000 nuevos) (21s)
+2026-08-05 12:25:56,350 [INFO] [Total 2/3] Página 11: 1000 registros (1000 nuevos) (20s)
+2026-08-05 12:26:15,945 [INFO] [Total 2/3] Página 12: 1000 registros (1000 nuevos) (20s)
+2026-08-05 12:26:43,909 [INFO] [Total 2/3] Página 13: 1000 registros (1000 nuevos) (28s)
+2026-08-05 12:27:13,164 [INFO] [Total 2/3] Página 14: 1000 registros (1000 nuevos) (29s)
+2026-08-05 12:27:47,033 [INFO] [Total 2/3] Página 15: 1000 registros (1000 nuevos) (34s)
+2026-08-05 12:28:16,034 [INFO] [Total 2/3] Página 16: 1000 registros (1000 nuevos) (29s)
+2026-08-05 12:28:37,731 [INFO] [Total 2/3] Página 17: 1000 registros (1000 nuevos) (22s)
+2026-08-05 12:29:09,026 [INFO] [Total 2/3] Página 18: 1000 registros (1000 nuevos) (31s)
+2026-08-05 12:29:35,808 [INFO] [Total 2/3] Página 19: 1000 registros (1000 nuevos) (27s)
+2026-08-05 12:29:58,694 [INFO] [Total 2/3] Página 20: 1000 registros (1000 nuevos) (23s)
+2026-08-05 12:30:18,308 [INFO] [Total 2/3] Página 21: 1000 registros (1000 nuevos) (20s)
+2026-08-05 12:30:45,580 [INFO] [Total 2/3] Página 22: 1000 registros (1000 nuevos) (27s)
+2026-08-05 12:31:05,448 [INFO] [Total 2/3] Página 23: 1000 registros (1000 nuevos) (20s)
+2026-08-05 12:31:25,096 [INFO] [Total 2/3] Página 24: 1000 registros (1000 nuevos) (20s)
+2026-08-05 12:31:47,805 [INFO] [Total 2/3] Página 25: 1000 registros (1000 nuevos) (23s)
+2026-08-05 12:32:08,509 [INFO] [Total 2/3] Página 26: 1000 registros (1000 nuevos) (21s)
+2026-08-05 12:32:32,345 [INFO] [Total 2/3] Página 27: 1000 registros (1000 nuevos) (24s)
+2026-08-05 12:33:01,592 [INFO] [Total 2/3] Página 28: 1000 registros (1000 nuevos) (29s)
+2026-08-05 12:33:30,603 [INFO] [Total 2/3] Página 29: 1000 registros (1000 nuevos) (29s)
+2026-08-05 12:33:53,595 [INFO] [Total 2/3] Página 30: 1000 registros (1000 nuevos) (23s)
+2026-08-05 12:34:20,307 [INFO] [Total 2/3] Página 31: 1000 registros (1000 nuevos) (27s)
+2026-08-05 12:34:46,514 [INFO] [Total 2/3] Página 32: 1000 registros (1000 nuevos) (26s)
+2026-08-05 12:35:12,692 [INFO] [Total 2/3] Página 33: 1000 registros (1000 nuevos) (26s)
+2026-08-05 12:35:36,782 [INFO] [Total 2/3] Página 34: 1000 registros (1000 nuevos) (24s)
+2026-08-05 12:35:58,331 [INFO] [Total 2/3] Página 35: 1000 registros (1000 nuevos) (21s)
+2026-08-05 12:44:55,181 [INFO] [Total 2/3] Página 36: 1000 registros (1000 nuevos) (24s)
+2026-08-05 12:45:17,121 [INFO] [Total 2/3] Página 37: 1000 registros (1000 nuevos) (22s)
+2026-08-05 12:45:37,113 [INFO] [Total 2/3] Página 38: 1000 registros (1000 nuevos) (20s)
+2026-08-05 12:45:56,546 [INFO] [Total 2/3] Página 39: 1000 registros (1000 nuevos) (19s)
+2026-08-05 12:46:16,867 [INFO] [Total 2/3] Página 40: 1000 registros (1000 nuevos) (20s)
+2026-08-05 12:46:39,882 [INFO] [Total 2/3] Página 41: 1000 registros (1000 nuevos) (23s)
+2026-08-05 12:47:00,091 [INFO] [Total 2/3] Página 42: 1000 registros (1000 nuevos) (20s)
+2026-08-05 12:47:20,591 [INFO] [Total 2/3] Página 43: 1000 registros (1000 nuevos) (20s)
+2026-08-05 12:47:58,332 [INFO] [Total 2/3] Página 44: 1000 registros (1000 nuevos) (38s)
+2026-08-05 12:48:22,581 [INFO] [Total 2/3] Página 45: 1000 registros (1000 nuevos) (24s)
+2026-08-05 12:48:44,037 [INFO] [Total 2/3] Página 46: 1000 registros (1000 nuevos) (21s)
+2026-08-05 12:49:06,040 [INFO] [Total 2/3] Página 47: 1000 registros (1000 nuevos) (22s)
+2026-08-05 12:49:27,852 [INFO] [Total 2/3] Página 48: 1000 registros (1000 nuevos) (22s)
+2026-08-05 12:49:47,665 [INFO] [Total 2/3] Página 49: 1000 registros (1000 nuevos) (20s)
+2026-08-05 12:50:06,482 [INFO] [Total 2/3] Página 50: 1000 registros (1000 nuevos) (19s)
+2026-08-05 12:50:27,936 [INFO] [Total 2/3] Página 51: 1000 registros (1000 nuevos) (21s)
+2026-08-05 12:50:55,793 [INFO] [Total 2/3] Página 52: 1000 registros (1000 nuevos) (28s)
+2026-08-05 12:51:16,683 [INFO] [Total 2/3] Página 53: 1000 registros (1000 nuevos) (21s)
+2026-08-05 12:51:39,630 [INFO] [Total 2/3] Página 54: 1000 registros (1000 nuevos) (23s)
+2026-08-05 12:52:13,595 [INFO] [Total 2/3] Página 55: 1000 registros (1000 nuevos) (34s)
+2026-08-05 12:52:36,912 [INFO] [Total 2/3] Página 56: 1000 registros (1000 nuevos) (23s)
+2026-08-05 12:52:58,264 [INFO] [Total 2/3] Página 57: 1000 registros (1000 nuevos) (21s)
+2026-08-05 12:53:25,816 [INFO] [Total 2/3] Página 58: 1000 registros (1000 nuevos) (27s)
+2026-08-05 12:53:47,051 [INFO] [Total 2/3] Página 59: 1000 registros (1000 nuevos) (21s)
+2026-08-05 12:54:12,015 [INFO] [Total 2/3] Página 60: 1000 registros (1000 nuevos) (25s)
+2026-08-05 12:54:31,658 [INFO] [Total 2/3] Página 61: 1000 registros (1000 nuevos) (20s)
+2026-08-05 12:54:50,467 [INFO] [Total 2/3] Página 62: 1000 registros (1000 nuevos) (19s)
+2026-08-05 12:55:09,201 [INFO] [Total 2/3] Página 63: 1000 registros (1000 nuevos) (19s)
+2026-08-05 12:55:35,513 [INFO] [Total 2/3] Página 64: 1000 registros (1000 nuevos) (26s)
+2026-08-05 12:55:55,984 [INFO] [Total 2/3] Página 65: 1000 registros (1000 nuevos) (20s)
+2026-08-05 12:56:19,058 [INFO] [Total 2/3] Página 66: 1000 registros (1000 nuevos) (23s)
+2026-08-05 12:56:43,556 [INFO] [Total 2/3] Página 67: 1000 registros (1000 nuevos) (24s)
+2026-08-05 12:57:03,733 [INFO] [Total 2/3] Página 68: 1000 registros (1000 nuevos) (20s)
+2026-08-05 12:57:32,655 [INFO] [Total 2/3] Página 69: 1000 registros (1000 nuevos) (29s)
+2026-08-05 12:58:01,329 [INFO] [Total 2/3] Página 70: 1000 registros (1000 nuevos) (29s)
+2026-08-05 12:58:26,185 [INFO] [Total 2/3] Página 71: 1000 registros (1000 nuevos) (25s)
+2026-08-05 12:58:50,660 [INFO] [Total 2/3] Página 72: 1000 registros (1000 nuevos) (24s)
+2026-08-05 12:59:14,154 [INFO] [Total 2/3] Página 73: 1000 registros (1000 nuevos) (23s)
+2026-08-05 12:59:36,288 [INFO] [Total 2/3] Página 74: 1000 registros (1000 nuevos) (22s)
+2026-08-05 12:59:57,547 [INFO] [Total 2/3] Página 75: 1000 registros (1000 nuevos) (21s)
+2026-08-05 13:00:17,772 [INFO] [Total 2/3] Página 76: 1000 registros (1000 nuevos) (20s)
+2026-08-05 13:00:43,248 [INFO] [Total 2/3] Página 77: 1000 registros (1000 nuevos) (25s)
+2026-08-05 13:01:11,786 [INFO] [Total 2/3] Página 78: 1000 registros (1000 nuevos) (28s)
+2026-08-05 13:01:35,865 [INFO] [Total 2/3] Página 79: 1000 registros (1000 nuevos) (24s)
+2026-08-05 13:02:00,177 [INFO] [Total 2/3] Página 80: 1000 registros (1000 nuevos) (24s)
+2026-08-05 13:02:20,536 [INFO] [Total 2/3] Página 81: 1000 registros (1000 nuevos) (20s)
+2026-08-05 13:02:54,847 [INFO] [Total 2/3] Página 82: 1000 registros (1000 nuevos) (34s)
+2026-08-05 13:03:24,288 [INFO] [Total 2/3] Página 83: 1000 registros (1000 nuevos) (29s)
+2026-08-05 13:03:50,161 [INFO] [Total 2/3] Página 84: 1000 registros (1000 nuevos) (26s)
+2026-08-05 13:04:10,706 [INFO] [Total 2/3] Página 85: 1000 registros (1000 nuevos) (20s)
+2026-08-05 13:04:37,005 [INFO] [Total 2/3] Página 86: 1000 registros (1000 nuevos) (26s)
+2026-08-05 13:05:01,490 [INFO] [Total 2/3] Página 87: 1000 registros (1000 nuevos) (24s)
+2026-08-05 13:05:20,315 [INFO] [Total 2/3] Página 88: 1000 registros (1000 nuevos) (19s)
+2026-08-05 13:05:47,739 [INFO] [Total 2/3] Página 89: 1000 registros (1000 nuevos) (27s)
+2026-08-05 13:06:16,275 [INFO] [Total 2/3] Página 90: 1000 registros (1000 nuevos) (28s)
+2026-08-05 13:06:39,502 [INFO] [Total 2/3] Página 91: 1000 registros (1000 nuevos) (23s)
+2026-08-05 13:07:04,610 [INFO] [Total 2/3] Página 92: 1000 registros (1000 nuevos) (25s)
+2026-08-05 13:07:28,079 [INFO] [Total 2/3] Página 93: 1000 registros (1000 nuevos) (23s)
+2026-08-05 13:08:00,821 [INFO] [Total 2/3] Página 94: 1000 registros (1000 nuevos) (33s)
+2026-08-05 13:08:28,195 [INFO] [Total 2/3] Página 95: 1000 registros (1000 nuevos) (27s)
+2026-08-05 13:08:48,175 [INFO] [Total 2/3] Página 96: 1000 registros (1000 nuevos) (20s)
+2026-08-05 13:09:13,859 [INFO] [Total 2/3] Página 97: 1000 registros (1000 nuevos) (26s)
+2026-08-05 13:09:33,138 [INFO] [Total 2/3] Página 98: 1000 registros (1000 nuevos) (19s)
+2026-08-05 13:09:51,864 [INFO] [Total 2/3] Página 99: 1000 registros (1000 nuevos) (19s)
+2026-08-05 13:10:13,713 [INFO] [Total 2/3] Página 100: 1000 registros (1000 nuevos) (22s)
+2026-08-05 13:10:40,039 [INFO] [Total 2/3] Página 101: 1000 registros (1000 nuevos) (26s)
+2026-08-05 13:11:00,199 [INFO] [Total 2/3] Página 102: 1000 registros (1000 nuevos) (20s)
+2026-08-05 13:11:18,986 [INFO] [Total 2/3] Página 103: 1000 registros (1000 nuevos) (19s)
+2026-08-05 13:11:40,764 [INFO] [Total 2/3] Página 104: 1000 registros (1000 nuevos) (22s)
+2026-08-05 13:11:59,101 [INFO] [Total 2/3] Página 105: 1000 registros (1000 nuevos) (18s)
+2026-08-05 13:12:25,032 [INFO] [Total 2/3] Página 106: 1000 registros (1000 nuevos) (26s)
+2026-08-05 13:12:53,750 [INFO] [Total 2/3] Página 107: 1000 registros (1000 nuevos) (29s)
+2026-08-05 13:13:16,760 [INFO] [Total 2/3] Página 108: 1000 registros (1000 nuevos) (23s)
+2026-08-05 13:13:36,414 [INFO] [Total 2/3] Página 109: 1000 registros (1000 nuevos) (20s)
+2026-08-05 13:13:55,176 [INFO] [Total 2/3] Página 110: 1000 registros (1000 nuevos) (19s)
+2026-08-05 13:14:16,413 [INFO] [Total 2/3] Página 111: 1000 registros (1000 nuevos) (21s)
+2026-08-05 13:14:37,089 [INFO] [Total 2/3] Página 112: 1000 registros (1000 nuevos) (21s)
+2026-08-05 13:14:57,733 [INFO] [Total 2/3] Página 113: 1000 registros (1000 nuevos) (21s)
+2026-08-05 13:15:25,172 [INFO] [Total 2/3] Página 114: 1000 registros (1000 nuevos) (27s)
+2026-08-05 13:15:46,152 [INFO] [Total 2/3] Página 115: 1000 registros (1000 nuevos) (21s)
+2026-08-05 13:16:04,967 [INFO] [Total 2/3] Página 116: 1000 registros (1000 nuevos) (19s)
+2026-08-05 13:16:23,875 [INFO] [Total 2/3] Página 117: 1000 registros (1000 nuevos) (19s)
+2026-08-05 13:16:44,278 [INFO] [Total 2/3] Página 118: 1000 registros (1000 nuevos) (20s)
+2026-08-05 13:17:16,278 [INFO] [Total 2/3] Página 119: 1000 registros (1000 nuevos) (32s)
+2026-08-05 13:17:36,994 [INFO] [Total 2/3] Página 120: 1000 registros (1000 nuevos) (21s)
+2026-08-05 13:18:04,919 [INFO] [Total 2/3] Página 121: 1000 registros (1000 nuevos) (28s)
+2026-08-05 13:18:26,752 [INFO] [Total 2/3] Página 122: 1000 registros (1000 nuevos) (22s)
+2026-08-05 13:18:47,743 [INFO] [Total 2/3] Página 123: 1000 registros (1000 nuevos) (21s)
+2026-08-05 13:19:14,113 [INFO] [Total 2/3] Página 124: 1000 registros (1000 nuevos) (26s)
+2026-08-05 13:19:37,869 [INFO] [Total 2/3] Página 125: 1000 registros (1000 nuevos) (24s)
+2026-08-05 13:19:57,301 [INFO] [Total 2/3] Página 126: 1000 registros (1000 nuevos) (19s)
+2026-08-05 13:20:27,136 [INFO] [Total 2/3] Página 127: 1000 registros (1000 nuevos) (30s)
+2026-08-05 13:20:46,798 [INFO] [Total 2/3] Página 128: 1000 registros (1000 nuevos) (20s)
+2026-08-05 13:21:08,363 [INFO] [Total 2/3] Página 129: 1000 registros (1000 nuevos) (22s)
+2026-08-05 13:21:26,507 [INFO] [Total 2/3] Página 130: 1000 registros (1000 nuevos) (18s)
+2026-08-05 13:21:47,598 [INFO] [Total 2/3] Página 131: 1000 registros (1000 nuevos) (21s)
+2026-08-05 13:22:06,499 [INFO] [Total 2/3] Página 132: 1000 registros (1000 nuevos) (19s)
+2026-08-05 13:22:30,597 [INFO] [Total 2/3] Página 133: 1000 registros (1000 nuevos) (24s)
+2026-08-05 13:22:50,610 [INFO] [Total 2/3] Página 134: 1000 registros (1000 nuevos) (20s)
+2026-08-05 13:23:17,850 [INFO] [Total 2/3] Página 135: 1000 registros (1000 nuevos) (27s)
+2026-08-05 13:23:41,806 [INFO] [Total 2/3] Página 136: 1000 registros (1000 nuevos) (24s)
+2026-08-05 13:24:10,627 [INFO] [Total 2/3] Página 137: 1000 registros (1000 nuevos) (29s)
+2026-08-05 13:24:34,034 [INFO] [Total 2/3] Página 138: 1000 registros (1000 nuevos) (23s)
+2026-08-05 13:24:57,415 [INFO] [Total 2/3] Página 139: 1000 registros (1000 nuevos) (23s)
+2026-08-05 13:35:13,948 [INFO] [Total 2/3] Página 140: 1000 registros (1000 nuevos) (27s)
+2026-08-05 13:35:44,682 [INFO] [Total 2/3] Página 141: 1000 registros (1000 nuevos) (31s)
+2026-08-05 13:36:17,399 [INFO] [Total 2/3] Página 142: 1000 registros (1000 nuevos) (33s)
+2026-08-05 13:36:39,223 [INFO] [Total 2/3] Página 143: 1000 registros (1000 nuevos) (22s)
+2026-08-05 13:37:02,671 [INFO] [Total 2/3] Página 144: 1000 registros (1000 nuevos) (23s)
+2026-08-05 13:37:26,202 [INFO] [Total 2/3] Página 145: 1000 registros (1000 nuevos) (23s)
+2026-08-05 13:38:01,169 [INFO] [Total 2/3] Página 146: 1000 registros (1000 nuevos) (35s)
+2026-08-05 13:38:25,672 [INFO] [Total 2/3] Página 147: 1000 registros (1000 nuevos) (24s)
+2026-08-05 13:38:47,486 [INFO] [Total 2/3] Página 148: 1000 registros (1000 nuevos) (22s)
+2026-08-05 13:39:06,712 [INFO] [Total 2/3] Página 149: 1000 registros (1000 nuevos) (19s)
+2026-08-05 13:39:27,941 [INFO] [Total 2/3] Página 150: 1000 registros (1000 nuevos) (21s)
+2026-08-05 13:39:52,322 [INFO] [Total 2/3] Página 151: 1000 registros (1000 nuevos) (24s)
+2026-08-05 13:40:15,084 [INFO] [Total 2/3] Página 152: 1000 registros (1000 nuevos) (23s)
+2026-08-05 13:40:36,530 [INFO] [Total 2/3] Página 153: 728 registros (728 nuevos) (21s)
+2026-08-05 13:41:06,605 [INFO] [Total 3/3] Página 1: 1000 registros (1000 nuevos) (29s)
+2026-08-05 13:41:25,028 [INFO] [Total 3/3] Página 2: 1000 registros (1000 nuevos) (18s)
+2026-08-05 13:41:46,827 [INFO] [Total 3/3] Página 3: 1000 registros (1000 nuevos) (22s)
+2026-08-05 13:42:05,008 [INFO] [Total 3/3] Página 4: 1000 registros (1000 nuevos) (18s)
+2026-08-05 13:42:20,746 [INFO] [Total 3/3] Página 5: 1000 registros (1000 nuevos) (16s)
+2026-08-05 13:42:44,505 [INFO] [Total 3/3] Página 6: 1000 registros (1000 nuevos) (24s)
+2026-08-05 13:42:55,308 [INFO] [Total 3/3] Página 7: 1000 registros (1000 nuevos) (11s)
+2026-08-05 13:43:10,658 [INFO] [Total 3/3] Página 8: 1000 registros (1000 nuevos) (15s)
+2026-08-05 13:43:21,531 [INFO] [Total 3/3] Página 9: 1000 registros (1000 nuevos) (11s)
+2026-08-05 13:43:31,971 [INFO] [Total 3/3] Página 10: 1000 registros (1000 nuevos) (10s)
+2026-08-05 13:43:42,474 [INFO] [Total 3/3] Página 11: 1000 registros (1000 nuevos) (10s)
+2026-08-05 13:43:53,277 [INFO] [Total 3/3] Página 12: 1000 registros (1000 nuevos) (11s)
+2026-08-05 13:44:04,122 [INFO] [Total 3/3] Página 13: 1000 registros (1000 nuevos) (11s)
+2026-08-05 13:44:14,725 [INFO] [Total 3/3] Página 14: 1000 registros (1000 nuevos) (11s)
+2026-08-05 13:44:25,258 [INFO] [Total 3/3] Página 15: 1000 registros (1000 nuevos) (10s)
+2026-08-05 13:44:35,441 [INFO] [Total 3/3] Página 16: 1000 registros (1000 nuevos) (10s)
+2026-08-05 13:44:45,361 [INFO] [Total 3/3] Página 17: 1000 registros (1000 nuevos) (10s)
+2026-08-05 13:44:55,838 [INFO] [Total 3/3] Página 18: 1000 registros (1000 nuevos) (10s)
+2026-08-05 13:45:08,900 [INFO] [Total 3/3] Página 19: 1000 registros (1000 nuevos) (13s)
+2026-08-05 13:45:19,681 [INFO] [Total 3/3] Página 20: 1000 registros (1000 nuevos) (11s)
+2026-08-05 13:45:29,600 [INFO] [Total 3/3] Página 21: 1000 registros (1000 nuevos) (10s)
+2026-08-05 13:45:39,634 [INFO] [Total 3/3] Página 22: 1000 registros (1000 nuevos) (10s)
+2026-08-05 13:45:49,988 [INFO] [Total 3/3] Página 23: 1000 registros (1000 nuevos) (10s)
+2026-08-05 13:46:00,097 [INFO] [Total 3/3] Página 24: 1000 registros (1000 nuevos) (10s)
+2026-08-05 13:46:10,678 [INFO] [Total 3/3] Página 25: 1000 registros (1000 nuevos) (11s)
+2026-08-05 13:46:20,809 [INFO] [Total 3/3] Página 26: 1000 registros (1000 nuevos) (10s)
+2026-08-05 13:46:31,204 [INFO] [Total 3/3] Página 27: 1000 registros (1000 nuevos) (10s)
+2026-08-05 13:46:41,675 [INFO] [Total 3/3] Página 28: 1000 registros (1000 nuevos) (10s)
+2026-08-05 13:46:51,996 [INFO] [Total 3/3] Página 29: 1000 registros (1000 nuevos) (10s)
+2026-08-05 13:47:02,343 [INFO] [Total 3/3] Página 30: 1000 registros (1000 nuevos) (10s)
+2026-08-05 13:47:12,939 [INFO] [Total 3/3] Página 31: 1000 registros (1000 nuevos) (11s)
+2026-08-05 13:47:25,842 [INFO] [Total 3/3] Página 32: 1000 registros (1000 nuevos) (13s)
+2026-08-05 13:47:38,454 [INFO] [Total 3/3] Página 33: 1000 registros (1000 nuevos) (13s)
+2026-08-05 13:47:54,959 [INFO] [Total 3/3] Página 34: 1000 registros (1000 nuevos) (16s)
+2026-08-05 13:48:06,494 [INFO] [Total 3/3] Página 35: 1000 registros (1000 nuevos) (11s)
+2026-08-05 13:48:17,677 [INFO] [Total 3/3] Página 36: 1000 registros (1000 nuevos) (11s)
+2026-08-05 13:48:28,352 [INFO] [Total 3/3] Página 37: 1000 registros (1000 nuevos) (11s)
+2026-08-05 13:48:39,265 [INFO] [Total 3/3] Página 38: 1000 registros (1000 nuevos) (11s)
+2026-08-05 13:48:50,743 [INFO] [Total 3/3] Página 39: 1000 registros (1000 nuevos) (11s)
+2026-08-05 13:49:01,698 [INFO] [Total 3/3] Página 40: 1000 registros (1000 nuevos) (11s)
+2026-08-05 13:49:12,243 [INFO] [Total 3/3] Página 41: 1000 registros (1000 nuevos) (10s)
+2026-08-05 13:49:22,925 [INFO] [Total 3/3] Página 42: 1000 registros (1000 nuevos) (11s)
+2026-08-05 13:49:32,966 [INFO] [Total 3/3] Página 43: 1000 registros (1000 nuevos) (10s)
+2026-08-05 13:49:43,335 [INFO] [Total 3/3] Página 44: 1000 registros (1000 nuevos) (10s)
+2026-08-05 13:49:53,954 [INFO] [Total 3/3] Página 45: 1000 registros (1000 nuevos) (11s)
+2026-08-05 13:50:04,354 [INFO] [Total 3/3] Página 46: 1000 registros (1000 nuevos) (10s)
+2026-08-05 13:50:14,782 [INFO] [Total 3/3] Página 47: 1000 registros (1000 nuevos) (10s)
+2026-08-05 13:50:25,563 [INFO] [Total 3/3] Página 48: 1000 registros (1000 nuevos) (11s)
+2026-08-05 13:50:36,328 [INFO] [Total 3/3] Página 49: 1000 registros (1000 nuevos) (11s)
+2026-08-05 13:50:46,559 [INFO] [Total 3/3] Página 50: 1000 registros (1000 nuevos) (10s)
+2026-08-05 13:50:59,409 [INFO] [Total 3/3] Página 51: 1000 registros (1000 nuevos) (13s)
+2026-08-05 13:51:10,099 [INFO] [Total 3/3] Página 52: 1000 registros (1000 nuevos) (11s)
+2026-08-05 13:51:20,196 [INFO] [Total 3/3] Página 53: 1000 registros (1000 nuevos) (10s)
+2026-08-05 13:51:30,154 [INFO] [Total 3/3] Página 54: 1000 registros (1000 nuevos) (10s)
+2026-08-05 13:51:40,350 [INFO] [Total 3/3] Página 55: 1000 registros (1000 nuevos) (10s)
+2026-08-05 13:51:50,749 [INFO] [Total 3/3] Página 56: 1000 registros (1000 nuevos) (10s)
+2026-08-05 13:52:01,530 [INFO] [Total 3/3] Página 57: 1000 registros (1000 nuevos) (11s)
+2026-08-05 13:52:12,028 [INFO] [Total 3/3] Página 58: 1000 registros (1000 nuevos) (10s)
+2026-08-05 13:52:22,697 [INFO] [Total 3/3] Página 59: 1000 registros (1000 nuevos) (11s)
+2026-08-05 13:52:36,264 [INFO] [Total 3/3] Página 60: 1000 registros (1000 nuevos) (14s)
+2026-08-05 13:52:46,560 [INFO] [Total 3/3] Página 61: 1000 registros (1000 nuevos) (10s)
+2026-08-05 13:52:58,466 [INFO] [Total 3/3] Página 62: 1000 registros (1000 nuevos) (12s)
+2026-08-05 13:53:08,997 [INFO] [Total 3/3] Página 63: 1000 registros (1000 nuevos) (10s)
+2026-08-05 13:53:19,384 [INFO] [Total 3/3] Página 64: 1000 registros (1000 nuevos) (10s)
+2026-08-05 13:53:29,799 [INFO] [Total 3/3] Página 65: 1000 registros (1000 nuevos) (10s)
+2026-08-05 13:53:41,208 [INFO] [Total 3/3] Página 66: 1000 registros (1000 nuevos) (11s)
+2026-08-05 13:53:53,229 [INFO] [Total 3/3] Página 67: 1000 registros (1000 nuevos) (12s)
+2026-08-05 13:54:04,219 [INFO] [Total 3/3] Página 68: 1000 registros (1000 nuevos) (11s)
+2026-08-05 13:54:14,524 [INFO] [Total 3/3] Página 69: 1000 registros (1000 nuevos) (10s)
+2026-08-05 13:54:25,060 [INFO] [Total 3/3] Página 70: 1000 registros (1000 nuevos) (10s)
+2026-08-05 13:54:35,126 [INFO] [Total 3/3] Página 71: 1000 registros (1000 nuevos) (10s)
+2026-08-05 13:54:45,594 [INFO] [Total 3/3] Página 72: 1000 registros (1000 nuevos) (10s)
+2026-08-05 13:54:55,948 [INFO] [Total 3/3] Página 73: 1000 registros (1000 nuevos) (10s)
+2026-08-05 13:55:06,170 [INFO] [Total 3/3] Página 74: 1000 registros (1000 nuevos) (10s)
+2026-08-05 13:55:16,510 [INFO] [Total 3/3] Página 75: 1000 registros (1000 nuevos) (10s)
+2026-08-05 13:55:27,191 [INFO] [Total 3/3] Página 76: 1000 registros (1000 nuevos) (11s)
+2026-08-05 13:55:37,204 [INFO] [Total 3/3] Página 77: 1000 registros (1000 nuevos) (10s)
+2026-08-05 13:55:48,343 [INFO] [Total 3/3] Página 78: 1000 registros (1000 nuevos) (11s)
+2026-08-05 13:55:59,561 [INFO] [Total 3/3] Página 79: 1000 registros (1000 nuevos) (11s)
+2026-08-05 13:56:12,036 [INFO] [Total 3/3] Página 80: 1000 registros (1000 nuevos) (12s)
+2026-08-05 13:56:22,455 [INFO] [Total 3/3] Página 81: 1000 registros (1000 nuevos) (10s)
+2026-08-05 13:56:33,826 [INFO] [Total 3/3] Página 82: 1000 registros (1000 nuevos) (11s)
+2026-08-05 13:56:45,937 [INFO] [Total 3/3] Página 83: 1000 registros (1000 nuevos) (12s)
+2026-08-05 13:56:58,542 [INFO] [Total 3/3] Página 84: 1000 registros (1000 nuevos) (13s)
+2026-08-05 13:57:09,165 [INFO] [Total 3/3] Página 85: 1000 registros (1000 nuevos) (11s)
+2026-08-05 13:57:20,122 [INFO] [Total 3/3] Página 86: 1000 registros (1000 nuevos) (11s)
+2026-08-05 13:57:30,539 [INFO] [Total 3/3] Página 87: 980 registros (980 nuevos) (10s)
+2026-08-05 13:57:30,589 [INFO] Total de registros descargados de la API (Total): 409093
+2026-08-05 13:57:41,257 [INFO] Staging: 1000 / 409093 filas
+2026-08-05 13:57:41,375 [INFO] Staging: 2000 / 409093 filas
+2026-08-05 13:57:41,497 [INFO] Staging: 3000 / 409093 filas
+2026-08-05 13:57:41,616 [INFO] Staging: 4000 / 409093 filas
+2026-08-05 13:57:41,741 [INFO] Staging: 5000 / 409093 filas
+2026-08-05 13:57:41,874 [INFO] Staging: 6000 / 409093 filas
+2026-08-05 13:57:42,005 [INFO] Staging: 7000 / 409093 filas
+2026-08-05 13:57:42,127 [INFO] Staging: 8000 / 409093 filas
+2026-08-05 13:57:42,256 [INFO] Staging: 9000 / 409093 filas
+2026-08-05 13:57:42,385 [INFO] Staging: 10000 / 409093 filas
+2026-08-05 13:57:42,510 [INFO] Staging: 11000 / 409093 filas
+2026-08-05 13:57:42,638 [INFO] Staging: 12000 / 409093 filas
+2026-08-05 13:57:42,768 [INFO] Staging: 13000 / 409093 filas
+2026-08-05 13:57:42,891 [INFO] Staging: 14000 / 409093 filas
+2026-08-05 13:57:43,026 [INFO] Staging: 15000 / 409093 filas
+2026-08-05 13:57:43,150 [INFO] Staging: 16000 / 409093 filas
+2026-08-05 13:57:43,273 [INFO] Staging: 17000 / 409093 filas
+2026-08-05 13:57:43,399 [INFO] Staging: 18000 / 409093 filas
+2026-08-05 13:57:43,518 [INFO] Staging: 19000 / 409093 filas
+2026-08-05 13:57:43,640 [INFO] Staging: 20000 / 409093 filas
+2026-08-05 13:57:43,761 [INFO] Staging: 21000 / 409093 filas
+2026-08-05 13:57:43,877 [INFO] Staging: 22000 / 409093 filas
+2026-08-05 13:57:44,006 [INFO] Staging: 23000 / 409093 filas
+2026-08-05 13:57:44,135 [INFO] Staging: 24000 / 409093 filas
+2026-08-05 13:57:44,266 [INFO] Staging: 25000 / 409093 filas
+2026-08-05 13:57:44,387 [INFO] Staging: 26000 / 409093 filas
+2026-08-05 13:57:44,502 [INFO] Staging: 27000 / 409093 filas
+2026-08-05 13:57:44,623 [INFO] Staging: 28000 / 409093 filas
+2026-08-05 13:57:44,743 [INFO] Staging: 29000 / 409093 filas
+2026-08-05 13:57:44,869 [INFO] Staging: 30000 / 409093 filas
+2026-08-05 13:57:44,991 [INFO] Staging: 31000 / 409093 filas
+2026-08-05 13:57:45,107 [INFO] Staging: 32000 / 409093 filas
+2026-08-05 13:57:45,232 [INFO] Staging: 33000 / 409093 filas
+2026-08-05 13:57:45,359 [INFO] Staging: 34000 / 409093 filas
+2026-08-05 13:57:45,481 [INFO] Staging: 35000 / 409093 filas
+2026-08-05 13:57:45,604 [INFO] Staging: 36000 / 409093 filas
+2026-08-05 13:57:45,730 [INFO] Staging: 37000 / 409093 filas
+2026-08-05 13:57:45,857 [INFO] Staging: 38000 / 409093 filas
+2026-08-05 13:57:45,979 [INFO] Staging: 39000 / 409093 filas
+2026-08-05 13:57:46,121 [INFO] Staging: 40000 / 409093 filas
+2026-08-05 13:57:46,248 [INFO] Staging: 41000 / 409093 filas
+2026-08-05 13:57:46,380 [INFO] Staging: 42000 / 409093 filas
+2026-08-05 13:57:46,517 [INFO] Staging: 43000 / 409093 filas
+2026-08-05 13:57:46,651 [INFO] Staging: 44000 / 409093 filas
+2026-08-05 13:57:46,781 [INFO] Staging: 45000 / 409093 filas
+2026-08-05 13:57:46,913 [INFO] Staging: 46000 / 409093 filas
+2026-08-05 13:57:47,043 [INFO] Staging: 47000 / 409093 filas
+2026-08-05 13:57:47,175 [INFO] Staging: 48000 / 409093 filas
+2026-08-05 13:57:47,310 [INFO] Staging: 49000 / 409093 filas
+2026-08-05 13:57:47,440 [INFO] Staging: 50000 / 409093 filas
+2026-08-05 13:57:47,562 [INFO] Staging: 51000 / 409093 filas
+2026-08-05 13:57:47,689 [INFO] Staging: 52000 / 409093 filas
+2026-08-05 13:57:47,862 [INFO] Staging: 53000 / 409093 filas
+2026-08-05 13:57:47,987 [INFO] Staging: 54000 / 409093 filas
+2026-08-05 13:57:48,113 [INFO] Staging: 55000 / 409093 filas
+2026-08-05 13:57:48,243 [INFO] Staging: 56000 / 409093 filas
+2026-08-05 13:57:48,368 [INFO] Staging: 57000 / 409093 filas
+2026-08-05 13:57:48,487 [INFO] Staging: 58000 / 409093 filas
+2026-08-05 13:57:48,615 [INFO] Staging: 59000 / 409093 filas
+2026-08-05 13:57:48,738 [INFO] Staging: 60000 / 409093 filas
+2026-08-05 13:57:48,876 [INFO] Staging: 61000 / 409093 filas
+2026-08-05 13:57:48,995 [INFO] Staging: 62000 / 409093 filas
+2026-08-05 13:57:49,121 [INFO] Staging: 63000 / 409093 filas
+2026-08-05 13:57:49,242 [INFO] Staging: 64000 / 409093 filas
+2026-08-05 13:57:49,359 [INFO] Staging: 65000 / 409093 filas
+2026-08-05 13:57:49,500 [INFO] Staging: 66000 / 409093 filas
+2026-08-05 13:57:49,631 [INFO] Staging: 67000 / 409093 filas
+2026-08-05 13:57:49,755 [INFO] Staging: 68000 / 409093 filas
+2026-08-05 13:57:49,877 [INFO] Staging: 69000 / 409093 filas
+2026-08-05 13:57:49,998 [INFO] Staging: 70000 / 409093 filas
+2026-08-05 13:57:50,125 [INFO] Staging: 71000 / 409093 filas
+2026-08-05 13:57:50,244 [INFO] Staging: 72000 / 409093 filas
+2026-08-05 13:57:50,377 [INFO] Staging: 73000 / 409093 filas
+2026-08-05 13:57:50,519 [INFO] Staging: 74000 / 409093 filas
+2026-08-05 13:57:50,648 [INFO] Staging: 75000 / 409093 filas
+2026-08-05 13:57:50,768 [INFO] Staging: 76000 / 409093 filas
+2026-08-05 13:57:50,893 [INFO] Staging: 77000 / 409093 filas
+2026-08-05 13:57:51,013 [INFO] Staging: 78000 / 409093 filas
+2026-08-05 13:57:51,146 [INFO] Staging: 79000 / 409093 filas
+2026-08-05 13:57:51,268 [INFO] Staging: 80000 / 409093 filas
+2026-08-05 13:57:51,394 [INFO] Staging: 81000 / 409093 filas
+2026-08-05 13:57:51,515 [INFO] Staging: 82000 / 409093 filas
+2026-08-05 13:57:51,640 [INFO] Staging: 83000 / 409093 filas
+2026-08-05 13:57:51,762 [INFO] Staging: 84000 / 409093 filas
+2026-08-05 13:57:51,896 [INFO] Staging: 85000 / 409093 filas
+2026-08-05 13:57:52,016 [INFO] Staging: 86000 / 409093 filas
+2026-08-05 13:57:52,146 [INFO] Staging: 87000 / 409093 filas
+2026-08-05 13:57:52,267 [INFO] Staging: 88000 / 409093 filas
+2026-08-05 13:57:52,393 [INFO] Staging: 89000 / 409093 filas
+2026-08-05 13:57:52,520 [INFO] Staging: 90000 / 409093 filas
+2026-08-05 13:57:52,651 [INFO] Staging: 91000 / 409093 filas
+2026-08-05 13:57:52,777 [INFO] Staging: 92000 / 409093 filas
+2026-08-05 13:57:52,912 [INFO] Staging: 93000 / 409093 filas
+2026-08-05 13:57:53,035 [INFO] Staging: 94000 / 409093 filas
+2026-08-05 13:57:53,162 [INFO] Staging: 95000 / 409093 filas
+2026-08-05 13:57:53,288 [INFO] Staging: 96000 / 409093 filas
+2026-08-05 13:57:53,414 [INFO] Staging: 97000 / 409093 filas
+2026-08-05 13:57:53,545 [INFO] Staging: 98000 / 409093 filas
+2026-08-05 13:57:53,668 [INFO] Staging: 99000 / 409093 filas
+2026-08-05 13:57:53,804 [INFO] Staging: 100000 / 409093 filas
+2026-08-05 13:57:53,927 [INFO] Staging: 101000 / 409093 filas
+2026-08-05 13:57:54,049 [INFO] Staging: 102000 / 409093 filas
+2026-08-05 13:57:54,166 [INFO] Staging: 103000 / 409093 filas
+2026-08-05 13:57:54,296 [INFO] Staging: 104000 / 409093 filas
+2026-08-05 13:57:54,422 [INFO] Staging: 105000 / 409093 filas
+2026-08-05 13:57:54,555 [INFO] Staging: 106000 / 409093 filas
+2026-08-05 13:57:54,690 [INFO] Staging: 107000 / 409093 filas
+2026-08-05 13:57:54,818 [INFO] Staging: 108000 / 409093 filas
+2026-08-05 13:57:54,943 [INFO] Staging: 109000 / 409093 filas
+2026-08-05 13:57:55,075 [INFO] Staging: 110000 / 409093 filas
+2026-08-05 13:57:55,207 [INFO] Staging: 111000 / 409093 filas
+2026-08-05 13:57:55,326 [INFO] Staging: 112000 / 409093 filas
+2026-08-05 13:57:55,452 [INFO] Staging: 113000 / 409093 filas
+2026-08-05 13:57:55,575 [INFO] Staging: 114000 / 409093 filas
+2026-08-05 13:57:55,695 [INFO] Staging: 115000 / 409093 filas
+2026-08-05 13:57:55,816 [INFO] Staging: 116000 / 409093 filas
+2026-08-05 13:57:55,941 [INFO] Staging: 117000 / 409093 filas
+2026-08-05 13:57:56,066 [INFO] Staging: 118000 / 409093 filas
+2026-08-05 13:57:56,189 [INFO] Staging: 119000 / 409093 filas
+2026-08-05 13:57:56,308 [INFO] Staging: 120000 / 409093 filas
+2026-08-05 13:57:56,428 [INFO] Staging: 121000 / 409093 filas
+2026-08-05 13:57:56,570 [INFO] Staging: 122000 / 409093 filas
+2026-08-05 13:57:56,693 [INFO] Staging: 123000 / 409093 filas
+2026-08-05 13:57:56,827 [INFO] Staging: 124000 / 409093 filas
+2026-08-05 13:57:56,958 [INFO] Staging: 125000 / 409093 filas
+2026-08-05 13:57:57,086 [INFO] Staging: 126000 / 409093 filas
+2026-08-05 13:57:57,209 [INFO] Staging: 127000 / 409093 filas
+2026-08-05 13:57:57,333 [INFO] Staging: 128000 / 409093 filas
+2026-08-05 13:57:57,455 [INFO] Staging: 129000 / 409093 filas
+2026-08-05 13:57:57,577 [INFO] Staging: 130000 / 409093 filas
+2026-08-05 13:57:57,703 [INFO] Staging: 131000 / 409093 filas
+2026-08-05 13:57:57,831 [INFO] Staging: 132000 / 409093 filas
+2026-08-05 13:57:57,959 [INFO] Staging: 133000 / 409093 filas
+2026-08-05 13:57:58,092 [INFO] Staging: 134000 / 409093 filas
+2026-08-05 13:57:58,213 [INFO] Staging: 135000 / 409093 filas
+2026-08-05 13:57:58,333 [INFO] Staging: 136000 / 409093 filas
+2026-08-05 13:57:58,456 [INFO] Staging: 137000 / 409093 filas
+2026-08-05 13:57:58,576 [INFO] Staging: 138000 / 409093 filas
+2026-08-05 13:57:58,701 [INFO] Staging: 139000 / 409093 filas
+2026-08-05 13:57:58,832 [INFO] Staging: 140000 / 409093 filas
+2026-08-05 13:57:58,963 [INFO] Staging: 141000 / 409093 filas
+2026-08-05 13:57:59,092 [INFO] Staging: 142000 / 409093 filas
+2026-08-05 13:57:59,243 [INFO] Staging: 143000 / 409093 filas
+2026-08-05 13:57:59,362 [INFO] Staging: 144000 / 409093 filas
+2026-08-05 13:57:59,484 [INFO] Staging: 145000 / 409093 filas
+2026-08-05 13:57:59,617 [INFO] Staging: 146000 / 409093 filas
+2026-08-05 13:57:59,744 [INFO] Staging: 147000 / 409093 filas
+2026-08-05 13:57:59,866 [INFO] Staging: 148000 / 409093 filas
+2026-08-05 13:58:00,003 [INFO] Staging: 149000 / 409093 filas
+2026-08-05 13:58:00,133 [INFO] Staging: 150000 / 409093 filas
+2026-08-05 13:58:00,262 [INFO] Staging: 151000 / 409093 filas
+2026-08-05 13:58:00,384 [INFO] Staging: 152000 / 409093 filas
+2026-08-05 13:58:00,516 [INFO] Staging: 153000 / 409093 filas
+2026-08-05 13:58:00,644 [INFO] Staging: 154000 / 409093 filas
+2026-08-05 13:58:00,768 [INFO] Staging: 155000 / 409093 filas
+2026-08-05 13:58:00,892 [INFO] Staging: 156000 / 409093 filas
+2026-08-05 13:58:01,030 [INFO] Staging: 157000 / 409093 filas
+2026-08-05 13:58:01,164 [INFO] Staging: 158000 / 409093 filas
+2026-08-05 13:58:01,293 [INFO] Staging: 159000 / 409093 filas
+2026-08-05 13:58:01,441 [INFO] Staging: 160000 / 409093 filas
+2026-08-05 13:58:01,570 [INFO] Staging: 161000 / 409093 filas
+2026-08-05 13:58:01,692 [INFO] Staging: 162000 / 409093 filas
+2026-08-05 13:58:01,813 [INFO] Staging: 163000 / 409093 filas
+2026-08-05 13:58:01,937 [INFO] Staging: 164000 / 409093 filas
+2026-08-05 13:58:02,062 [INFO] Staging: 165000 / 409093 filas
+2026-08-05 13:58:02,195 [INFO] Staging: 166000 / 409093 filas
+2026-08-05 13:58:02,320 [INFO] Staging: 167000 / 409093 filas
+2026-08-05 13:58:02,449 [INFO] Staging: 168000 / 409093 filas
+2026-08-05 13:58:02,576 [INFO] Staging: 169000 / 409093 filas
+2026-08-05 13:58:02,708 [INFO] Staging: 170000 / 409093 filas
+2026-08-05 13:58:02,845 [INFO] Staging: 171000 / 409093 filas
+2026-08-05 13:58:02,991 [INFO] Staging: 172000 / 409093 filas
+2026-08-05 13:58:03,125 [INFO] Staging: 173000 / 409093 filas
+2026-08-05 13:58:03,265 [INFO] Staging: 174000 / 409093 filas
+2026-08-05 13:58:03,413 [INFO] Staging: 175000 / 409093 filas
+2026-08-05 13:58:03,564 [INFO] Staging: 176000 / 409093 filas
+2026-08-05 13:58:03,709 [INFO] Staging: 177000 / 409093 filas
+2026-08-05 13:58:03,853 [INFO] Staging: 178000 / 409093 filas
+2026-08-05 13:58:03,993 [INFO] Staging: 179000 / 409093 filas
+2026-08-05 13:58:04,149 [INFO] Staging: 180000 / 409093 filas
+2026-08-05 13:58:04,325 [INFO] Staging: 181000 / 409093 filas
+2026-08-05 13:58:04,484 [INFO] Staging: 182000 / 409093 filas
+2026-08-05 13:58:04,641 [INFO] Staging: 183000 / 409093 filas
+2026-08-05 13:58:04,785 [INFO] Staging: 184000 / 409093 filas
+2026-08-05 13:58:04,943 [INFO] Staging: 185000 / 409093 filas
+2026-08-05 13:58:05,114 [INFO] Staging: 186000 / 409093 filas
+2026-08-05 13:58:05,273 [INFO] Staging: 187000 / 409093 filas
+2026-08-05 13:58:05,417 [INFO] Staging: 188000 / 409093 filas
+2026-08-05 13:58:05,557 [INFO] Staging: 189000 / 409093 filas
+2026-08-05 13:58:05,695 [INFO] Staging: 190000 / 409093 filas
+2026-08-05 13:58:05,825 [INFO] Staging: 191000 / 409093 filas
+2026-08-05 13:58:05,973 [INFO] Staging: 192000 / 409093 filas
+2026-08-05 13:58:06,107 [INFO] Staging: 193000 / 409093 filas
+2026-08-05 13:58:06,254 [INFO] Staging: 194000 / 409093 filas
+2026-08-05 13:58:06,397 [INFO] Staging: 195000 / 409093 filas
+2026-08-05 13:58:06,537 [INFO] Staging: 196000 / 409093 filas
+2026-08-05 13:58:06,675 [INFO] Staging: 197000 / 409093 filas
+2026-08-05 13:58:06,813 [INFO] Staging: 198000 / 409093 filas
+2026-08-05 13:58:06,968 [INFO] Staging: 199000 / 409093 filas
+2026-08-05 13:58:07,114 [INFO] Staging: 200000 / 409093 filas
+2026-08-05 13:58:07,256 [INFO] Staging: 201000 / 409093 filas
+2026-08-05 13:58:07,430 [INFO] Staging: 202000 / 409093 filas
+2026-08-05 13:58:07,605 [INFO] Staging: 203000 / 409093 filas
+2026-08-05 13:58:07,746 [INFO] Staging: 204000 / 409093 filas
+2026-08-05 13:58:07,891 [INFO] Staging: 205000 / 409093 filas
+2026-08-05 13:58:08,037 [INFO] Staging: 206000 / 409093 filas
+2026-08-05 13:58:08,179 [INFO] Staging: 207000 / 409093 filas
+2026-08-05 13:58:08,352 [INFO] Staging: 208000 / 409093 filas
+2026-08-05 13:58:08,504 [INFO] Staging: 209000 / 409093 filas
+2026-08-05 13:58:08,658 [INFO] Staging: 210000 / 409093 filas
+2026-08-05 13:58:08,808 [INFO] Staging: 211000 / 409093 filas
+2026-08-05 13:58:08,962 [INFO] Staging: 212000 / 409093 filas
+2026-08-05 13:58:09,135 [INFO] Staging: 213000 / 409093 filas
+2026-08-05 13:58:09,319 [INFO] Staging: 214000 / 409093 filas
+2026-08-05 13:58:09,479 [INFO] Staging: 215000 / 409093 filas
+2026-08-05 13:58:09,724 [INFO] Staging: 216000 / 409093 filas
+2026-08-05 13:58:09,953 [INFO] Staging: 217000 / 409093 filas
+2026-08-05 13:58:10,180 [INFO] Staging: 218000 / 409093 filas
+2026-08-05 13:58:10,413 [INFO] Staging: 219000 / 409093 filas
+2026-08-05 13:58:10,636 [INFO] Staging: 220000 / 409093 filas
+2026-08-05 13:58:10,845 [INFO] Staging: 221000 / 409093 filas
+2026-08-05 13:58:11,044 [INFO] Staging: 222000 / 409093 filas
+2026-08-05 13:58:11,238 [INFO] Staging: 223000 / 409093 filas
+2026-08-05 13:58:11,432 [INFO] Staging: 224000 / 409093 filas
+2026-08-05 13:58:11,646 [INFO] Staging: 225000 / 409093 filas
+2026-08-05 13:58:11,871 [INFO] Staging: 226000 / 409093 filas
+2026-08-05 13:58:12,069 [INFO] Staging: 227000 / 409093 filas
+2026-08-05 13:58:12,258 [INFO] Staging: 228000 / 409093 filas
+2026-08-05 13:58:12,459 [INFO] Staging: 229000 / 409093 filas
+2026-08-05 13:58:12,621 [INFO] Staging: 230000 / 409093 filas
+2026-08-05 13:58:12,792 [INFO] Staging: 231000 / 409093 filas
+2026-08-05 13:58:12,946 [INFO] Staging: 232000 / 409093 filas
+2026-08-05 13:58:13,119 [INFO] Staging: 233000 / 409093 filas
+2026-08-05 13:58:16,577 [INFO] Staging: 234000 / 409093 filas
+2026-08-05 13:58:16,763 [INFO] Staging: 235000 / 409093 filas
+2026-08-05 13:58:17,008 [INFO] Staging: 236000 / 409093 filas
+2026-08-05 13:58:17,225 [INFO] Staging: 237000 / 409093 filas
+2026-08-05 13:58:17,376 [INFO] Staging: 238000 / 409093 filas
+2026-08-05 13:58:17,555 [INFO] Staging: 239000 / 409093 filas
+2026-08-05 13:58:17,699 [INFO] Staging: 240000 / 409093 filas
+2026-08-05 13:58:17,843 [INFO] Staging: 241000 / 409093 filas
+2026-08-05 13:58:18,005 [INFO] Staging: 242000 / 409093 filas
+2026-08-05 13:58:18,148 [INFO] Staging: 243000 / 409093 filas
+2026-08-05 13:58:18,292 [INFO] Staging: 244000 / 409093 filas
+2026-08-05 13:58:18,427 [INFO] Staging: 245000 / 409093 filas
+2026-08-05 13:58:18,549 [INFO] Staging: 246000 / 409093 filas
+2026-08-05 13:58:18,674 [INFO] Staging: 247000 / 409093 filas
+2026-08-05 13:58:18,800 [INFO] Staging: 248000 / 409093 filas
+2026-08-05 13:58:18,933 [INFO] Staging: 249000 / 409093 filas
+2026-08-05 13:58:19,051 [INFO] Staging: 250000 / 409093 filas
+2026-08-05 13:58:19,176 [INFO] Staging: 251000 / 409093 filas
+2026-08-05 13:58:19,303 [INFO] Staging: 252000 / 409093 filas
+2026-08-05 13:58:19,428 [INFO] Staging: 253000 / 409093 filas
+2026-08-05 13:58:19,551 [INFO] Staging: 254000 / 409093 filas
+2026-08-05 13:58:19,678 [INFO] Staging: 255000 / 409093 filas
+2026-08-05 13:58:19,795 [INFO] Staging: 256000 / 409093 filas
+2026-08-05 13:58:19,916 [INFO] Staging: 257000 / 409093 filas
+2026-08-05 13:58:20,076 [INFO] Staging: 258000 / 409093 filas
+2026-08-05 13:58:20,195 [INFO] Staging: 259000 / 409093 filas
+2026-08-05 13:58:20,322 [INFO] Staging: 260000 / 409093 filas
+2026-08-05 13:58:20,448 [INFO] Staging: 261000 / 409093 filas
+2026-08-05 13:58:20,582 [INFO] Staging: 262000 / 409093 filas
+2026-08-05 13:58:20,715 [INFO] Staging: 263000 / 409093 filas
+2026-08-05 13:58:20,844 [INFO] Staging: 264000 / 409093 filas
+2026-08-05 13:58:20,967 [INFO] Staging: 265000 / 409093 filas
+2026-08-05 13:58:21,084 [INFO] Staging: 266000 / 409093 filas
+2026-08-05 13:58:21,215 [INFO] Staging: 267000 / 409093 filas
+2026-08-05 13:58:21,349 [INFO] Staging: 268000 / 409093 filas
+2026-08-05 13:58:21,475 [INFO] Staging: 269000 / 409093 filas
+2026-08-05 13:58:21,606 [INFO] Staging: 270000 / 409093 filas
+2026-08-05 13:58:21,730 [INFO] Staging: 271000 / 409093 filas
+2026-08-05 13:58:21,857 [INFO] Staging: 272000 / 409093 filas
+2026-08-05 13:58:21,986 [INFO] Staging: 273000 / 409093 filas
+2026-08-05 13:58:22,117 [INFO] Staging: 274000 / 409093 filas
+2026-08-05 13:58:22,243 [INFO] Staging: 275000 / 409093 filas
+2026-08-05 13:58:22,369 [INFO] Staging: 276000 / 409093 filas
+2026-08-05 13:58:22,501 [INFO] Staging: 277000 / 409093 filas
+2026-08-05 13:58:22,629 [INFO] Staging: 278000 / 409093 filas
+2026-08-05 13:58:22,752 [INFO] Staging: 279000 / 409093 filas
+2026-08-05 13:58:22,874 [INFO] Staging: 280000 / 409093 filas
+2026-08-05 13:58:22,996 [INFO] Staging: 281000 / 409093 filas
+2026-08-05 13:58:23,122 [INFO] Staging: 282000 / 409093 filas
+2026-08-05 13:58:23,255 [INFO] Staging: 283000 / 409093 filas
+2026-08-05 13:58:23,376 [INFO] Staging: 284000 / 409093 filas
+2026-08-05 13:58:23,513 [INFO] Staging: 285000 / 409093 filas
+2026-08-05 13:58:23,653 [INFO] Staging: 286000 / 409093 filas
+2026-08-05 13:58:23,780 [INFO] Staging: 287000 / 409093 filas
+2026-08-05 13:58:23,899 [INFO] Staging: 288000 / 409093 filas
+2026-08-05 13:58:24,018 [INFO] Staging: 289000 / 409093 filas
+2026-08-05 13:58:24,141 [INFO] Staging: 290000 / 409093 filas
+2026-08-05 13:58:24,272 [INFO] Staging: 291000 / 409093 filas
+2026-08-05 13:58:24,410 [INFO] Staging: 292000 / 409093 filas
+2026-08-05 13:58:24,545 [INFO] Staging: 293000 / 409093 filas
+2026-08-05 13:58:24,689 [INFO] Staging: 294000 / 409093 filas
+2026-08-05 13:58:24,822 [INFO] Staging: 295000 / 409093 filas
+2026-08-05 13:58:24,960 [INFO] Staging: 296000 / 409093 filas
+2026-08-05 13:58:25,095 [INFO] Staging: 297000 / 409093 filas
+2026-08-05 13:58:25,226 [INFO] Staging: 298000 / 409093 filas
+2026-08-05 13:58:25,348 [INFO] Staging: 299000 / 409093 filas
+2026-08-05 13:58:25,478 [INFO] Staging: 300000 / 409093 filas
+2026-08-05 13:58:25,616 [INFO] Staging: 301000 / 409093 filas
+2026-08-05 13:58:25,744 [INFO] Staging: 302000 / 409093 filas
+2026-08-05 13:58:25,873 [INFO] Staging: 303000 / 409093 filas
+2026-08-05 13:58:26,004 [INFO] Staging: 304000 / 409093 filas
+2026-08-05 13:58:26,149 [INFO] Staging: 305000 / 409093 filas
+2026-08-05 13:58:26,273 [INFO] Staging: 306000 / 409093 filas
+2026-08-05 13:58:26,398 [INFO] Staging: 307000 / 409093 filas
+2026-08-05 13:58:26,522 [INFO] Staging: 308000 / 409093 filas
+2026-08-05 13:58:26,651 [INFO] Staging: 309000 / 409093 filas
+2026-08-05 13:58:26,770 [INFO] Staging: 310000 / 409093 filas
+2026-08-05 13:58:26,895 [INFO] Staging: 311000 / 409093 filas
+2026-08-05 13:58:27,012 [INFO] Staging: 312000 / 409093 filas
+2026-08-05 13:58:27,140 [INFO] Staging: 313000 / 409093 filas
+2026-08-05 13:58:27,252 [INFO] Staging: 314000 / 409093 filas
+2026-08-05 13:58:27,380 [INFO] Staging: 315000 / 409093 filas
+2026-08-05 13:58:27,496 [INFO] Staging: 316000 / 409093 filas
+2026-08-05 13:58:27,615 [INFO] Staging: 317000 / 409093 filas
+2026-08-05 13:58:27,730 [INFO] Staging: 318000 / 409093 filas
+2026-08-05 13:58:27,852 [INFO] Staging: 319000 / 409093 filas
+2026-08-05 13:58:27,980 [INFO] Staging: 320000 / 409093 filas
+2026-08-05 13:58:28,104 [INFO] Staging: 321000 / 409093 filas
+2026-08-05 13:58:28,229 [INFO] Staging: 322000 / 409093 filas
+2026-08-05 13:58:28,363 [INFO] Staging: 323000 / 409093 filas
+2026-08-05 13:58:28,506 [INFO] Staging: 324000 / 409093 filas
+2026-08-05 13:58:28,651 [INFO] Staging: 325000 / 409093 filas
+2026-08-05 13:58:28,796 [INFO] Staging: 326000 / 409093 filas
+2026-08-05 13:58:28,949 [INFO] Staging: 327000 / 409093 filas
+2026-08-05 13:58:29,110 [INFO] Staging: 328000 / 409093 filas
+2026-08-05 13:58:29,274 [INFO] Staging: 329000 / 409093 filas
+2026-08-05 13:58:29,428 [INFO] Staging: 330000 / 409093 filas
+2026-08-05 13:58:29,576 [INFO] Staging: 331000 / 409093 filas
+2026-08-05 13:58:29,715 [INFO] Staging: 332000 / 409093 filas
+2026-08-05 13:58:29,869 [INFO] Staging: 333000 / 409093 filas
+2026-08-05 13:58:30,021 [INFO] Staging: 334000 / 409093 filas
+2026-08-05 13:58:30,161 [INFO] Staging: 335000 / 409093 filas
+2026-08-05 13:58:30,299 [INFO] Staging: 336000 / 409093 filas
+2026-08-05 13:58:30,433 [INFO] Staging: 337000 / 409093 filas
+2026-08-05 13:58:30,571 [INFO] Staging: 338000 / 409093 filas
+2026-08-05 13:58:30,695 [INFO] Staging: 339000 / 409093 filas
+2026-08-05 13:58:30,850 [INFO] Staging: 340000 / 409093 filas
+2026-08-05 13:58:30,991 [INFO] Staging: 341000 / 409093 filas
+2026-08-05 13:58:31,145 [INFO] Staging: 342000 / 409093 filas
+2026-08-05 13:58:31,292 [INFO] Staging: 343000 / 409093 filas
+2026-08-05 13:58:31,435 [INFO] Staging: 344000 / 409093 filas
+2026-08-05 13:58:31,576 [INFO] Staging: 345000 / 409093 filas
+2026-08-05 13:58:31,837 [INFO] Staging: 346000 / 409093 filas
+2026-08-05 13:58:32,093 [INFO] Staging: 347000 / 409093 filas
+2026-08-05 13:58:32,359 [INFO] Staging: 348000 / 409093 filas
+2026-08-05 13:58:32,598 [INFO] Staging: 349000 / 409093 filas
+2026-08-05 13:58:32,774 [INFO] Staging: 350000 / 409093 filas
+2026-08-05 13:58:32,923 [INFO] Staging: 351000 / 409093 filas
+2026-08-05 13:58:33,077 [INFO] Staging: 352000 / 409093 filas
+2026-08-05 13:58:33,275 [INFO] Staging: 353000 / 409093 filas
+2026-08-05 13:58:33,430 [INFO] Staging: 354000 / 409093 filas
+2026-08-05 13:58:33,582 [INFO] Staging: 355000 / 409093 filas
+2026-08-05 13:58:33,723 [INFO] Staging: 356000 / 409093 filas
+2026-08-05 13:58:33,873 [INFO] Staging: 357000 / 409093 filas
+2026-08-05 13:58:34,020 [INFO] Staging: 358000 / 409093 filas
+2026-08-05 13:58:34,171 [INFO] Staging: 359000 / 409093 filas
+2026-08-05 13:58:34,350 [INFO] Staging: 360000 / 409093 filas
+2026-08-05 13:58:34,492 [INFO] Staging: 361000 / 409093 filas
+2026-08-05 13:58:34,647 [INFO] Staging: 362000 / 409093 filas
+2026-08-05 13:58:34,922 [INFO] Staging: 363000 / 409093 filas
+2026-08-05 13:58:35,087 [INFO] Staging: 364000 / 409093 filas
+2026-08-05 13:58:35,243 [INFO] Staging: 365000 / 409093 filas
+2026-08-05 13:58:35,404 [INFO] Staging: 366000 / 409093 filas
+2026-08-05 13:58:35,558 [INFO] Staging: 367000 / 409093 filas
+2026-08-05 13:58:35,706 [INFO] Staging: 368000 / 409093 filas
+2026-08-05 13:58:35,839 [INFO] Staging: 369000 / 409093 filas
+2026-08-05 13:58:35,986 [INFO] Staging: 370000 / 409093 filas
+2026-08-05 13:58:36,129 [INFO] Staging: 371000 / 409093 filas
+2026-08-05 13:58:36,260 [INFO] Staging: 372000 / 409093 filas
+2026-08-05 13:58:36,388 [INFO] Staging: 373000 / 409093 filas
+2026-08-05 13:58:36,513 [INFO] Staging: 374000 / 409093 filas
+2026-08-05 13:58:36,646 [INFO] Staging: 375000 / 409093 filas
+2026-08-05 13:58:36,770 [INFO] Staging: 376000 / 409093 filas
+2026-08-05 13:58:36,916 [INFO] Staging: 377000 / 409093 filas
+2026-08-05 13:58:37,047 [INFO] Staging: 378000 / 409093 filas
+2026-08-05 13:58:37,183 [INFO] Staging: 379000 / 409093 filas
+2026-08-05 13:58:37,326 [INFO] Staging: 380000 / 409093 filas
+2026-08-05 13:58:37,490 [INFO] Staging: 381000 / 409093 filas
+2026-08-05 13:58:37,632 [INFO] Staging: 382000 / 409093 filas
+2026-08-05 13:58:37,783 [INFO] Staging: 383000 / 409093 filas
+2026-08-05 13:58:37,925 [INFO] Staging: 384000 / 409093 filas
+2026-08-05 13:58:38,058 [INFO] Staging: 385000 / 409093 filas
+2026-08-05 13:58:38,185 [INFO] Staging: 386000 / 409093 filas
+2026-08-05 13:58:38,333 [INFO] Staging: 387000 / 409093 filas
+2026-08-05 13:58:38,481 [INFO] Staging: 388000 / 409093 filas
+2026-08-05 13:58:38,614 [INFO] Staging: 389000 / 409093 filas
+2026-08-05 13:58:38,877 [INFO] Staging: 390000 / 409093 filas
+2026-08-05 13:58:39,027 [INFO] Staging: 391000 / 409093 filas
+2026-08-05 13:58:39,170 [INFO] Staging: 392000 / 409093 filas
+2026-08-05 13:58:39,321 [INFO] Staging: 393000 / 409093 filas
+2026-08-05 13:58:39,466 [INFO] Staging: 394000 / 409093 filas
+2026-08-05 13:58:39,606 [INFO] Staging: 395000 / 409093 filas
+2026-08-05 13:58:39,746 [INFO] Staging: 396000 / 409093 filas
+2026-08-05 13:58:39,892 [INFO] Staging: 397000 / 409093 filas
+2026-08-05 13:58:40,040 [INFO] Staging: 398000 / 409093 filas
+2026-08-05 13:58:40,184 [INFO] Staging: 399000 / 409093 filas
+2026-08-05 13:58:40,327 [INFO] Staging: 400000 / 409093 filas
+2026-08-05 13:58:40,471 [INFO] Staging: 401000 / 409093 filas
+2026-08-05 13:58:40,613 [INFO] Staging: 402000 / 409093 filas
+2026-08-05 13:58:40,769 [INFO] Staging: 403000 / 409093 filas
+2026-08-05 13:58:40,925 [INFO] Staging: 404000 / 409093 filas
+2026-08-05 13:58:41,060 [INFO] Staging: 405000 / 409093 filas
+2026-08-05 13:58:41,211 [INFO] Staging: 406000 / 409093 filas
+2026-08-05 13:58:41,361 [INFO] Staging: 407000 / 409093 filas
+2026-08-05 13:58:41,516 [INFO] Staging: 408000 / 409093 filas
+2026-08-05 13:58:41,658 [INFO] Staging: 409000 / 409093 filas
+2026-08-05 13:58:41,674 [INFO] Staging: 409093 / 409093 filas
+2026-08-05 13:58:41,729 [INFO] Filas en staging: 409093
+2026-08-05 14:00:31,992 [INFO] UPSERT terminado -> insertados: 223658 | actualizados: 1226
+2026-08-05 14:00:32,002 [INFO] === Carga finalizada correctamente en 3:14:50.471563 ===
+2026-08-05 14:03:12,522 [INFO] === Inicio de carga | lote 5687c2fd-3390-4217-8ccf-5a95904219f2 | modo incremental ===
+2026-08-05 14:03:12,523 [INFO] Usando reporte INCREMENTAL (últimos días).
+2026-08-05 14:03:16,192 [INFO] [incremental] Página 1: 1000 registros (1000 nuevos) (4s)
+2026-08-05 14:03:18,580 [INFO] [incremental] Página 2: 1000 registros (1000 nuevos) (2s)
+2026-08-05 14:03:20,836 [INFO] [incremental] Página 3: 1000 registros (1000 nuevos) (2s)
+2026-08-05 14:03:23,293 [INFO] [incremental] Página 4: 1000 registros (1000 nuevos) (2s)
+2026-08-05 14:03:25,745 [INFO] [incremental] Página 5: 1000 registros (1000 nuevos) (2s)
+2026-08-05 14:03:28,588 [INFO] [incremental] Página 6: 1000 registros (1000 nuevos) (3s)
+2026-08-05 14:03:29,598 [INFO] [incremental] Página 7: 106 registros (106 nuevos) (1s)
+2026-08-05 14:03:29,605 [INFO] Total de registros descargados de la API (incremental): 6106
+2026-08-05 14:03:29,927 [INFO] Staging: 1000 / 6106 filas
+2026-08-05 14:03:30,059 [INFO] Staging: 2000 / 6106 filas
+2026-08-05 14:03:30,198 [INFO] Staging: 3000 / 6106 filas
+2026-08-05 14:03:30,340 [INFO] Staging: 4000 / 6106 filas
+2026-08-05 14:03:30,518 [INFO] Staging: 5000 / 6106 filas
+2026-08-05 14:03:30,660 [INFO] Staging: 6000 / 6106 filas
+2026-08-05 14:03:30,681 [INFO] Staging: 6106 / 6106 filas
+2026-08-05 14:03:30,688 [INFO] Filas en staging: 6106
+2026-08-05 14:03:32,965 [INFO] UPSERT terminado -> insertados: 1016 | actualizados: 879
+2026-08-05 14:03:32,974 [INFO] === Carga finalizada correctamente en 0:00:20.451318 ===
+2026-08-06 10:49:59,010 [INFO] === Inicio de carga | lote 1f903382-14af-4d6c-be4f-8b09b6be1a47 | modo incremental ===
+2026-08-06 10:49:59,260 [INFO] Usando reporte INCREMENTAL (últimos días).
+2026-08-06 10:50:04,769 [INFO] [incremental] Página 1: 1000 registros (1000 nuevos) (5s)
+2026-08-06 10:50:07,094 [INFO] [incremental] Página 2: 1000 registros (1000 nuevos) (2s)
+2026-08-06 10:50:09,729 [INFO] [incremental] Página 3: 1000 registros (1000 nuevos) (3s)
+2026-08-06 10:50:12,268 [INFO] [incremental] Página 4: 1000 registros (1000 nuevos) (2s)
+2026-08-06 10:50:14,781 [INFO] [incremental] Página 5: 1000 registros (1000 nuevos) (2s)
+2026-08-06 10:50:17,406 [INFO] [incremental] Página 6: 1000 registros (1000 nuevos) (3s)
+2026-08-06 10:50:19,850 [INFO] [incremental] Página 7: 1000 registros (1000 nuevos) (2s)
+2026-08-06 10:50:21,607 [INFO] [incremental] Página 8: 512 registros (512 nuevos) (2s)
+2026-08-06 10:50:21,615 [INFO] Total de registros descargados de la API (incremental): 7512
+2026-08-06 10:50:22,268 [INFO] Staging: 1000 / 7512 filas
+2026-08-06 10:50:22,393 [INFO] Staging: 2000 / 7512 filas
+2026-08-06 10:50:22,536 [INFO] Staging: 3000 / 7512 filas
+2026-08-06 10:50:22,674 [INFO] Staging: 4000 / 7512 filas
+2026-08-06 10:50:22,805 [INFO] Staging: 5000 / 7512 filas
+2026-08-06 10:50:22,941 [INFO] Staging: 6000 / 7512 filas
+2026-08-06 10:50:23,085 [INFO] Staging: 7000 / 7512 filas
+2026-08-06 10:50:23,176 [INFO] Staging: 7512 / 7512 filas
+2026-08-06 10:50:23,184 [INFO] Filas en staging: 7512
+2026-08-06 10:50:26,263 [INFO] UPSERT terminado -> insertados: 700 | actualizados: 2186
+2026-08-06 10:50:26,272 [INFO] === Carga finalizada correctamente en 0:00:27.262274 ===
+2026-08-07 09:59:22,342 [INFO] === Inicio de carga | lote ef3873c5-a7c1-48f5-bf4e-9988e4611643 | modo incremental ===
+2026-08-07 09:59:22,537 [INFO] Usando reporte INCREMENTAL (últimos días).
+2026-08-07 09:59:34,663 [INFO] [incremental] Página 1: 1000 registros (1000 nuevos) (12s)
+2026-08-07 09:59:36,990 [INFO] [incremental] Página 2: 1000 registros (1000 nuevos) (2s)
+2026-08-07 09:59:39,382 [INFO] [incremental] Página 3: 1000 registros (1000 nuevos) (2s)
+2026-08-07 09:59:42,131 [INFO] [incremental] Página 4: 1000 registros (1000 nuevos) (3s)
+2026-08-07 09:59:44,752 [INFO] [incremental] Página 5: 1000 registros (1000 nuevos) (3s)
+2026-08-07 09:59:47,290 [INFO] [incremental] Página 6: 1000 registros (1000 nuevos) (2s)
+2026-08-07 09:59:49,683 [INFO] [incremental] Página 7: 1000 registros (1000 nuevos) (2s)
+2026-08-07 09:59:51,246 [INFO] [incremental] Página 8: 373 registros (373 nuevos) (2s)
+2026-08-07 09:59:51,254 [INFO] Total de registros descargados de la API (incremental): 7373
+2026-08-07 09:59:51,861 [INFO] Staging: 1000 / 7373 filas
+2026-08-07 09:59:51,982 [INFO] Staging: 2000 / 7373 filas
+2026-08-07 09:59:52,115 [INFO] Staging: 3000 / 7373 filas
+2026-08-07 09:59:52,254 [INFO] Staging: 4000 / 7373 filas
+2026-08-07 09:59:52,384 [INFO] Staging: 5000 / 7373 filas
+2026-08-07 09:59:52,522 [INFO] Staging: 6000 / 7373 filas
+2026-08-07 09:59:52,657 [INFO] Staging: 7000 / 7373 filas
+2026-08-07 09:59:52,711 [INFO] Staging: 7373 / 7373 filas
+2026-08-07 09:59:52,719 [INFO] Filas en staging: 7373
+2026-08-07 10:00:05,586 [INFO] UPSERT terminado -> insertados: 939 | actualizados: 1658
+2026-08-07 10:00:05,600 [INFO] === Carga finalizada correctamente en 0:00:43.257622 ===
