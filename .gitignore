@@ -1,0 +1,8 @@
+config.json
+config-old.json
+*.log
+logs/
+extraccion_*.json
+respuesta.json
+__pycache__/
+*.pyc
