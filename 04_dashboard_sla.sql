@@ -300,33 +300,38 @@ AS
 BEGIN
     SET NOCOUNT ON;
 
-    ;WITH base AS
-    (
-        SELECT *
-        FROM dbo.vw_Dash_ProductividadBase b
-        WHERE b.FechaRegistro >= @FechaInicio
-          AND b.FechaRegistro < DATEADD(DAY, 1, @FechaFin)
-          AND (NULLIF(LTRIM(RTRIM(@Grupos)), N'') IS NULL OR b.Grupo IN (SELECT Valor FROM dbo.fn_Dash_SplitList(@Grupos)))
-          AND (NULLIF(LTRIM(RTRIM(@Tecnicos)), N'') IS NULL OR b.Tecnico IN (SELECT Valor FROM dbo.fn_Dash_SplitList(@Tecnicos)))
-    )
+    /* Un CTE solo es visible para el SELECT que le sigue de inmediato; como
+       aqui se necesitan tres SELECT sobre el mismo subconjunto filtrado, se
+       materializa una vez en una tabla temporal en vez de usar ";WITH base". */
+    SELECT
+        Estado,
+        Prioridad,
+        AgingBucket
+    INTO #DistribucionBase
+    FROM dbo.vw_Dash_ProductividadBase b
+    WHERE b.FechaRegistro >= @FechaInicio
+      AND b.FechaRegistro < DATEADD(DAY, 1, @FechaFin)
+      AND (NULLIF(LTRIM(RTRIM(@Grupos)), N'') IS NULL OR b.Grupo IN (SELECT Valor FROM dbo.fn_Dash_SplitList(@Grupos)))
+      AND (NULLIF(LTRIM(RTRIM(@Tecnicos)), N'') IS NULL OR b.Tecnico IN (SELECT Valor FROM dbo.fn_Dash_SplitList(@Tecnicos)));
+
     SELECT
         Valor = ISNULL(NULLIF(LTRIM(RTRIM(Estado)), N''), N'Sin estado'),
         Tickets = COUNT_BIG(*)
-    FROM base
+    FROM #DistribucionBase
     GROUP BY ISNULL(NULLIF(LTRIM(RTRIM(Estado)), N''), N'Sin estado')
     ORDER BY Tickets DESC;
 
     SELECT
         Valor = ISNULL(NULLIF(LTRIM(RTRIM(Prioridad)), N''), N'Sin prioridad'),
         Tickets = COUNT_BIG(*)
-    FROM base
+    FROM #DistribucionBase
     GROUP BY ISNULL(NULLIF(LTRIM(RTRIM(Prioridad)), N''), N'Sin prioridad')
     ORDER BY Tickets DESC;
 
     SELECT
         Valor = AgingBucket,
         Tickets = COUNT_BIG(*)
-    FROM base
+    FROM #DistribucionBase
     GROUP BY AgingBucket
     ORDER BY CASE AgingBucket
         WHEN N'0-1 dias' THEN 1
@@ -337,6 +342,8 @@ BEGIN
         WHEN N'31+ dias' THEN 6
         ELSE 99
     END;
+
+    DROP TABLE #DistribucionBase;
 END;
 GO
 
