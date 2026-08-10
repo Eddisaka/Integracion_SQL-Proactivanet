@@ -1,3 +1,6 @@
 requests>=2.31
 pyodbc>=5.0
+fastapi>=0.110
+uvicorn>=0.29
+openpyxl>=3.1
 flask>=3.0

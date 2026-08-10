@@ -432,7 +432,7 @@ def _a_lista(datos: Any) -> list[dict]:
 
 
 # ------------------------------------------------------------------------ transformación
-def normalizar(filas: list[dict], mapeo: dict[str, str]) -> list[tuple]:
+def normalizar(filas: list[dict], mapeo: dict[str, str], columnas: list[str] | None = None) -> list[tuple]:
     """Convierte la respuesta de la API en tuplas listas para stg.Tickets."""
     # Un campo sólo se considera "faltante" si no aparece en NINGUNA fila:
     # es normal que la API omita campos vacíos en filas concretas.
@@ -442,10 +442,11 @@ def normalizar(filas: list[dict], mapeo: dict[str, str]) -> list[tuple]:
     faltantes = {o for o in mapeo.values()
                  if o and o not in presentes and por_ruta(filas[0], o) is None}
 
+    cols = columnas if columnas is not None else COLUMNAS_DESTINO
     salida = []
     for fila in filas:
         registro = []
-        for col in COLUMNAS_DESTINO:
+        for col in cols:
             origen = mapeo.get(col)
             valor = None
             if origen:
@@ -502,12 +503,13 @@ def obtener_watermark(cn: pyodbc.Connection, dias_solape: int, fecha_inicial: st
     return desde
 
 
-def cargar_staging(cn: pyodbc.Connection, filas: list[tuple], lote: uuid.UUID, tam_lote: int) -> int:
+def cargar_staging(cn: pyodbc.Connection, filas: list[tuple], lote: uuid.UUID, tam_lote: int,
+                   tabla_stg: str = "stg.Tickets", columnas: list[str] | None = None) -> int:
     cur = cn.cursor()
-    cur.execute("TRUNCATE TABLE stg.Tickets;")
+    cur.execute(f"TRUNCATE TABLE {tabla_stg};")
 
-    cols = COLUMNAS_DESTINO + ["LoteCarga"]
-    sql = (f"INSERT INTO stg.Tickets ({', '.join(cols)}) "
+    cols = (columnas if columnas is not None else COLUMNAS_DESTINO) + ["LoteCarga"]
+    sql = (f"INSERT INTO {tabla_stg} ({', '.join(cols)}) "
            f"VALUES ({', '.join(['?'] * len(cols))})")
 
     datos = [f + (str(lote),) for f in filas]
@@ -524,21 +526,54 @@ def cargar_staging(cn: pyodbc.Connection, filas: list[tuple], lote: uuid.UUID, t
         LOG.warning("fast_executemany falló (%s). Reintentando fila por fila...", e)
         cn.rollback()
         cur = cn.cursor()
-        cur.execute("TRUNCATE TABLE stg.Tickets;")
+        cur.execute(f"TRUNCATE TABLE {tabla_stg};")
         cur.fast_executemany = False
         cur.executemany(sql, datos)
 
     cn.commit()
-    cur.execute("SELECT COUNT(*) FROM stg.Tickets;")
+    cur.execute(f"SELECT COUNT(*) FROM {tabla_stg};")
     total = cur.fetchone()[0]
     cur.close()
     LOG.info("Filas en staging: %s", total)
     return total
 
 
-def ejecutar_upsert(cn: pyodbc.Connection, lote: uuid.UUID) -> tuple[int, int]:
+def ejecutar_upsert(cn: pyodbc.Connection, lote: uuid.UUID,
+                    sp: str = "dbo.usp_CargarTicketsDesdeStaging") -> tuple[int, int]:
     cur = cn.cursor()
-    cur.execute("{CALL dbo.usp_CargarTicketsDesdeStaging (?)}", str(lote))
+    try:
+        cur.execute("{CALL " + sp + " (?)}", str(lote))
+    except pyodbc.Error as e:
+        # Un fallo de permisos es muy común aquí. En vez de repetir el mensaje seco de ODBC,
+        # se consulta con QUÉ usuario se está conectando realmente y qué permisos tiene:
+        # casi siempre el GRANT se dio a un principal distinto del que usa la conexión.
+        if "permission was denied" in str(e) or "42000" in str(e):
+            info = []
+            try:
+                c2 = cn.cursor()
+                c2.execute("SELECT SUSER_SNAME(), USER_NAME(), DB_NAME(), "
+                           "HAS_PERMS_BY_NAME(?, 'OBJECT', 'EXECUTE')", sp)
+                login, usuario, bd, puede = c2.fetchone()
+                c2.close()
+                info = [
+                    f"login de conexión (SUSER_SNAME) : {login}",
+                    f"usuario de base (USER_NAME)     : {usuario}",
+                    f"base de datos                   : {bd}",
+                    f"¿tiene EXECUTE sobre {sp}?      : {'SÍ' if puede else 'NO'}",
+                ]
+            except Exception:
+                pass
+            detalle = "\n    ".join(info) if info else "(no se pudo consultar el contexto)"
+            raise RuntimeError(
+                f"Permiso denegado al ejecutar {sp}.\n"
+                f"    {detalle}\n"
+                f"    Otorga el permiso AL USUARIO QUE APARECE ARRIBA, no a otro:\n"
+                f"      GRANT EXECUTE ON {sp} TO [<usuario de base>];\n"
+                f"    Si el usuario mostrado no es el esperado, revisa 'sql.usuario' y "
+                f"'sql.autenticacion_windows' en config.json.\n"
+                f"    Ver 05_diagnostico_permisos.sql para el diagnóstico completo."
+            ) from e
+        raise
     fila = cur.fetchone()
     while fila is None and cur.nextset():
         fila = cur.fetchone()
@@ -549,7 +584,8 @@ def ejecutar_upsert(cn: pyodbc.Connection, lote: uuid.UUID) -> tuple[int, int]:
     return ins, upd
 
 
-def registrar_log(cn, lote, inicio, modo, watermark, n_api, n_stg, ins, upd, estatus, mensaje):
+def registrar_log(cn, lote, inicio, modo, watermark, n_api, n_stg, ins, upd, estatus, mensaje,
+                  proceso: str = "tickets"):
     try:
         cur = cn.cursor()
         cur.execute("""
@@ -557,7 +593,7 @@ def registrar_log(cn, lote, inicio, modo, watermark, n_api, n_stg, ins, upd, est
                                     FilasApi, FilasStaging, FilasInsertadas, FilasActualizadas,
                                     Estatus, Mensaje)
             VALUES (?,?,?,SYSDATETIME(),?,?,?,?,?,?,?,?)
-        """, "Tickets Proactivanet", str(lote), inicio, modo, watermark,
+        """, f"Proactivanet {proceso}", str(lote), inicio, modo, watermark,
              n_api, n_stg, ins, upd, estatus, (mensaje or "")[:4000])
         cn.commit()
         cur.close()
@@ -566,11 +602,115 @@ def registrar_log(cn, lote, inicio, modo, watermark, n_api, n_stg, ins, upd, est
 
 
 # -------------------------------------------------------------------------------- main
+def resolver_entidades(cfg: dict, pedida: str | None) -> dict:
+    """Devuelve {nombre: definición} de las entidades a procesar.
+
+    Compatibilidad: si el config no tiene bloque 'entidades', se arma una entidad
+    'tickets' con las claves de siempre (api.url_cruda_*, mapeo, tabla stg.Tickets).
+    """
+    ents = cfg.get("entidades")
+    if ents:
+        # Las claves que empiezan con "_" son comentarios del config, no entidades.
+        ents = {k: v for k, v in ents.items()
+                if not k.startswith("_") and isinstance(v, dict)}
+    if not ents:
+        ents = {
+            "tickets": {
+                "url_cruda_completa": cfg["api"].get("url_cruda_completa"),
+                "url_cruda_incremental": (cfg["api"].get("url_cruda_incremental")
+                                          or cfg["api"].get("url_cruda")),
+                "tabla_staging": "stg.Tickets",
+                "sp_upsert": "dbo.usp_CargarTicketsDesdeStaging",
+                "mapeo": cfg.get("mapeo") or {},
+            }
+        }
+    if pedida:
+        if pedida not in ents:
+            raise RuntimeError(f"Entidad '{pedida}' no está en el config. "
+                               f"Disponibles: {', '.join(ents)}")
+        return {pedida: ents[pedida]}
+    # Solo las habilitadas (por defecto, todas)
+    return {k: v for k, v in ents.items() if v.get("habilitada", True)}
+
+
+def procesar_entidad(nombre: str, ent: dict, cfg: dict, args, cn_ref: dict) -> tuple[int, str]:
+    """Procesa una entidad completa (extraer -> transformar -> cargar). Devuelve (rc, resumen)."""
+    lote = uuid.uuid4()
+    inicio = datetime.now()
+    modo = "completa" if args.completa else "incremental"
+    LOG.info("=== [%s] Inicio de carga | lote %s | modo %s ===", nombre, lote, modo)
+
+    mapeo = ent.get("mapeo") or {}
+    if not mapeo:
+        raise RuntimeError(f"La entidad '{nombre}' no tiene 'mapeo' en el config.")
+    columnas = list(mapeo.keys())
+    tabla_stg = ent.get("tabla_staging") or f"stg.{nombre.capitalize()}"
+    sp = ent.get("sp_upsert") or f"dbo.usp_Cargar{nombre.capitalize()}DesdeStaging"
+
+    n_api = n_stg = ins = upd = 0
+    cn = cn_ref.get("cn")
+    try:
+        # Extracción: se usa un cfg 'api' apuntando a las URLs de esta entidad
+        cfg_ent = dict(cfg)
+        api_ent = dict(cfg["api"])
+        api_ent["url_cruda_completa"] = ent.get("url_cruda_completa")
+        api_ent["url_cruda_incremental"] = ent.get("url_cruda_incremental")
+        api_ent.pop("url_cruda", None)
+        if ent.get("ruta_items") is not None:
+            api_ent["ruta_items"] = ent["ruta_items"]
+        cfg_ent["api"] = api_ent
+
+        if args.muestra:
+            datos = json.loads(Path(args.muestra).read_text(encoding="utf-8"))
+            filas_api = _extraer_lote(datos, api_ent.get("ruta_items"))
+        else:
+            filas_api = extraer(cfg_ent, None, completa=args.completa)
+
+        n_api = len(filas_api)
+        if args.solo_extraer:
+            destino = RAIZ / f"extraccion_{nombre}_{inicio:%Y%m%d_%H%M%S}.json"
+            destino.write_text(json.dumps(filas_api, ensure_ascii=False, indent=2), encoding="utf-8")
+            LOG.info("[%s] Extracción guardada en %s", nombre, destino)
+            return 0, f"{nombre}: {n_api} registros extraídos a disco"
+
+        if cn is None:
+            cn = conectar(cfg["sql"]); cn_ref["cn"] = cn
+
+        if n_api == 0:
+            LOG.info("[%s] La API no devolvió registros.", nombre)
+            registrar_log(cn, lote, inicio, modo, None, 0, 0, 0, 0, "OK",
+                          f"{nombre}: sin registros", proceso=nombre)
+            return 0, f"{nombre}: sin registros"
+
+        filas = normalizar(filas_api, mapeo, columnas)
+        n_stg = cargar_staging(cn, filas, lote, cfg["carga"].get("tam_lote", 1000),
+                               tabla_stg, columnas)
+        ins, upd = ejecutar_upsert(cn, lote, sp)
+
+        registrar_log(cn, lote, inicio, modo, None, n_api, n_stg, ins, upd, "OK", None,
+                      proceso=nombre)
+        LOG.info("=== [%s] Carga finalizada en %s ===", nombre, datetime.now() - inicio)
+        return 0, f"{nombre}: {n_api} de la API | +{ins} nuevos, ~{upd} actualizados"
+
+    except Exception as e:
+        LOG.exception("[%s] Error en la carga: %s", nombre, e)
+        if cn is not None:
+            try:
+                cn.rollback()
+            except Exception:
+                pass
+            registrar_log(cn, lote, inicio, modo, None, n_api, n_stg, ins, upd, "ERROR",
+                          str(e), proceso=nombre)
+        return 1, f"{nombre}: ERROR - {str(e)[:80]}"
+
+
 def main() -> int:
-    ap = argparse.ArgumentParser(description="ETL de tickets de Proactivanet hacia SQL Server")
+    ap = argparse.ArgumentParser(description="ETL de Proactivanet hacia SQL Server")
     ap.add_argument("--config", default=str(RAIZ / "config.json"))
     ap.add_argument("--completa", action="store_true",
-                    help="Usa el reporte 'Total' (carga inicial única de todo el año)")
+                    help="Usa el reporte 'Total' (carga inicial única)")
+    ap.add_argument("--entidad", help="Procesa solo esta entidad (p. ej. tickets, categorias). "
+                                      "Por defecto se procesan todas las habilitadas.")
     ap.add_argument("--desde", help="Fecha de inicio explícita (YYYY-MM-DD)")
     ap.add_argument("--muestra", help="Lee de un archivo JSON local en lugar de la API")
     ap.add_argument("--solo-extraer", action="store_true", help="Sólo baja de la API y guarda a disco")
@@ -579,80 +719,30 @@ def main() -> int:
 
     configurar_log(args.nivel_log)
     cfg = cargar_config(Path(args.config))
-    lote = uuid.uuid4()
-    inicio = datetime.now()
-    modo = "completa" if (args.completa or args.desde) else "incremental"
-    LOG.info("=== Inicio de carga | lote %s | modo %s ===", lote, modo)
 
-    cn = None
-    n_api = n_stg = ins = upd = 0
-    watermark = None
     try:
-        # 1. Determinar de dónde y cómo pedir
-        usa_reportes = bool(cfg["api"].get("url_cruda_completa")
-                            or cfg["api"].get("url_cruda_incremental")
-                            or cfg["api"].get("url_cruda"))
-
-        if args.muestra:
-            filas_api = json.loads(Path(args.muestra).read_text(encoding="utf-8"))
-            filas_api = _a_lista(por_ruta(filas_api, cfg["api"].get("ruta_items")))
-        elif usa_reportes:
-            # El propio reporte de Proactivanet aplica el filtro de fechas:
-            #   --completa -> reporte "Total" (carga inicial única)
-            #   sin flag   -> reporte "Ultimos 3 dias" (incremental)
-            # No se usa watermark porque el rango lo define el reporte.
-            filas_api = extraer(cfg, None, completa=args.completa)
-        else:
-            # APIs REST clásicas con filtro por fecha (watermark desde la BD)
-            if args.desde:
-                watermark = datetime.fromisoformat(args.desde)
-            elif args.completa:
-                watermark = datetime.fromisoformat(cfg["carga"]["fecha_inicial"])
-            else:
-                cn = conectar(cfg["sql"])
-                watermark = obtener_watermark(cn, cfg["carga"].get("dias_solape", 3),
-                                              cfg["carga"]["fecha_inicial"])
-            filas_api = extraer(cfg, watermark)
-
-        n_api = len(filas_api)
-        if args.solo_extraer:
-            destino = RAIZ / f"extraccion_{inicio:%Y%m%d_%H%M%S}.json"
-            destino.write_text(json.dumps(filas_api, ensure_ascii=False, indent=2), encoding="utf-8")
-            LOG.info("Extracción guardada en %s", destino)
-            return 0
-
-        if n_api == 0:
-            LOG.info("La API no devolvió registros. No hay nada que cargar.")
-            if cn is None:
-                cn = conectar(cfg["sql"])
-            registrar_log(cn, lote, inicio, modo, watermark, 0, 0, 0, 0, "OK", "Sin registros nuevos")
-            return 0
-
-        # 2. Transformar
-        filas = normalizar(filas_api, cfg["mapeo"])
-
-        # 3. Cargar
-        if cn is None:
-            cn = conectar(cfg["sql"])
-        n_stg = cargar_staging(cn, filas, lote, cfg["carga"].get("tam_lote", 1000))
-        ins, upd = ejecutar_upsert(cn, lote)
-
-        registrar_log(cn, lote, inicio, modo, watermark, n_api, n_stg, ins, upd, "OK", None)
-        LOG.info("=== Carga finalizada correctamente en %s ===", datetime.now() - inicio)
-        return 0
-
+        entidades = resolver_entidades(cfg, args.entidad)
     except Exception as e:
-        LOG.exception("Error en la carga: %s", e)
-        if cn is not None:
-            try:
-                cn.rollback()
-            except Exception:
-                pass
-            registrar_log(cn, lote, inicio, modo, watermark, n_api, n_stg, ins, upd, "ERROR", str(e))
+        LOG.error("%s", e)
         return 1
+
+    LOG.info("Entidades a procesar: %s", ", ".join(entidades))
+    cn_ref: dict = {"cn": None}
+    rc_final = 0
+    resumen: list[str] = []
+    try:
+        for nombre, ent in entidades.items():
+            rc, msg = procesar_entidad(nombre, ent, cfg, args, cn_ref)
+            resumen.append(msg)
+            rc_final = rc_final or rc
     finally:
-        if cn is not None:
-            cn.close()
+        if cn_ref.get("cn") is not None:
+            cn_ref["cn"].close()
+
+    LOG.info("===== RESUMEN =====")
+    for r in resumen:
+        LOG.info("  %s", r)
+    return rc_final
 
 
 if __name__ == "__main__":

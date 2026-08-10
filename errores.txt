@@ -1,0 +1,6 @@
+Gravedad	Código	Descripción	Proyecto	Archivo	Línea	Estado suprimido
+Error		Nombre de objeto 'base' no válido.	Archivos varios	C:\Users\edgarrad\OneDrive - soriana.com\Documentos\GitHub\Integracion_SQL-Proactivanet\04_dashboard_sla.sql	322	
+Error		Nombre de columna 'AgingBucket' no válido.	Archivos varios	C:\Users\edgarrad\OneDrive - soriana.com\Documentos\GitHub\Integracion_SQL-Proactivanet\04_dashboard_sla.sql	327	
+Error		Nombre de objeto 'base' no válido.	Archivos varios	C:\Users\edgarrad\OneDrive - soriana.com\Documentos\GitHub\Integracion_SQL-Proactivanet\04_dashboard_sla.sql	329	
+Error		Nombre de columna 'AgingBucket' no válido.	Archivos varios	C:\Users\edgarrad\OneDrive - soriana.com\Documentos\GitHub\Integracion_SQL-Proactivanet\04_dashboard_sla.sql	330	
+Error		Nombre de columna 'AgingBucket' no válido.	Archivos varios	C:\Users\edgarrad\OneDrive - soriana.com\Documentos\GitHub\Integracion_SQL-Proactivanet\04_dashboard_sla.sql	331	
