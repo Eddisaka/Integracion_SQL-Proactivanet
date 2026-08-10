@@ -54,6 +54,47 @@ Windows) — no hace falta configurar nada aparte.
 - Distribucion por Estado, Prioridad y Antiguedad (aging).
 - Tabla de detalle (hasta 500 tickets del rango filtrado).
 
+## Compartir temporalmente en la intranet
+
+Mientras no exista el servidor definitivo, puedes dejar que alguien mas de
+la intranet vea el tablero corriendo desde tu escritorio virtual. Son 3
+pasos, y son temporales: se pierden con cada reinicio diario.
+
+**1) Averigua la IP de tu escritorio virtual:**
+```powershell
+ipconfig
+# Busca "Direccion IPv4" del adaptador de red activo, ej. 10.20.30.40
+```
+
+**2) Abre el puerto 5000 en el firewall de Windows** (una sola vez por dia,
+tras el reinicio; requiere permisos de administrador en el escritorio
+virtual — si no los tienes, pidele a IT que agregue la regla):
+```powershell
+New-NetFirewallRule -DisplayName "Dashboard Tickets (temporal)" `
+    -Direction Inbound -Protocol TCP -LocalPort 5000 -Action Allow
+```
+
+**3) Corre la API (ya escucha en `0.0.0.0`, no solo en localhost) y
+comparte la URL:**
+```powershell
+python dashboard_api.py
+```
+Tu companero abre `http://<tu-ip>:5000` desde su propio equipo, siempre que
+este en la misma intranet.
+
+**Si aun asi no conecta:** en muchos escritorios virtuales (Citrix, VMware
+Horizon, etc.) la politica de red bloquea el trafico *entre* escritorios
+virtuales aunque el firewall local este abierto — solo permite salir hacia
+servidores especificos. Si es tu caso, no hay ajuste de Flask que lo
+resuelva; toca pedirle a IT que habilite ese trafico, o mientras tanto
+compartir pantalla (Teams/Zoom) en lugar de la URL directa.
+
+**Ten presente:** esta forma de compartir no tiene autenticacion — cualquiera
+en la intranet con la IP y el puerto puede ver los datos de tickets mientras
+la API este corriendo. Esta bien para una demo puntual; no lo dejes
+corriendo de forma permanente ni lo anuncies ampliamente. Para algo estable
+y con control de acceso, el destino real sigue siendo el servidor IIS.
+
 ## Notas
 
 - `dashboard_api.py` usa el servidor de desarrollo de Flask

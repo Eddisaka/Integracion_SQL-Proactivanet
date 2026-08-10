@@ -8,6 +8,12 @@ Uso local:
     python dashboard_api.py
     # abrir http://127.0.0.1:5000
 
+Escucha en 0.0.0.0, es decir, tambien en la IP de red del equipo (no solo
+localhost), para poder compartir la vista dentro de la intranet mientras no
+exista un servidor definitivo. Ver DASHBOARD.md, seccion "Compartir
+temporalmente en la intranet" (abrir el puerto en el firewall de Windows,
+etc.).
+
 Lee la conexion a SQL Server del mismo config.json que usa el ETL
 (bloque "sql"). No se guarda ninguna credencial en este archivo.
 """
@@ -204,4 +210,4 @@ def detalle():
 
 
 if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=5000, debug=False)
+    app.run(host="0.0.0.0", port=5000, debug=False)
