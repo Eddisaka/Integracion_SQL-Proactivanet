@@ -1,0 +1,207 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1560" height="792" viewBox="0 0 1560 792" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif">
+  <defs>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f8fafc"/>
+      <stop offset="1" stop-color="#eef2f7"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#0f172a" flood-opacity="0.12"/>
+    </filter>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#475569"/>
+    </marker>
+  </defs>
+
+  <rect width="1560" height="792" fill="url(#bgGrad)"/>
+
+  <!-- Título -->
+  <text x="40" y="52" font-size="30" font-weight="700" fill="#0f172a">Arquitectura de Integración — Proactivanet → SQL Server → Web</text>
+  <text x="40" y="82" font-size="16" fill="#64748b">Pipeline ETL de tickets / incidentes · Soriana · carga histórica (una vez) + incremental programado</text>
+  <line x1="40" y1="100" x2="1520" y2="100" stroke="#cbd5e1" stroke-width="1.5"/>
+
+  <!-- ================= Columnas (bandas de capa) ================= -->
+  <!-- Col 1 -->
+  <rect x="40"   y="120" width="330" height="562" rx="14" fill="#eef0fb" stroke="#c7cdf5"/>
+  <rect x="40"   y="120" width="330" height="46"  rx="14" fill="#6366f1"/>
+  <rect x="40"   y="150" width="330" height="16"  fill="#6366f1"/>
+  <text x="205"  y="150" font-size="17" font-weight="700" fill="#ffffff" text-anchor="middle">1 · EXTRACCIÓN (Origen)</text>
+
+  <!-- Col 2 -->
+  <rect x="410"  y="120" width="330" height="562" rx="14" fill="#fef4e7" stroke="#f6d09a"/>
+  <rect x="410"  y="120" width="330" height="46"  rx="14" fill="#f59e0b"/>
+  <rect x="410"  y="150" width="330" height="16"  fill="#f59e0b"/>
+  <text x="575"  y="150" font-size="17" font-weight="700" fill="#ffffff" text-anchor="middle">2 · PROCESAMIENTO (ETL)</text>
+
+  <!-- Col 3 -->
+  <rect x="780"  y="120" width="330" height="562" rx="14" fill="#fdecec" stroke="#f4b6b6"/>
+  <rect x="780"  y="120" width="330" height="46"  rx="14" fill="#dc2626"/>
+  <rect x="780"  y="150" width="330" height="16"  fill="#dc2626"/>
+  <text x="945"  y="150" font-size="17" font-weight="700" fill="#ffffff" text-anchor="middle">3 · ALMACENAMIENTO (SQL Server)</text>
+
+  <!-- Col 4 -->
+  <rect x="1150" y="120" width="370" height="562" rx="14" fill="#e7f6f8" stroke="#a6dbe4"/>
+  <rect x="1150" y="120" width="370" height="46"  rx="14" fill="#0891b2"/>
+  <rect x="1150" y="150" width="370" height="16"  fill="#0891b2"/>
+  <text x="1335" y="150" font-size="17" font-weight="700" fill="#ffffff" text-anchor="middle">4 · PRESENTACIÓN (Web Server)</text>
+
+  <!-- ================= COL 1 : EXTRACCIÓN ================= -->
+  <!-- Proactivanet -->
+  <rect x="62" y="190" width="286" height="180" rx="10" fill="#ffffff" stroke="#c7cdf5" filter="url(#shadow)"/>
+  <circle cx="90" cy="220" r="12" fill="#6366f1"/>
+  <path d="M84,220 h12 M90,214 v12" stroke="#fff" stroke-width="2"/>
+  <text x="112" y="217" font-size="15" font-weight="700" fill="#1e293b">Proactivanet</text>
+  <text x="112" y="234" font-size="11.5" fill="#64748b">soriana.proactivanet.com</text>
+  <line x1="78" y1="246" x2="332" y2="246" stroke="#e2e8f0"/>
+  <text x="78" y="266" font-size="11.5" fill="#334155">API REST: /proactivanet/api/table/data</text>
+  <text x="78" y="286" font-size="11.5" fill="#334155">Auth: JWT en header Authorization</text>
+  <text x="90" y="302" font-size="11" fill="#64748b">(token crudo, sin prefijo «Bearer»)</text>
+  <text x="78" y="322" font-size="11.5" fill="#334155">Salida: labelAsName=true → JSON</text>
+  <text x="78" y="342" font-size="11.5" fill="#334155">Paginación: $limit=1000 + $offset</text>
+  <text x="90" y="358" font-size="11" fill="#64748b">(offset 0, 1000, 2000 … evita timeout)</text>
+
+  <!-- Reporte Total -->
+  <rect x="62" y="392" width="286" height="112" rx="10" fill="#ffffff" stroke="#c7cdf5" filter="url(#shadow)"/>
+  <rect x="62" y="392" width="6" height="112" rx="3" fill="#6366f1"/>
+  <text x="82" y="418" font-size="14" font-weight="700" fill="#1e293b">Reporte «Backlog Soriana Total»</text>
+  <text x="82" y="438" font-size="11.5" fill="#475569">Todo 2026 · carga inicial única</text>
+  <text x="82" y="456" font-size="11.5" fill="#475569">Ejecución: --completa</text>
+  <text x="82" y="482" font-size="11" fill="#64748b">Se pagina por $offset para no</text>
+  <text x="82" y="497" font-size="11" fill="#64748b">exceder el límite de ~120 s del server.</text>
+
+  <!-- Reporte incremental -->
+  <rect x="62" y="524" width="286" height="112" rx="10" fill="#ffffff" stroke="#c7cdf5" filter="url(#shadow)"/>
+  <rect x="62" y="524" width="6" height="112" rx="3" fill="#6366f1"/>
+  <text x="82" y="550" font-size="14" font-weight="700" fill="#1e293b">Reporte «Últimos 3 días»</text>
+  <text x="82" y="570" font-size="11.5" fill="#475569">Tickets con cambios recientes</text>
+  <text x="82" y="588" font-size="11.5" fill="#475569">Ejecución: programada (sin flag)</text>
+  <text x="82" y="614" font-size="11" fill="#64748b">Alimenta la actualización continua</text>
+  <text x="82" y="629" font-size="11" fill="#64748b">de tickets nuevos y modificados.</text>
+
+  <!-- ================= COL 2 : ETL ================= -->
+  <!-- Scheduler -->
+  <rect x="432" y="190" width="286" height="92" rx="10" fill="#ffffff" stroke="#f6d09a" filter="url(#shadow)"/>
+  <rect x="432" y="190" width="6" height="92" rx="3" fill="#f59e0b"/>
+  <text x="452" y="216" font-size="14" font-weight="700" fill="#1e293b">Orquestación</text>
+  <text x="452" y="238" font-size="11.5" fill="#475569">Windows Task Scheduler</text>
+  <text x="452" y="258" font-size="11.5" fill="#475569">(o SQL Server Agent)</text>
+  <text x="452" y="276" font-size="11" fill="#64748b">Incremental cada hora · Total a demanda</text>
+
+  <!-- etl script -->
+  <rect x="432" y="300" width="286" height="250" rx="10" fill="#ffffff" stroke="#f6d09a" filter="url(#shadow)"/>
+  <rect x="432" y="300" width="6" height="250" rx="3" fill="#f59e0b"/>
+  <text x="452" y="326" font-size="14.5" font-weight="700" fill="#1e293b">etl_proactivanet.py</text>
+  <text x="452" y="344" font-size="11.5" fill="#64748b">Python · requests + pyodbc</text>
+  <line x1="452" y1="356" x2="702" y2="356" stroke="#e2e8f0"/>
+  <text x="452" y="378" font-size="12" fill="#334155">① Autenticación (token de entorno)</text>
+  <text x="452" y="402" font-size="12" fill="#334155">② Extracción paginada ($offset)</text>
+  <text x="452" y="426" font-size="12" fill="#334155">③ Transformación y tipado</text>
+  <text x="464" y="442" font-size="10.5" fill="#64748b">fechas, enteros, booleanos, hash</text>
+  <text x="452" y="466" font-size="12" fill="#334155">④ Deduplicación por Código</text>
+  <text x="452" y="490" font-size="12" fill="#334155">⑤ Carga a staging (fast_executemany)</text>
+  <text x="452" y="514" font-size="12" fill="#334155">⑥ Ejecuta SP de UPSERT</text>
+  <text x="452" y="536" font-size="10.5" fill="#64748b">registra resultado en dbo.EtlLog</text>
+
+  <!-- diagnósticos -->
+  <rect x="432" y="568" width="286" height="86" rx="10" fill="#fffaf0" stroke="#f6d09a"/>
+  <text x="452" y="592" font-size="12.5" font-weight="700" fill="#1e293b">Utilidades de diagnóstico</text>
+  <text x="452" y="612" font-size="11" fill="#475569">verificar_token · diagnostico_auth</text>
+  <text x="452" y="629" font-size="11" fill="#475569">diagnostico_timeout · inspeccionar_respuesta</text>
+  <text x="452" y="646" font-size="11" fill="#475569">descubrir_campos · generar_sql</text>
+
+  <!-- ================= COL 3 : SQL SERVER ================= -->
+  <text x="945" y="192" font-size="12.5" font-weight="700" fill="#7f1d1d" text-anchor="middle">Servidor AZAUDITPRECIOS · BD Tickets_Proactivanet</text>
+
+  <!-- staging -->
+  <rect x="802" y="206" width="286" height="70" rx="10" fill="#ffffff" stroke="#f4b6b6" filter="url(#shadow)"/>
+  <rect x="802" y="206" width="6" height="70" rx="3" fill="#dc2626"/>
+  <text x="822" y="230" font-size="13.5" font-weight="700" fill="#1e293b">stg.Tickets</text>
+  <text x="822" y="250" font-size="11" fill="#475569">Zona de aterrizaje · todo NVARCHAR</text>
+  <text x="822" y="267" font-size="11" fill="#64748b">Se vacía y recarga en cada corrida</text>
+
+  <!-- SP upsert (badge) -->
+  <rect x="802" y="286" width="286" height="40" rx="8" fill="#fef2f2" stroke="#f4b6b6"/>
+  <text x="945" y="311" font-size="12" font-weight="700" fill="#b91c1c" text-anchor="middle">usp_CargarTicketsDesdeStaging — UPSERT</text>
+
+  <!-- dbo.Tickets -->
+  <rect x="802" y="336" width="286" height="86" rx="10" fill="#ffffff" stroke="#f4b6b6" filter="url(#shadow)"/>
+  <rect x="802" y="336" width="6" height="86" rx="3" fill="#dc2626"/>
+  <text x="822" y="360" font-size="14" font-weight="700" fill="#1e293b">dbo.Tickets</text>
+  <text x="822" y="380" font-size="11.5" fill="#475569">48 columnas · PK Código</text>
+  <text x="822" y="398" font-size="11" fill="#64748b">Detección de cambios por hash SHA2_256</text>
+  <text x="822" y="414" font-size="11" fill="#64748b">(UPDATE + INSERT, sin MERGE)</text>
+
+  <!-- hist -->
+  <rect x="802" y="432" width="286" height="66" rx="10" fill="#ffffff" stroke="#f4b6b6" filter="url(#shadow)"/>
+  <rect x="802" y="432" width="6" height="66" rx="3" fill="#dc2626"/>
+  <text x="822" y="456" font-size="13.5" font-weight="700" fill="#1e293b">dbo.TicketsHist</text>
+  <text x="822" y="476" font-size="11" fill="#475569">Historial: versión anterior en cada cambio</text>
+  <text x="822" y="492" font-size="11" fill="#64748b">(evolución de estado, reasignaciones)</text>
+
+  <!-- etllog -->
+  <rect x="802" y="508" width="286" height="56" rx="10" fill="#ffffff" stroke="#f4b6b6" filter="url(#shadow)"/>
+  <rect x="802" y="508" width="6" height="56" rx="3" fill="#dc2626"/>
+  <text x="822" y="532" font-size="13.5" font-weight="700" fill="#1e293b">dbo.EtlLog</text>
+  <text x="822" y="551" font-size="11" fill="#475569">Bitácora de cada ejecución del ETL</text>
+
+  <!-- vista -->
+  <rect x="802" y="574" width="286" height="80" rx="10" fill="#fff7f7" stroke="#dc2626" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="822" y="598" font-size="14" font-weight="700" fill="#b91c1c">dbo.vw_Tickets</text>
+  <text x="822" y="618" font-size="11.5" fill="#475569">Vista de consumo para BI / Web</text>
+  <text x="822" y="636" font-size="11" fill="#64748b">Campos derivados: Tienda, AñoMes,</text>
+  <text x="822" y="650" font-size="11" fill="#64748b">HorasEnBacklog, EstaAbierto…</text>
+
+  <!-- ================= COL 4 : PRESENTACIÓN ================= -->
+  <text x="1335" y="192" font-size="12.5" font-weight="700" fill="#0e5b6b" text-anchor="middle">Web Server (IIS) · Application Pool</text>
+
+  <!-- App Pool -->
+  <rect x="1172" y="206" width="326" height="150" rx="10" fill="#ffffff" stroke="#a6dbe4" filter="url(#shadow)"/>
+  <rect x="1172" y="206" width="6" height="150" rx="3" fill="#0891b2"/>
+  <text x="1192" y="232" font-size="14.5" font-weight="700" fill="#1e293b">App Pool (IIS)</text>
+  <text x="1192" y="250" font-size="11.5" fill="#64748b">Aplicación web dedicada</text>
+  <line x1="1192" y1="262" x2="1482" y2="262" stroke="#e2e8f0"/>
+  <text x="1192" y="286" font-size="12.5" fill="#334155">Páginas y tableros en HTML</text>
+  <text x="1204" y="303" font-size="10.5" fill="#64748b">servidas por el App Pool (IIS)</text>
+  <text x="1192" y="328" font-size="12.5" fill="#334155">Datos desde dbo.vw_Tickets</text>
+  <text x="1204" y="345" font-size="10.5" fill="#64748b">consulta de solo lectura</text>
+
+  <!-- Power BI -->
+  <rect x="1172" y="374" width="326" height="96" rx="10" fill="#ffffff" stroke="#a6dbe4" filter="url(#shadow)"/>
+  <rect x="1172" y="374" width="6" height="96" rx="3" fill="#0891b2"/>
+  <text x="1192" y="400" font-size="14.5" font-weight="700" fill="#1e293b">Power BI</text>
+  <text x="1192" y="420" font-size="11.5" fill="#475569">Conexión Import a dbo.vw_Tickets</text>
+  <text x="1192" y="438" font-size="11" fill="#64748b">Refresco incremental por FechaRegistro</text>
+  <text x="1192" y="456" font-size="11" fill="#64748b">Tableros de backlog, SLA, tiendas…</text>
+
+  <!-- Usuarios -->
+  <rect x="1172" y="488" width="326" height="76" rx="10" fill="#ecfeff" stroke="#a6dbe4"/>
+  <circle cx="1206" cy="526" r="14" fill="#0891b2"/>
+  <circle cx="1206" cy="520" r="5" fill="#ecfeff"/>
+  <path d="M1197,536 a9,7 0 0 1 18,0" fill="#ecfeff"/>
+  <text x="1232" y="518" font-size="13.5" font-weight="700" fill="#1e293b">Usuarios finales</text>
+  <text x="1232" y="537" font-size="11.5" fill="#475569">Operación, soporte, gerencia</text>
+  <text x="1232" y="554" font-size="11" fill="#64748b">Acceso vía navegador (intranet)</text>
+
+  <!-- ================= Flechas de flujo entre capas ================= -->
+  <!-- 1 -> 2 -->
+  <line x1="372" y1="410" x2="408" y2="410" stroke="#475569" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <text x="390" y="398" font-size="10.5" fill="#475569" text-anchor="middle">HTTPS</text>
+  <text x="390" y="428" font-size="10.5" fill="#475569" text-anchor="middle">JSON</text>
+
+  <!-- 2 -> 3 -->
+  <line x1="742" y1="410" x2="778" y2="410" stroke="#475569" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <text x="760" y="398" font-size="10.5" fill="#475569" text-anchor="middle">pyodbc</text>
+  <text x="760" y="428" font-size="10.5" fill="#475569" text-anchor="middle">UPSERT</text>
+
+  <!-- 3 -> 4 (desde la vista) -->
+  <line x1="1112" y1="612" x2="1170" y2="470" stroke="#475569" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <text x="1150" y="560" font-size="10.5" fill="#475569" text-anchor="middle">SELECT</text>
+  <text x="1150" y="574" font-size="10.5" fill="#475569" text-anchor="middle">vw_Tickets</text>
+
+  <!-- ================= Pie / notas ================= -->
+  <rect x="40" y="704" width="1480" height="66" rx="10" fill="#ffffff" stroke="#cbd5e1"/>
+  <text x="58" y="729" font-size="12.5" font-weight="700" fill="#334155">Notas de diseño:</text>
+  <text x="58" y="749" font-size="11.5" fill="#475569">• Staging en texto + UPSERT por hash evita duplicados y conserva historial.  • El reporte incremental (3 días) cubre la operación diaria; el Total llena el histórico.</text>
+  <text x="58" y="764" font-size="11.5" fill="#475569">• Token JWT fuera del código (variable de entorno PVNET_API_TOKEN).  • La capa web (HTML / Power BI) solo lee la vista vw_Tickets, nunca las tablas base.</text>
+
+  <text x="1520" y="52" font-size="11" fill="#94a3b8" text-anchor="end">v1 · 2026</text>
+</svg>
