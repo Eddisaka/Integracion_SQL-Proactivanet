@@ -1,0 +1,511 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tickets Proactivanet — Tablero de SLA y productividad</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #f4f6f8;
+    --panel: #ffffff;
+    --border: #dfe4ea;
+    --text: #1f2937;
+    --text-muted: #6b7280;
+    --blue: #2563eb;
+    --green: #16a34a;
+    --red: #dc2626;
+    --amber: #d97706;
+    --purple: #7c3aed;
+    --cyan: #0891b2;
+    --slate: #64748b;
+    --radius: 10px;
+    --shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Segoe UI", system-ui, -apple-system, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  header {
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  header h1 {
+    font-size: 1.25rem;
+    margin: 0;
+  }
+  header .subtitulo {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+  #estado-carga {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+  }
+  main {
+    padding: 20px 24px 40px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  .filtros {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 16px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 14px;
+    align-items: end;
+    margin-bottom: 20px;
+  }
+  .filtros .campo { display: flex; flex-direction: column; gap: 4px; }
+  .filtros label { font-size: 0.78rem; font-weight: 600; color: var(--text-muted); }
+  .filtros input[type="date"],
+  .filtros select {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 8px;
+    font-size: 0.85rem;
+    background: #fff;
+    color: var(--text);
+  }
+  .filtros select[multiple] { min-height: 92px; }
+  .filtros .rango-rapido { display: flex; gap: 6px; flex-wrap: wrap; }
+  .filtros .rango-rapido button {
+    border: 1px solid var(--border);
+    background: #fff;
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 0.75rem;
+    cursor: pointer;
+  }
+  .filtros .rango-rapido button:hover { background: #eef2f7; }
+  .filtros .acciones { display: flex; gap: 8px; align-items: center; }
+  .btn-primario {
+    background: var(--blue);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 9px 16px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .btn-primario:hover { background: #1d4ed8; }
+  .btn-secundario {
+    background: #fff;
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 9px 14px;
+    font-size: 0.85rem;
+    cursor: pointer;
+  }
+
+  .kpis {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .kpi-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 14px 16px;
+  }
+  .kpi-card .valor { font-size: 1.6rem; font-weight: 700; line-height: 1.1; }
+  .kpi-card .etiqueta { font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; }
+  .kpi-card.ok .valor { color: var(--green); }
+  .kpi-card.warn .valor { color: var(--amber); }
+  .kpi-card.bad .valor { color: var(--red); }
+
+  .graficos {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 16px;
+    min-width: 0;
+  }
+  .panel h2 {
+    font-size: 0.95rem;
+    margin: 0 0 12px;
+  }
+  .panel .lienzo { position: relative; height: 280px; }
+  .panel.ancho { grid-column: 1 / -1; }
+  .panel.ancho .lienzo { height: 320px; }
+
+  .tabla-wrap {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 16px;
+    overflow-x: auto;
+  }
+  .tabla-wrap h2 { font-size: 0.95rem; margin: 0 0 4px; }
+  .tabla-wrap .nota { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 10px; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.8rem; white-space: nowrap; }
+  th, td { padding: 6px 10px; border-bottom: 1px solid var(--border); text-align: left; }
+  th { position: sticky; top: 0; background: var(--panel); font-weight: 600; color: var(--text-muted); }
+  tr:hover td { background: #f8fafc; }
+  .pill { border-radius: 999px; padding: 2px 8px; font-size: 0.72rem; font-weight: 600; }
+  .pill.vencido { background: #fde2e1; color: var(--red); }
+  .pill.dentro { background: #dcfce7; color: var(--green); }
+  .pill.neutro { background: #e5e7eb; color: var(--text-muted); }
+
+  .vacio { color: var(--text-muted); font-size: 0.85rem; padding: 20px; text-align: center; }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Tickets Proactivanet — SLA y productividad</h1>
+    <div class="subtitulo">Base Tickets_Proactivanet · dbo.vw_Dash_ProductividadBase</div>
+  </div>
+  <div id="estado-carga"></div>
+</header>
+
+<main>
+  <section class="filtros">
+    <div class="campo">
+      <label for="f-inicio">Fecha inicio</label>
+      <input type="date" id="f-inicio">
+    </div>
+    <div class="campo">
+      <label for="f-fin">Fecha fin</label>
+      <input type="date" id="f-fin">
+    </div>
+    <div class="campo">
+      <label>Rango rapido</label>
+      <div class="rango-rapido">
+        <button type="button" data-rango="hoy">Hoy</button>
+        <button type="button" data-rango="7d">Ultimos 7 dias</button>
+        <button type="button" data-rango="mes">Este mes</button>
+        <button type="button" data-rango="anio">Año actual</button>
+      </div>
+    </div>
+    <div class="campo">
+      <label for="f-grupos">Grupos (Ctrl/Cmd + clic para varios)</label>
+      <select id="f-grupos" multiple></select>
+    </div>
+    <div class="campo">
+      <label for="f-tecnicos">Tecnicos (Ctrl/Cmd + clic para varios)</label>
+      <select id="f-tecnicos" multiple></select>
+    </div>
+    <div class="campo acciones">
+      <button class="btn-primario" id="btn-aplicar">Aplicar filtros</button>
+      <button class="btn-secundario" id="btn-limpiar">Limpiar</button>
+    </div>
+  </section>
+
+  <section class="kpis" id="kpis"></section>
+
+  <section class="graficos">
+    <div class="panel ancho">
+      <h2>Tendencia diaria: creados vs cerrados vs vencidos SLA</h2>
+      <div class="lienzo"><canvas id="chart-tendencia"></canvas></div>
+    </div>
+    <div class="panel ancho">
+      <h2>Productividad por tecnico (top 15 por volumen)</h2>
+      <div class="lienzo"><canvas id="chart-productividad"></canvas></div>
+    </div>
+    <div class="panel">
+      <h2>Distribucion por estado</h2>
+      <div class="lienzo"><canvas id="chart-estado"></canvas></div>
+    </div>
+    <div class="panel">
+      <h2>Distribucion por prioridad</h2>
+      <div class="lienzo"><canvas id="chart-prioridad"></canvas></div>
+    </div>
+    <div class="panel">
+      <h2>Antiguedad de tickets (aging)</h2>
+      <div class="lienzo"><canvas id="chart-aging"></canvas></div>
+    </div>
+  </section>
+
+  <section class="tabla-wrap">
+    <h2>Detalle de tickets</h2>
+    <div class="nota">Se muestran hasta 500 tickets del rango filtrado, ordenados por fecha de registro descendente.</div>
+    <div id="tabla-detalle"></div>
+  </section>
+</main>
+
+<script>
+const PALETA = {
+  azul: '#2563eb', verde: '#16a34a', rojo: '#dc2626', ambar: '#d97706',
+  morado: '#7c3aed', cian: '#0891b2', gris: '#94a3b8'
+};
+const PALETA_CATEGORICA = [PALETA.azul, PALETA.verde, PALETA.ambar, PALETA.morado, PALETA.cian, PALETA.rojo, PALETA.gris, '#db2777', '#65a30d', '#0d9488'];
+
+let graficos = {};
+
+function hoyISO() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function formatoFecha(d) {
+  return d.toISOString().slice(0, 10);
+}
+
+function aplicarRangoRapido(tipo) {
+  const hoy = new Date();
+  let inicio, fin = new Date(hoy);
+  if (tipo === 'hoy') {
+    inicio = new Date(hoy);
+  } else if (tipo === '7d') {
+    inicio = new Date(hoy);
+    inicio.setDate(inicio.getDate() - 6);
+  } else if (tipo === 'mes') {
+    inicio = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+  } else if (tipo === 'anio') {
+    inicio = new Date(hoy.getFullYear(), 0, 1);
+  }
+  document.getElementById('f-inicio').value = formatoFecha(inicio);
+  document.getElementById('f-fin').value = formatoFecha(fin);
+  cargarTodo();
+}
+
+function valoresSeleccionados(idSelect) {
+  return Array.from(document.getElementById(idSelect).selectedOptions).map(o => o.value);
+}
+
+function paramsFiltros() {
+  const fi = document.getElementById('f-inicio').value;
+  const ff = document.getElementById('f-fin').value;
+  const grupos = valoresSeleccionados('f-grupos');
+  const tecnicos = valoresSeleccionados('f-tecnicos');
+  const p = new URLSearchParams();
+  if (fi) p.set('fecha_inicio', fi);
+  if (ff) p.set('fecha_fin', ff);
+  if (grupos.length) p.set('grupos', grupos.join(','));
+  if (tecnicos.length) p.set('tecnicos', tecnicos.join(','));
+  return p;
+}
+
+async function obtenerJSON(ruta) {
+  const resp = await fetch(ruta);
+  if (!resp.ok) throw new Error(`${ruta} -> HTTP ${resp.status}`);
+  return resp.json();
+}
+
+async function cargarCatalogos() {
+  const datos = await obtenerJSON('/api/catalogos');
+  const selGrupos = document.getElementById('f-grupos');
+  const selTecnicos = document.getElementById('f-tecnicos');
+  selGrupos.innerHTML = datos.grupos.map(g => `<option value="${escapeAttr(g)}">${escapeHtml(g)}</option>`).join('');
+  selTecnicos.innerHTML = datos.tecnicos.map(t => `<option value="${escapeAttr(t)}">${escapeHtml(t)}</option>`).join('');
+}
+
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function escapeAttr(s) { return escapeHtml(s); }
+
+function claseKpiSla(pct) {
+  if (pct === null || pct === undefined) return '';
+  if (pct >= 90) return 'ok';
+  if (pct >= 75) return 'warn';
+  return 'bad';
+}
+
+function renderKpis(k) {
+  const cont = document.getElementById('kpis');
+  const cumplimiento = k.CumplimientoSlaPct ?? null;
+  const tarjetas = [
+    { valor: k.TicketsTotales ?? 0, etiqueta: 'Tickets totales' },
+    { valor: k.TicketsAbiertos ?? 0, etiqueta: 'Abiertos' },
+    { valor: k.TicketsCerrados ?? 0, etiqueta: 'Cerrados' },
+    { valor: cumplimiento !== null ? `${cumplimiento}%` : 'N/D', etiqueta: 'Cumplimiento SLA', clase: claseKpiSla(cumplimiento) },
+    { valor: k.TicketsSlaVencidos ?? 0, etiqueta: 'Vencidos SLA', clase: (k.TicketsSlaVencidos ?? 0) > 0 ? 'bad' : 'ok' },
+    { valor: k.HorasResolucionPromedio ?? 'N/D', etiqueta: 'Horas resolucion promedio' },
+    { valor: k.TecnicosActivos ?? 0, etiqueta: 'Tecnicos activos' },
+    { valor: k.GruposActivos ?? 0, etiqueta: 'Grupos activos' },
+  ];
+  cont.innerHTML = tarjetas.map(t => `
+    <div class="kpi-card ${t.clase ?? ''}">
+      <div class="valor">${t.valor}</div>
+      <div class="etiqueta">${t.etiqueta}</div>
+    </div>
+  `).join('');
+}
+
+function destruirGrafico(id) {
+  if (graficos[id]) { graficos[id].destroy(); delete graficos[id]; }
+}
+
+function renderTendencia(filas) {
+  destruirGrafico('tendencia');
+  const ctx = document.getElementById('chart-tendencia');
+  graficos.tendencia = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: filas.map(f => f.Fecha),
+      datasets: [
+        { label: 'Creados', data: filas.map(f => f.TicketsCreados), borderColor: PALETA.azul, backgroundColor: PALETA.azul, tension: 0.25 },
+        { label: 'Cerrados', data: filas.map(f => f.TicketsCerrados), borderColor: PALETA.verde, backgroundColor: PALETA.verde, tension: 0.25 },
+        { label: 'Vencidos SLA', data: filas.map(f => f.TicketsSlaVencidos), borderColor: PALETA.rojo, backgroundColor: PALETA.rojo, tension: 0.25 },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+    }
+  });
+}
+
+function renderProductividad(filas) {
+  destruirGrafico('productividad');
+  const top = filas.slice(0, 15);
+  const ctx = document.getElementById('chart-productividad');
+  graficos.productividad = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: top.map(f => f.Tecnico),
+      datasets: [
+        { label: 'Totales', data: top.map(f => f.TicketsTotales), backgroundColor: PALETA.azul },
+        { label: 'Cerrados', data: top.map(f => f.TicketsCerrados), backgroundColor: PALETA.verde },
+      ]
+    },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      scales: { x: { beginAtZero: true, ticks: { precision: 0 } } }
+    }
+  });
+}
+
+function renderDona(idCanvas, idGrafico, filas) {
+  destruirGrafico(idGrafico);
+  const ctx = document.getElementById(idCanvas);
+  graficos[idGrafico] = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: filas.map(f => f.Valor),
+      datasets: [{ data: filas.map(f => f.Tickets), backgroundColor: PALETA_CATEGORICA }]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } } }
+  });
+}
+
+function renderBarraSimple(idCanvas, idGrafico, filas, color) {
+  destruirGrafico(idGrafico);
+  const ctx = document.getElementById(idCanvas);
+  graficos[idGrafico] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: filas.map(f => f.Valor),
+      datasets: [{ label: 'Tickets', data: filas.map(f => f.Tickets), backgroundColor: color ?? PALETA.azul }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+    }
+  });
+}
+
+function renderTablaDetalle(filas) {
+  const cont = document.getElementById('tabla-detalle');
+  if (!filas.length) {
+    cont.innerHTML = '<div class="vacio">Sin tickets para este filtro.</div>';
+    return;
+  }
+  const filasHtml = filas.map(f => {
+    let pill = '<span class="pill neutro">N/D</span>';
+    if (f.SlaVencido === true || f.SlaVencido === 1) pill = '<span class="pill vencido">Vencido</span>';
+    else if (f.DentroSla === true || f.DentroSla === 1) pill = '<span class="pill dentro">Dentro</span>';
+    return `<tr>
+      <td>${escapeHtml(f.CodigoTicket)}</td>
+      <td>${escapeHtml((f.FechaRegistro || '').replace('T', ' ').slice(0, 16))}</td>
+      <td>${escapeHtml(f.Grupo)}</td>
+      <td>${escapeHtml(f.Tecnico)}</td>
+      <td>${escapeHtml(f.Estado)}</td>
+      <td>${escapeHtml(f.Prioridad)}</td>
+      <td>${escapeHtml(f.Categoria)}</td>
+      <td>${pill}</td>
+      <td>${f.HorasResolucion ?? ''}</td>
+      <td>${escapeHtml(f.AgingBucket)}</td>
+      <td>${escapeHtml(f.Tienda)}</td>
+    </tr>`;
+  }).join('');
+  cont.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>Ticket</th><th>Fecha registro</th><th>Grupo</th><th>Tecnico</th>
+          <th>Estado</th><th>Prioridad</th><th>Categoria</th><th>SLA</th>
+          <th>Hrs. resolucion</th><th>Aging</th><th>Tienda</th>
+        </tr>
+      </thead>
+      <tbody>${filasHtml}</tbody>
+    </table>`;
+}
+
+async function cargarTodo() {
+  const estado = document.getElementById('estado-carga');
+  estado.textContent = 'Cargando...';
+  try {
+    const qs = paramsFiltros().toString();
+    const [kpis, tendencia, productividad, distribucion, detalle] = await Promise.all([
+      obtenerJSON(`/api/kpis?${qs}`),
+      obtenerJSON(`/api/tendencia?${qs}`),
+      obtenerJSON(`/api/productividad?${qs}`),
+      obtenerJSON(`/api/distribucion?${qs}`),
+      obtenerJSON(`/api/detalle?${qs}&top=500`),
+    ]);
+    renderKpis(kpis);
+    renderTendencia(tendencia);
+    renderProductividad(productividad);
+    renderDona('chart-estado', 'estado', distribucion.estado ?? []);
+    renderBarraSimple('chart-prioridad', 'prioridad', distribucion.prioridad ?? [], PALETA.ambar);
+    renderBarraSimple('chart-aging', 'aging', distribucion.aging ?? [], PALETA.morado);
+    renderTablaDetalle(detalle);
+    estado.textContent = `Actualizado ${new Date().toLocaleTimeString('es-MX')}`;
+  } catch (err) {
+    estado.textContent = 'Error al cargar datos. Revisa que dashboard_api.py este corriendo.';
+    console.error(err);
+  }
+}
+
+document.querySelectorAll('.rango-rapido button').forEach(btn => {
+  btn.addEventListener('click', () => aplicarRangoRapido(btn.dataset.rango));
+});
+document.getElementById('btn-aplicar').addEventListener('click', cargarTodo);
+document.getElementById('btn-limpiar').addEventListener('click', () => {
+  document.getElementById('f-grupos').selectedIndex = -1;
+  document.getElementById('f-tecnicos').selectedIndex = -1;
+  cargarTodo();
+});
+
+(async function iniciar() {
+  const inicioMes = new Date();
+  inicioMes.setDate(1);
+  document.getElementById('f-inicio').value = formatoFecha(inicioMes);
+  document.getElementById('f-fin').value = hoyISO();
+  await cargarCatalogos();
+  await cargarTodo();
+})();
+</script>
+</body>
+</html>
