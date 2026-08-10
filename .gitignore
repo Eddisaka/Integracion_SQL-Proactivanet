@@ -1,0 +1,9 @@
+config*.json
+!config.ejemplo.json
+!config.soriana*.json
+*.log
+logs/
+extraccion_*.json
+respuesta.json
+__pycache__/
+*.pyc
