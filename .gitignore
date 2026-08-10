@@ -1,5 +1,6 @@
-config.json
-config-old.json
+config*.json
+!config.ejemplo.json
+!config.soriana*.json
 *.log
 logs/
 extraccion_*.json
