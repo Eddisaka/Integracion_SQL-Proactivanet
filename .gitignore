@@ -7,3 +7,6 @@ extraccion_*.json
 respuesta.json
 __pycache__/
 *.pyc
+Web.config
+bin/
+obj/

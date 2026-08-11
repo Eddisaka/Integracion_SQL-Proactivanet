@@ -310,7 +310,7 @@ async function obtenerJSON(ruta) {
 }
 
 async function cargarCatalogos() {
-  const datos = await obtenerJSON('/api/catalogos');
+  const datos = await obtenerJSON('catalogos.ashx');
   const selGrupos = document.getElementById('f-grupos');
   const selTecnicos = document.getElementById('f-tecnicos');
   selGrupos.innerHTML = datos.grupos.map(g => `<option value="${escapeAttr(g)}">${escapeHtml(g)}</option>`).join('');
@@ -468,11 +468,11 @@ async function cargarTodo() {
   try {
     const qs = paramsFiltros().toString();
     const [kpis, tendencia, productividad, distribucion, detalle] = await Promise.all([
-      obtenerJSON(`/api/kpis?${qs}`),
-      obtenerJSON(`/api/tendencia?${qs}`),
-      obtenerJSON(`/api/productividad?${qs}`),
-      obtenerJSON(`/api/distribucion?${qs}`),
-      obtenerJSON(`/api/detalle?${qs}&top=500`),
+      obtenerJSON(`kpis.ashx?${qs}`),
+      obtenerJSON(`tendencia.ashx?${qs}`),
+      obtenerJSON(`productividad.ashx?${qs}`),
+      obtenerJSON(`distribucion.ashx?${qs}`),
+      obtenerJSON(`detalle.ashx?${qs}&top=500`),
     ]);
     renderKpis(kpis);
     renderTendencia(tendencia);

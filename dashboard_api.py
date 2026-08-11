@@ -79,7 +79,7 @@ def index():
     return send_from_directory(BASE_DIR, "dashboard.html")
 
 
-@app.route("/api/catalogos")
+@app.route("/catalogos.ashx")
 def catalogos():
     cn = _conectar()
     try:
@@ -98,7 +98,7 @@ def catalogos():
     )
 
 
-@app.route("/api/kpis")
+@app.route("/kpis.ashx")
 def kpis():
     fi, ff = _rango_fechas()
     grupos = _lista_filtro("grupos")
@@ -119,7 +119,7 @@ def kpis():
     return jsonify(filas[0] if filas else {})
 
 
-@app.route("/api/tendencia")
+@app.route("/tendencia.ashx")
 def tendencia():
     fi, ff = _rango_fechas()
     grupos = _lista_filtro("grupos")
@@ -140,7 +140,7 @@ def tendencia():
     return jsonify(filas)
 
 
-@app.route("/api/productividad")
+@app.route("/productividad.ashx")
 def productividad():
     fi, ff = _rango_fechas()
     grupos = _lista_filtro("grupos")
@@ -161,7 +161,7 @@ def productividad():
     return jsonify(filas)
 
 
-@app.route("/api/distribucion")
+@app.route("/distribucion.ashx")
 def distribucion():
     fi, ff = _rango_fechas()
     grupos = _lista_filtro("grupos")
@@ -186,7 +186,7 @@ def distribucion():
     return jsonify({"estado": estado, "prioridad": prioridad, "aging": aging})
 
 
-@app.route("/api/detalle")
+@app.route("/detalle.ashx")
 def detalle():
     fi, ff = _rango_fechas()
     grupos = _lista_filtro("grupos")
