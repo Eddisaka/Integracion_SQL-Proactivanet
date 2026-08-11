@@ -23,43 +23,40 @@ piezas — ver la tabla de equivalencias mas abajo.
 ## Regla de negocio (ya implementada en `dbo.vw_CorreoQA_Base`)
 
 Para cada ticket:
-- Su `Categoria` se busca en `dbo.CategoriaCatalogo.RutaCompleta` → de ahi
-  sale el **Grupo Correcto** (`GrupoIncidenciasPeticiones`).
+- Su `Categoria` se busca en `dbo.Categorias.RutaCompleta` → de ahi sale el
+  **Grupo Correcto** (`GrupoIncidenciasPeticiones`).
 - `Grupo` del ticket = Grupo Correcto → **OK**.
-- No coinciden, pero `(GrupoCorrecto, Grupo)` esta en `dbo.GrupoValido`
-  (un grupo con permiso de cerrar tickets de otro) → **Valido**.
+- No coinciden, pero `(GrupoCorrecto, Grupo)` esta en
+  `dbo.vw_GruposValidos` (un grupo con permiso de cerrar tickets de otro)
+  → **Valido**.
 - Cualquier otro caso → **Incorrecto**.
 
 Esta regla se dedujo comparando fila por fila los 3 archivos de ejemplo en
 `Envio_correos/` — coincide exactamente con la columna `Validacion` que ya
 traen.
 
-## 1) Cargar los catalogos (una vez, y cuando cambien)
+## 1) Catalogos: los mantiene tu ETL, no este script
 
-`dbo.CategoriaCatalogo` y `dbo.GrupoValido` empiezan vacias — no hay forma
-de leer `.xlsx` desde T-SQL sin instalar el driver ACE (misma clase de
-restriccion que no poder correr Python). La forma mas simple sin instalar
-nada nuevo:
+`05_correo_qa_categorias.sql` **no crea tablas propias** para categorias ni
+grupos validos — usa directo las que ya tienes:
 
-1. En SSMS, clic derecho sobre `Tickets_Proactivanet` → **Tareas →
-   Importar datos**.
-2. Origen: **Microsoft Excel**, selecciona `Cat_detalle.xlsx`, hoja
-   `DETALLE$`.
-3. Destino: SQL Server Native Client → tabla `dbo.CategoriaCatalogo`.
-   Mapea las columnas del Excel a las de la tabla (mismos nombres, solo
-   cambia "Ruta completa" → `RutaCompleta`, "Grupo incidencias /
-   peticiones" → `GrupoIncidenciasPeticiones`, etc. — revisa el `CREATE
-   TABLE` en `05_correo_qa_categorias.sql` para la lista completa).
-4. Repite con `Cat_gruposvalidos.xlsx` (hoja `tabla valid$`) → tabla
-   `dbo.GrupoValido` (`Grupo Correcto` → `GrupoCorrecto`, `Grupo Valido` →
-   `GrupoValido`).
+- `dbo.Categorias` (catalogo de categorias, `RutaCompleta` /
+  `GrupoIncidenciasPeticiones` / `VigenteEnOrigen`), cargada por tu ETL
+  diario — ver `04_esquema_categorias.sql`.
+- `dbo.CatGruposValidos` + `dbo.vw_GruposValidos` (la vista ya filtra a
+  `VigenteEnOrigen = 1`), actualizada esporadicamente — ver
+  `06_catalogos_excel.sql`.
 
-Las categorias y excepciones cambian poco (no a diario), asi que no hace
-falta automatizar esta carga para una primera version — repite estos pasos
-manualmente cuando Proactivanet tenga categorias nuevas. Si mas adelante
-quieres automatizarlo tambien, el asistente permite guardar el proceso
-como paquete SSIS y programarlo con SQL Server Agent (sigue sin requerir
-Python, corre en el motor de SQL Server).
+Requisito: corre `04_esquema_categorias.sql` y `06_catalogos_excel.sql`
+(o confirma que tu ETL ya las tiene cargadas) **antes** de
+`05_correo_qa_categorias.sql`.
+
+Como `dbo.Categorias` no tiene a `RutaCompleta` como llave (la llave es
+`Id`), en teoria podria haber mas de una fila con la misma ruta -por
+ejemplo una version vigente y otra vieja que quedo inactiva-. Para que eso
+no duplique tickets en el cruce, se agrego `dbo.vw_CorreoQA_CategoriaUnica`,
+que se queda con una sola fila por `RutaCompleta` (prefiriendo la vigente,
+y si hay empate la de carga mas reciente) antes de unirla con los tickets.
 
 ## 2) Equivalencia correo actual → procedimiento SQL
 

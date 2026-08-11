@@ -24,8 +24,9 @@
    - En cualquier otro caso                         -> Validacion = 'Incorrecto'
 
    Objetos creados:
-   - dbo.CategoriaCatalogo   (tabla: catalogo de categorias, reemplazo de Cat_detalle.xlsx)
-   - dbo.GrupoValido         (tabla: excepciones grupo correcto/valido, reemplazo de Cat_gruposvalidos.xlsx)
+   - dbo.vw_CorreoQA_CategoriaUnica (vista: una fila por RutaCompleta, para
+     que el join no se duplique si dbo.Categorias trae mas de una version
+     de la misma ruta -p. ej. vigente + historica-)
    - dbo.vw_CorreoQA_Base    (vista: un renglon por ticket con GrupoCorrecto y Validacion ya calculados)
    - dbo.usp_CorreoQA_Kpis                (tarjetas KPI, imagen 1 del correo)
    - dbo.usp_CorreoQA_PorGrupo            (barras "mal categorizados por grupo", imagen 1)
@@ -37,14 +38,15 @@
    - dbo.usp_CorreoQA_CatalogoCategorias  (reemplazo de Cat_detalle.xlsx)
    - dbo.usp_CorreoQA_GruposValidos       (reemplazo de Cat_gruposvalidos.xlsx)
 
-   Como cargar/actualizar dbo.CategoriaCatalogo y dbo.GrupoValido:
-   - No hay forma nativa de leer .xlsx desde T-SQL sin instalar el driver
-     ACE (mismo tipo de restriccion que no poder correr Python). La forma
-     mas simple sin instalar nada nuevo es el "Asistente para importacion y
-     exportacion de datos de SQL Server" que ya viene con SSMS: origen
-     Microsoft Excel -> destino las tablas de abajo. Ver CORREO_QA.md para
-     el paso a paso. Las categorias/grupos validos cambian poco, no hace
-     falta automatizar esta carga para la primera version.
+   Catalogos: NO se crean tablas propias. Este script se apoya en las que
+   ya mantiene tu ETL diario:
+   - dbo.Categorias   (catalogo de categorias, columnas RutaCompleta /
+     GrupoIncidenciasPeticiones / VigenteEnOrigen -ver 04_esquema_categorias.sql-)
+   - dbo.CatGruposValidos + dbo.vw_GruposValidos (excepciones grupo
+     correcto/valido, ya filtrada a VigenteEnOrigen = 1 -ver 06_catalogos_excel.sql-)
+   Requiere que 04_esquema_categorias.sql y 06_catalogos_excel.sql ya se
+   hayan ejecutado (y que el ETL las tenga cargadas) antes de correr este
+   archivo.
 
    Notas:
    - Script idempotente. Compatible con SQL Server 2016+.
@@ -57,43 +59,31 @@ SET NOCOUNT ON;
 GO
 
 /* =====================================================================================
-   1) Tablas de catalogo (reemplazan Cat_detalle.xlsx y Cat_gruposvalidos.xlsx)
+   1) Una fila por categoria (RutaCompleta puede tener mas de una version en
+      dbo.Categorias -p. ej. si quedo inactiva y se recreo-; sin este paso
+      el LEFT JOIN de la vista base podria duplicar tickets).
    ===================================================================================== */
-IF OBJECT_ID('dbo.CategoriaCatalogo', 'U') IS NULL
-BEGIN
-    CREATE TABLE dbo.CategoriaCatalogo
-    (
-        RutaCompleta                 NVARCHAR(500)  NOT NULL,
-        Nombre                       NVARCHAR(255)  NULL,
-        GrupoIncidenciasPeticiones   NVARCHAR(255)  NULL,
-        GrupoCambios                 NVARCHAR(255)  NULL,
-        AplicaIncidencias            BIT            NULL,
-        AplicaCambios                BIT            NULL,
-        AplicaKB                     BIT            NULL,
-        AplicaProblemas              BIT            NULL,
-        Inactiva                     BIT            NULL,
-        FechaCargaDW                 DATETIME2(0)   NOT NULL CONSTRAINT DF_CategoriaCatalogo_Carga DEFAULT (SYSDATETIME()),
-        CONSTRAINT PK_CategoriaCatalogo PRIMARY KEY CLUSTERED (RutaCompleta)
-    );
-END;
-GO
-
-IF OBJECT_ID('dbo.GrupoValido', 'U') IS NULL
-BEGIN
-    CREATE TABLE dbo.GrupoValido
-    (
-        GrupoCorrecto  NVARCHAR(255) NOT NULL,
-        GrupoValido    NVARCHAR(255) NOT NULL,
-        FechaCargaDW   DATETIME2(0)  NOT NULL CONSTRAINT DF_GrupoValido_Carga DEFAULT (SYSDATETIME()),
-        CONSTRAINT PK_GrupoValido PRIMARY KEY CLUSTERED (GrupoCorrecto, GrupoValido)
-    );
-END;
+CREATE OR ALTER VIEW dbo.vw_CorreoQA_CategoriaUnica
+AS
+SELECT RutaCompleta, GrupoIncidenciasPeticiones
+FROM (
+    SELECT
+        RutaCompleta = LTRIM(RTRIM(REPLACE(c.RutaCompleta, NCHAR(160), N' '))),
+        c.GrupoIncidenciasPeticiones,
+        rn = ROW_NUMBER() OVER (
+            PARTITION BY LTRIM(RTRIM(REPLACE(c.RutaCompleta, NCHAR(160), N' ')))
+            ORDER BY c.VigenteEnOrigen DESC, c.FechaUltimaCargaDW DESC
+        )
+    FROM dbo.Categorias AS c
+    WHERE c.RutaCompleta IS NOT NULL
+) q
+WHERE rn = 1;
 GO
 
 /* =====================================================================================
    2) Vista base: un renglon por ticket con GrupoCorrecto y Validacion.
       LTRIM/RTRIM/REPLACE(NCHAR(160)) normaliza espacios raros que a veces
-      trae la Categoria del ticket o la Ruta completa del catalogo.
+      trae la Categoria del ticket o la RutaCompleta del catalogo.
    ===================================================================================== */
 CREATE OR ALTER VIEW dbo.vw_CorreoQA_Base
 AS
@@ -120,16 +110,15 @@ SELECT
         WHEN LTRIM(RTRIM(t.Grupo)) = LTRIM(RTRIM(cat.GrupoIncidenciasPeticiones)) THEN N'OK'
         WHEN EXISTS (
             SELECT 1
-            FROM dbo.GrupoValido gv
+            FROM dbo.vw_GruposValidos gv
             WHERE gv.GrupoCorrecto = cat.GrupoIncidenciasPeticiones
               AND gv.GrupoValido = t.Grupo
         ) THEN N'Valido'
         ELSE N'Incorrecto'
     END
 FROM dbo.Tickets AS t
-LEFT JOIN dbo.CategoriaCatalogo AS cat
-       ON LTRIM(RTRIM(REPLACE(cat.RutaCompleta, NCHAR(160), N' ')))
-        = LTRIM(RTRIM(REPLACE(t.Categoria, NCHAR(160), N' ')))
+LEFT JOIN dbo.vw_CorreoQA_CategoriaUnica AS cat
+       ON cat.RutaCompleta = LTRIM(RTRIM(REPLACE(t.Categoria, NCHAR(160), N' ')))
 WHERE t.FechaRegistro IS NOT NULL;
 GO
 
@@ -361,8 +350,10 @@ GO
 
 /* =====================================================================================
    8) Catalogos completos, para adjuntar igual que Cat_detalle.xlsx / Cat_gruposvalidos.xlsx
+      (leen directo de las tablas que mantiene tu ETL, sin copia propia)
    ===================================================================================== */
 CREATE OR ALTER PROCEDURE dbo.usp_CorreoQA_CatalogoCategorias
+    @SoloVigentes BIT = 1
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -372,12 +363,14 @@ BEGIN
         Nombre,
         GrupoIncidenciasPeticiones,
         GrupoCambios,
-        AplicaIncidencias,
-        AplicaCambios,
-        AplicaKB,
-        AplicaProblemas,
-        Inactiva
-    FROM dbo.CategoriaCatalogo
+        AplicaAIncidencias,
+        AplicaACambios,
+        AplicaAKB,
+        AplicaAProblemas,
+        Inactiva,
+        VigenteEnOrigen
+    FROM dbo.Categorias
+    WHERE @SoloVigentes = 0 OR VigenteEnOrigen = 1
     ORDER BY RutaCompleta;
 END;
 GO
@@ -388,13 +381,13 @@ BEGIN
     SET NOCOUNT ON;
 
     SELECT GrupoCorrecto, GrupoValido
-    FROM dbo.GrupoValido
+    FROM dbo.vw_GruposValidos
     ORDER BY GrupoCorrecto, GrupoValido;
 END;
 GO
 
 /* =====================================================================================
-   9) Indice recomendado (el join contra CategoriaCatalogo es por Categoria)
+   9) Indice recomendado (el join contra dbo.Categorias es por Categoria)
    ===================================================================================== */
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Tickets_CorreoQA_FechaCategoriaGrupo' AND object_id = OBJECT_ID('dbo.Tickets'))
 BEGIN
@@ -408,8 +401,8 @@ GO
    10) Pruebas rapidas de uso
    =====================================================================================
 
--- Antes de probar, dbo.CategoriaCatalogo y dbo.GrupoValido deben tener datos
--- (importados desde Cat_detalle.xlsx / Cat_gruposvalidos.xlsx, ver CORREO_QA.md)
+-- Antes de probar, corre 04_esquema_categorias.sql y 06_catalogos_excel.sql
+-- (o confirma que tu ETL ya cargo dbo.Categorias y dbo.CatGruposValidos).
 
 EXEC dbo.usp_CorreoQA_Kpis;
 EXEC dbo.usp_CorreoQA_PorGrupo @Minimo = 10;
@@ -423,7 +416,8 @@ EXEC dbo.usp_CorreoQA_GruposValidos;
 
 -- Cuantos tickets del rango no encontraron su categoria en el catalogo
 -- (Validacion = 'Sin catalogo'): si da mas de un puñado, revisa que
--- dbo.CategoriaCatalogo este completo/actualizado.
+-- dbo.Categorias este completo/actualizado (o si la Categoria del ticket
+-- ya no existe en el catalogo vigente).
 SELECT COUNT(*) FROM dbo.vw_CorreoQA_Base
 WHERE Validacion = N'Sin catalogo' AND FechaRegistroDia >= DATEADD(DAY,-14,GETDATE());
 
