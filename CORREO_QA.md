@@ -72,6 +72,12 @@ y si hay empate la de carga mas reciente) antes de unirla con los tickets.
 | `Cat_detalle.xlsx` | `dbo.usp_CorreoQA_CatalogoCategorias` |
 | `Cat_gruposvalidos.xlsx` | `dbo.usp_CorreoQA_GruposValidos` |
 
+El flujo de Power Automate descrito en la seccion 3 solo llama
+directamente a los ultimos 3 (`_Detalle`, `_CatalogoCategorias`,
+`_GruposValidos`); las imagenes de KPIs/graficas/matrices se resuelven
+dejando que Power BI exporte el reporte ya existente, asi que esos otros 6
+procedimientos quedan disponibles pero no se usan en este flujo especifico.
+
 **Nota sobre las matrices (imagenes 3 y 4):** en vez de una columna por
 fecha (que cambiaria de forma cada dia y es fragil de generar en un
 procedimiento), estos dos devuelven `Fecha, Grupo/Tecnico,
@@ -89,28 +95,115 @@ dia, no alcanza para deducir la definicion exacta — si es otra cosa (ej.
 semana calendario lunes-domingo), ajusta `@SemanaAntInicio`/`@SemanaAntFin`
 dentro de `dbo.usp_CorreoQA_Kpis`.
 
-## 3) Flujo de Power Automate (borrador)
+## 3) Flujo de Power Automate — guia de construccion
 
-1. **Trigger**: Recurrence, diario a la hora que hoy se manda el correo.
-2. **SQL Server → Execute stored procedure** (usa el On-premises Data
-   Gateway que probablemente ya existe para el refresh de Power BI contra
-   esta misma base): llama `usp_CorreoQA_Kpis`, `usp_CorreoQA_PorGrupo`,
-   `usp_CorreoQA_PorTecnico`, `usp_CorreoQA_TopCategorias`.
-3. **Compose / HTML table**: arma el cuerpo del correo con esos resultados
-   (tarjetas KPI + tablas). Si quieres conservar el look de graficas de
-   Power BI en vez de tablas HTML, usa la accion de Power BI **"Export To
-   File"** sobre el reporte/pagina correspondiente y adjunta o incrusta esa
-   imagen/PDF — asi no hay que recrear graficas dentro de Power Automate.
-4. **SQL Server → Execute stored procedure**: `usp_CorreoQA_Detalle`,
-   `usp_CorreoQA_CatalogoCategorias`, `usp_CorreoQA_GruposValidos`.
-5. **Excel Online (Business) o "Create CSV table"**: convierte cada
-   resultado en un archivo. Para arrancar simple, usa CSV (Excel lo abre
-   igual); si despues quieres el `.xlsx` con formato identico al actual,
-   usa una plantilla en OneDrive/SharePoint y la accion "Add a row into a
-   table" por cada fila.
-6. **Outlook → Send an email (V2)**: destinatarios, cuerpo (texto de
-   `Cuerpo_correo.docx` + lo armado en el paso 3), adjunta los 3 archivos
-   del paso 5.
+**Decision de diseno:** en vez de reconstruir las 4 imagenes (KPIs, 2
+graficas, tabla de categorias, 2 matrices) como HTML dentro de Power
+Automate —el pivote Fecha x Grupo/Tecnico en particular es fragil de armar
+sin un paso de scripting—, se deja que **Power BI exporte el reporte
+completo a PDF** de forma automatica (una sola accion, cero mantenimiento).
+Los 3 Excel/CSV si se generan 100% desde los procedimientos SQL nuevos. Por
+eso de los 9 procedimientos de `05_correo_qa_categorias.sql`, este flujo
+solo usa 3 (`usp_CorreoQA_Detalle`, `usp_CorreoQA_CatalogoCategorias`,
+`usp_CorreoQA_GruposValidos`); los otros 6 (KPIs, barras, tendencia) quedan
+disponibles para otros usos (ej. si mas adelante quieres una version del
+correo sin depender de que el reporte de Power BI siga existiendo).
+
+**Prerrequisitos:**
+- Licencia Power BI Pro (o el reporte en un workspace Premium/PPU) — la
+  necesitas de todas formas para publicar/compartir el reporte, asi que
+  normalmente ya la tienes.
+- El **On-premises Data Gateway** que Power BI ya usa para refrescar este
+  reporte contra `Tickets_Proactivanet` — Power Automate reutiliza el mismo
+  para el conector de SQL Server. Confirmalo con quien administra Power BI
+  en Soriana antes de armar el flujo.
+
+### Paso a paso (en make.powerautomate.com → Crear → Flujo de nube automatizado)
+
+**1. Trigger — Recurrence**
+- Interval: `1`, Frequency: `Day`, Time zone: `(UTC-06:00) Guadalajara,
+  Ciudad de Mexico, Monterrey`, Hora: la que hoy se manda el correo.
+
+**2. Initialize variable — `FechaFin`** (tipo String)
+```
+formatDateTime(convertFromUtc(utcNow(), 'Central Standard Time (Mexico)'), 'yyyy-MM-dd')
+```
+
+**3. Initialize variable — `FechaInicio`** (tipo String)
+```
+formatDateTime(addDays(convertFromUtc(utcNow(), 'Central Standard Time (Mexico)'), -14), 'yyyy-MM-dd')
+```
+(15 dias, igual que el titulo del reporte actual "ultimos 15 dias"; ajusta
+el `-14` si quieres otra ventana.)
+
+**4. Power BI — "Refresh a dataset"**
+- Workspace y Dataset del reporte "Analisis diario de tickets".
+- Asegura que el PDF del paso 6 no salga con datos de ayer. Si el dataset
+  ya tiene un refresh programado que siempre termina antes de la hora del
+  trigger (paso 1), puedes omitir este paso.
+
+**5. Power BI — "Wait for a Dataset Refresh to complete"** (opcional pero
+recomendado si agregaste el paso 4; el refresh es asincrono, sin esto el
+export del paso 6 podria correr sobre datos viejos)
+
+**6. Power BI — "Export To File for Power BI reports"**
+- Workspace / Report: el reporte "Analisis diario de tickets".
+- Export Format: `PDF`.
+- Pages: `All pages` (asi el PDF trae las 4 vistas en un solo archivo, sin
+  importar en cuantas paginas este dividido el reporte).
+- Guarda el resultado (`body`, en base64) — se usa en el paso 10.
+
+**7. SQL Server — "Execute stored procedure (V2)"** → `usp_CorreoQA_Detalle`
+- Server / Database: los de `Tickets_Proactivanet` (conexion via el
+  gateway).
+- Parametros: `FechaInicio` = variable del paso 3, `FechaFin` = variable
+  del paso 2, `SoloIncorrectos` = `false`, `Top` = `10000`.
+
+**8. SQL Server — "Execute stored procedure (V2)"** → `usp_CorreoQA_CatalogoCategorias`
+- Parametro: `SoloVigentes` = `true`.
+
+**9. SQL Server — "Execute stored procedure (V2)"** → `usp_CorreoQA_GruposValidos`
+- Sin parametros.
+
+**10. "Create CSV table"** — uno por cada resultado de los pasos 7-9
+- From: `outputs('Execute_stored_procedure_(V2)')?['body/ResultSets']?['Table1']`
+  (el nombre exacto de la referencia depende de como Power Automate llamo
+  a cada accion; usa el selector de contenido dinamico en vez de escribirlo
+  a mano).
+- Columns: Automatic.
+- Resultado: 3 variables de texto CSV (detalle, catalogo, grupos validos).
+
+No hace falta guardar estos archivos en OneDrive/SharePoint para este
+flujo — se adjuntan directo al correo en base64 desde el resultado de
+"Create CSV table".
+
+**11. Outlook — "Send an email (V2)"**
+- To: la lista de distribucion actual del correo.
+- Subject: `Analisis diario de tickets - @{variables('FechaFin')}`
+- Body (HTML): el texto de `Cuerpo_correo.docx` ("Buen dia a todos. Les
+  compartimos el Dashboard y los KPIs..."), pegado como HTML fijo.
+- Attachments:
+  1. `Dashboard_QA.pdf` — Content: la salida en base64 del paso 6 (Export
+     To File).
+  2. `TICKETS_QA_<fecha>.csv` — Content: base64 de la salida del paso 10
+     (Detalle). Expresion: `base64(body('Create_CSV_table'))` (usa el
+     nombre real de la accion).
+  3. `Cat_detalle.csv` — CSV del catalogo de categorias (paso 8).
+  4. `Cat_gruposvalidos.csv` — CSV de grupos validos (paso 9).
+
+### Mejoras opcionales, para despues de que la v1 funcione
+
+- **`.xlsx` en vez de `.csv`**: usa una plantilla en OneDrive/SharePoint con
+  el conector "Excel Online (Business)" y la accion "Add a row into a
+  table" dentro de un "Apply to each" sobre cada resultado SQL — mismo
+  formato que los adjuntos actuales, pero mas pasos de configurar y mas
+  lento en filas grandes (el detalle trae ~4,000+ tickets).
+- **Alertar si `TicketsIncorrectosAyer` sube mucho**: agrega un `SQL Server
+  → Execute stored procedure (V2)` a `usp_CorreoQA_Kpis` y una condicion
+  antes del envio (ej. Teams/correo aparte si supera un umbral).
+- **Historico de envios**: si quieres poder auditar que se mando cada dia,
+  agrega al final del flujo un `INSERT` a una tabla de log propia (o
+  reutiliza `dbo.EtlLog` con un `Proceso = 'CorreoQA'`).
 
 No arme el flujo de Power Automate en si (eso se construye en
 `make.powerautomate.com`, no vive en este repositorio) — este documento es
