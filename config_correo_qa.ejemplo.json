@@ -1,0 +1,22 @@
+{
+  "_comentario": "Copia este archivo como config_correo_qa.json y ajustalo. NO subas config_correo_qa.json (con SMTP/destinatarios reales) a git -ya cubierto por .gitignore-.",
+
+  "destinatarios": [
+    "persona1@soriana.com",
+    "persona2@soriana.com"
+  ],
+  "remitente": "reportes-ti@soriana.com",
+
+  "_smtp": "Servidor de relay SMTP interno de Soriana. La mayoria de los relays internos aceptan correo sin autenticacion desde IPs conocidas -deja smtp_usuario vacio en ese caso-.",
+  "smtp_servidor": "smtp.soriana.com",
+  "smtp_puerto": 25,
+  "smtp_usa_ssl": false,
+  "smtp_usuario": "",
+  "smtp_password": "",
+
+  "_ventana": "Dias hacia atras desde hoy para el reporte -15 dias, igual que el correo actual-.",
+  "ventana_dias": 14,
+  "minimo_grupo": 10,
+  "minimo_tecnico": 5,
+  "top_categorias": 10
+}
