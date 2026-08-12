@@ -1,8 +1,21 @@
 # Correo automatizado de QA de categorizacion
 
 Reemplaza el proceso manual (Power BI + capturas + 3 Excel armados a mano)
-por: SQL Server (datos + logica) → Power Automate (orquesta y arma el
-correo) → Outlook (envio). Sin Python en ningun punto.
+por un envio automatico. Sin Python en ningun punto. Hay dos rutas:
+
+- **Ahora (activa):** SQL Server + PowerShell + Windows Task Scheduler —
+  `Enviar_CorreoQA.ps1`. No depende de nada nuevo, corre con lo que ya
+  tienes hoy. Ver seccion 3.
+- **Mas adelante, cuando exista el On-premises Data Gateway:** SQL Server →
+  Power Automate (orquesta, y deja que Power BI exporte el reporte a PDF
+  para conservar exactamente el mismo look) → Outlook. Ver seccion 4. No
+  se pudo armar todavia porque no hay gateway instalado en la organizacion
+  (confirmado: el reporte de Power BI se refresca manualmente, asi que no
+  hay ninguno en uso ahora mismo).
+
+Las dos rutas usan los mismos procedimientos de `05_correo_qa_categorias.sql`
+— cuando el gateway exista, se puede migrar de una a otra sin tocar el lado
+SQL.
 
 ## Que se automatiza
 
@@ -72,7 +85,7 @@ y si hay empate la de carga mas reciente) antes de unirla con los tickets.
 | `Cat_detalle.xlsx` | `dbo.usp_CorreoQA_CatalogoCategorias` |
 | `Cat_gruposvalidos.xlsx` | `dbo.usp_CorreoQA_GruposValidos` |
 
-El flujo de Power Automate descrito en la seccion 3 solo llama
+El flujo de Power Automate descrito en la seccion 4 solo llama
 directamente a los ultimos 3 (`_Detalle`, `_CatalogoCategorias`,
 `_GruposValidos`); las imagenes de KPIs/graficas/matrices se resuelven
 dejando que Power BI exporte el reporte ya existente, asi que esos otros 6
@@ -95,7 +108,66 @@ dia, no alcanza para deducir la definicion exacta — si es otra cosa (ej.
 semana calendario lunes-domingo), ajusta `@SemanaAntInicio`/`@SemanaAntFin`
 dentro de `dbo.usp_CorreoQA_Kpis`.
 
-## 3) Flujo de Power Automate — guia de construccion
+## 3) Ruta activa ahora: PowerShell + Windows Task Scheduler
+
+`Enviar_CorreoQA.ps1` hace todo en un solo script: consulta los
+procedimientos, arma el cuerpo del correo en HTML (tarjetas de KPI + las
+tablas de grupo/tecnico/categorias — no incluye las graficas ni la matriz
+de Power BI, solo texto/tablas) y lo manda por SMTP con los 3 adjuntos
+CSV. Mismo patron operativo que ya usas para `etl_proactivanet.py`
+(Task Scheduler), solo que en PowerShell en vez de Python.
+
+**1) Modulo de PowerShell** (una sola vez, en la maquina donde vaya a
+correr la tarea):
+```powershell
+Install-Module SqlServer -Scope CurrentUser
+```
+Si esa maquina no tiene salida a internet para instalar desde la
+PowerShell Gallery, usa el modulo `SQLPS` que ya viene junto con
+SSMS/SQL Server (el script cae a ese automaticamente si no encuentra
+`SqlServer`).
+
+**2) Configuracion de correo** — copia `config_correo_qa.ejemplo.json`
+como `config_correo_qa.json` (mismo patron que `config.json`: la copia
+real **no** se sube a git, ya esta en `.gitignore`) y llena:
+- `destinatarios`, `remitente`
+- `smtp_servidor` / `smtp_puerto` — el relay SMTP interno de Soriana.
+  La mayoria de los relays internos aceptan correo sin autenticacion desde
+  IPs conocidas de la red corporativa; en ese caso deja `smtp_usuario`
+  vacio y no hace falta contraseña. Si tu relay si pide autenticacion,
+  llena `smtp_usuario`/`smtp_password` — igual que con `config.json`, no
+  subas ese archivo con la contraseña real a ningun lado.
+- `ventana_dias` (15 dias por defecto, igual que el correo actual),
+  `minimo_grupo`/`minimo_tecnico` (los mismos umbrales ">10"/">5" que usan
+  las graficas de barras hoy), `top_categorias`.
+
+**3) Probarlo a mano** antes de programarlo:
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File Enviar_CorreoQA.ps1
+```
+Revisa que llegue el correo con los 3 adjuntos y que los numeros
+coincidan con lo que esperas. `config.json` (el bloque `sql`) debe estar
+en la misma carpeta — reusa la conexion que ya usa el ETL/dashboard.
+
+**4) Programar en Task Scheduler:**
+- Programa nueva → Diaria, a la hora que hoy se manda el correo.
+- Accion: `powershell.exe`
+- Argumentos: `-NoProfile -ExecutionPolicy Bypass -File "C:\ruta\Enviar_CorreoQA.ps1"`
+- Iniciar en (directorio de trabajo): la carpeta donde estan
+  `Enviar_CorreoQA.ps1`, `config.json` y `config_correo_qa.json` — el
+  script asume que corre desde ahi.
+- Ejecutar con la cuenta que tenga permisos de `EXECUTE` sobre los
+  procedimientos `usp_CorreoQA_*` en SQL Server (si usas autenticacion de
+  Windows en `config.json`, es la cuenta con la que corre la tarea; si no,
+  la cuenta SQL que pusiste en `config.json`).
+
+**Limitacion conocida de esta ruta:** el cuerpo del correo tiene tablas en
+vez de las graficas/matrices de Power BI. Si eso es un problema para quien
+lo recibe, prioriza conseguir el gateway y migrar a la seccion 4; mientras
+tanto, esto ya reemplaza por completo el trabajo manual de armar los 3
+Excel y escribir el correo.
+
+## 4) Ruta futura, cuando exista el gateway: flujo de Power Automate — guia de construccion
 
 **Decision de diseno:** en vez de reconstruir las 4 imagenes (KPIs, 2
 graficas, tabla de categorias, 2 matrices) como HTML dentro de Power
