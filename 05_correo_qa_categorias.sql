@@ -23,6 +23,13 @@
      (un grupo tiene permitido cerrar tickets de otro)  -> Validacion = 'Valido'
    - En cualquier otro caso                         -> Validacion = 'Incorrecto'
 
+   Grupos fuera de alcance (confirmado con Edgar): estos tickets no se
+   consideran en absoluto -ni en el total, ni en ningun KPI/tabla-, se
+   excluyen desde dbo.vw_CorreoQA_Base:
+   - Grupo que empieza con 'Datos Maestros'
+   - Grupo que empieza con 'Servicios al personal'
+   - Grupo = 'SorIA' (exacto)
+
    Objetos creados:
    - dbo.vw_CorreoQA_CategoriaUnica (vista: una fila por RutaCompleta, para
      que el join no se duplique si dbo.Categorias trae mas de una version
@@ -119,7 +126,12 @@ SELECT
 FROM dbo.Tickets AS t
 LEFT JOIN dbo.vw_CorreoQA_CategoriaUnica AS cat
        ON cat.RutaCompleta = LTRIM(RTRIM(REPLACE(t.Categoria, NCHAR(160), N' ')))
-WHERE t.FechaRegistro IS NOT NULL;
+WHERE t.FechaRegistro IS NOT NULL
+  -- Grupos fuera del alcance de este QA (confirmado con Edgar): no cuentan
+  -- ni para el total de tickets ni para ningun KPI/tabla de este correo.
+  AND LTRIM(RTRIM(ISNULL(t.Grupo, N''))) NOT LIKE N'Datos Maestros%'
+  AND LTRIM(RTRIM(ISNULL(t.Grupo, N''))) NOT LIKE N'Servicios al personal%'
+  AND LTRIM(RTRIM(ISNULL(t.Grupo, N''))) <> N'SorIA';
 GO
 
 /* =====================================================================================
