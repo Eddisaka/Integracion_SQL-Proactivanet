@@ -117,17 +117,15 @@ de Power BI, solo texto/tablas) y lo manda por SMTP con los 3 adjuntos
 CSV. Mismo patron operativo que ya usas para `etl_proactivanet.py`
 (Task Scheduler), solo que en PowerShell en vez de Python.
 
-**1) Modulo de PowerShell** (una sola vez, en la maquina donde vaya a
-correr la tarea):
-```powershell
-Install-Module SqlServer -Scope CurrentUser
-```
-Si esa maquina no tiene salida a internet para instalar desde la
-PowerShell Gallery, usa el modulo `SQLPS` que ya viene junto con
-SSMS/SQL Server (el script cae a ese automaticamente si no encuentra
-`SqlServer`).
+**No hay nada que instalar.** La primera version usaba el modulo
+`Invoke-Sqlcmd`/`SqlServer`, pero en el escritorio virtual no hay salida a
+internet para instalarlo (`Install-Module` falla al no poder bajar el
+proveedor NuGet) ni esta presente el modulo viejo `SQLPS`. El script ahora
+se conecta con `System.Data.SqlClient` directo — viene incluido en .NET
+Framework en cualquier Windows, sin depender de ningun modulo externo (es
+lo mismo que usan los `.ashx` en C#, solo que llamado desde PowerShell).
 
-**2) Configuracion de correo** — copia `config_correo_qa.ejemplo.json`
+**1) Configuracion de correo** — copia `config_correo_qa.ejemplo.json`
 como `config_correo_qa.json` (mismo patron que `config.json`: la copia
 real **no** se sube a git, ya esta en `.gitignore`) y llena:
 - `destinatarios`, `remitente`
@@ -141,7 +139,7 @@ real **no** se sube a git, ya esta en `.gitignore`) y llena:
   `minimo_grupo`/`minimo_tecnico` (los mismos umbrales ">10"/">5" que usan
   las graficas de barras hoy), `top_categorias`.
 
-**3) Probarlo a mano** antes de programarlo:
+**2) Probarlo a mano** antes de programarlo:
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File Enviar_CorreoQA.ps1
 ```
@@ -149,7 +147,7 @@ Revisa que llegue el correo con los 3 adjuntos y que los numeros
 coincidan con lo que esperas. `config.json` (el bloque `sql`) debe estar
 en la misma carpeta — reusa la conexion que ya usa el ETL/dashboard.
 
-**4) Programar en Task Scheduler:**
+**3) Programar en Task Scheduler:**
 - Programa nueva → Diaria, a la hora que hoy se manda el correo.
 - Accion: `powershell.exe`
 - Argumentos: `-NoProfile -ExecutionPolicy Bypass -File "C:\ruta\Enviar_CorreoQA.ps1"`

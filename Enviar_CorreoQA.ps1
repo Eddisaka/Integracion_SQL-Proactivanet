@@ -8,9 +8,10 @@
     CORREO_QA.md).
 
 .REQUISITOS
-    - Modulo de PowerShell "SqlServer" (trae Invoke-Sqlcmd). Si no esta
-      instalado: Install-Module SqlServer -Scope CurrentUser
-      (o el modulo "SQLPS" que ya viene con SQL Server/SSMS, como respaldo).
+    - Ninguno que instalar: usa System.Data.SqlClient directo (viene con
+      .NET Framework en cualquier Windows), no depende del modulo
+      "SqlServer" ni de "SQLPS" -por si el equipo no tiene salida a
+      internet para Install-Module, como paso con el escritorio virtual-.
     - config.json en la misma carpeta (el mismo que usa etl_proactivanet.py
       y dashboard_api.py; se lee su bloque "sql").
     - config_correo_qa.json en la misma carpeta (copia de
@@ -37,29 +38,50 @@ $carpetaTemp = Join-Path $carpetaScript "correo_qa_temp"
 New-Item -ItemType Directory -Force -Path $carpetaTemp | Out-Null
 
 # ==================================================== Conexion a SQL Server
-if (-not (Get-Module -ListAvailable -Name SqlServer)) {
-    Import-Module SQLPS -DisableNameChecking -ErrorAction Stop
+# System.Data.SqlClient viene con .NET Framework, no requiere instalar ni
+# importar ningun modulo de PowerShell (equivalente a como se conecta
+# DashboardDb.cs en C# y _conectar() en dashboard_api.py).
+Add-Type -AssemblyName "System.Data"
+
+$partesConexion = @(
+    "Server=$($configSql.servidor)",
+    "Database=$($configSql.base_datos)"
+)
+if ($configSql.autenticacion_windows) {
+    $partesConexion += "Integrated Security=True"
 } else {
-    Import-Module SqlServer -ErrorAction Stop
+    $partesConexion += "User ID=$($configSql.usuario)"
+    $partesConexion += "Password=$($configSql.password)"
 }
+$partesConexion += "Encrypt=$(if ($configSql.encriptar) { 'True' } else { 'False' })"
+$partesConexion += "TrustServerCertificate=$(if ($configSql.confiar_certificado) { 'True' } else { 'False' })"
+$partesConexion += "Connect Timeout=$($configSql.timeout)"
+$cadenaConexion = $partesConexion -join ';'
 
 function Invoke-Consulta {
     param([string]$Query)
 
-    $parametrosSql = @{
-        ServerInstance = $configSql.servidor
-        Database       = $configSql.base_datos
-        Query          = $Query
-        QueryTimeout   = 120
+    $conexion = New-Object System.Data.SqlClient.SqlConnection($cadenaConexion)
+    try {
+        $conexion.Open()
+        $comando = New-Object System.Data.SqlClient.SqlCommand($Query, $conexion)
+        $comando.CommandTimeout = 120
+        $adaptador = New-Object System.Data.SqlClient.SqlDataAdapter($comando)
+        $tabla = New-Object System.Data.DataTable
+        [void]$adaptador.Fill($tabla)
+    } finally {
+        $conexion.Close()
     }
-    if (-not $configSql.autenticacion_windows) {
-        $parametrosSql.Username = $configSql.usuario
-        $parametrosSql.Password = $configSql.password
+
+    # DataRow no sirve tal cual para Export-Csv/propiedades dinamicas;
+    # se convierte cada fila a un objeto normal de PowerShell.
+    $columnas = $tabla.Columns.ColumnName
+    $filas = foreach ($fila in $tabla.Rows) {
+        $obj = [ordered]@{}
+        foreach ($col in $columnas) { $obj[$col] = $fila[$col] }
+        [PSCustomObject]$obj
     }
-    if ($configSql.encriptar) {
-        $parametrosSql.TrustServerCertificate = $true
-    }
-    return Invoke-Sqlcmd @parametrosSql
+    return $filas
 }
 
 Write-Host "Consultando KPIs y tablas ($fechaInicio a $fechaFin)..."
