@@ -130,7 +130,14 @@ function ConvertTo-XmlEscapado {
     $valido = New-Object System.Text.StringBuilder
     foreach ($ch in $t.ToCharArray()) {
         $codigo = [int]$ch
-        if ($codigo -ge 32 -or $ch -eq "`t" -or $ch -eq "`r" -or $ch -eq "`n") {
+        $esControlPermitido = ($ch -eq "`t" -or $ch -eq "`r" -or $ch -eq "`n")
+        # Ademas de los controles 0x00-0x1F (salvo tab/CR/LF), se excluye
+        # 0x7F-0x9F: texto largo pegado desde Word/Outlook (Descripcion,
+        # QA_*, QARe_*) a veces trae esos caracteres por una mala
+        # codificacion Windows-1252 en el origen, y Excel los rechaza al
+        # abrir el .xlsx ("hemos encontrado un problema con el contenido").
+        $prohibido = ($codigo -lt 32 -and -not $esControlPermitido) -or ($codigo -ge 127 -and $codigo -le 159)
+        if (-not $prohibido) {
             [void]$valido.Append($ch)
         }
     }
