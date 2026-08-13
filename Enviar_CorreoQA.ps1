@@ -284,7 +284,6 @@ function New-GraficaBarras {
         $indicePunto = $serie.Points.AddY([double]$fila.$ColumnaValor)
         $serie.Points[$indicePunto].AxisLabel = [string]$fila.$ColumnaEtiqueta
     }
-    $chart.Series.Add($serie)
 
     if (Test-Path $RutaArchivo) { Remove-Item $RutaArchivo -Force }
     $chart.SaveImage($RutaArchivo, [System.Windows.Forms.DataVisualization.Charting.ChartImageFormat]::Png)
