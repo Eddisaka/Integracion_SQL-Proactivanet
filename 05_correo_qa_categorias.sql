@@ -23,12 +23,14 @@
      (un grupo tiene permitido cerrar tickets de otro)  -> Validacion = 'Valido'
    - En cualquier otro caso                         -> Validacion = 'Incorrecto'
 
-   Grupos fuera de alcance (confirmado con Edgar): estos tickets no se
-   consideran en absoluto -ni en el total, ni en ningun KPI/tabla-, se
-   excluyen desde dbo.vw_CorreoQA_Base:
-   - Grupo que empieza con 'Datos Maestros'
-   - Grupo que empieza con 'Servicios al personal'
-   - Grupo = 'SorIA' (exacto)
+   Alcance del reporte (confirmado con Edgar), aplicado en
+   dbo.vw_CorreoQA_Base -no cuenta ni en el total ni en ningun KPI/tabla-:
+   - Solo tickets con Estado = 'Cerrada'.
+   - Excluye por Grupo: empieza con 'Datos Maestros', empieza con
+     'Servicios al personal', o es exactamente 'SorIA'.
+   - Excluye por Categoria (independiente del Grupo, por si un ticket de
+     estas categorias quedo asignado a otro grupo): empieza con 'Soria',
+     'S-Mesa de Servicios al Personal' o 'S-Datos-Maestros'.
 
    Objetos creados:
    - dbo.vw_CorreoQA_CategoriaUnica (vista: una fila por RutaCompleta, para
@@ -124,14 +126,32 @@ SELECT
         ELSE N'Incorrecto'
     END
 FROM dbo.Tickets AS t
+CROSS APPLY (
+    SELECT CategoriaNorm = LTRIM(RTRIM(REPLACE(ISNULL(t.Categoria, N''), NCHAR(160), N' ')))
+) AS catn
+CROSS APPLY (
+    -- Sin la barra inicial, para comparar contra los prefijos tal como los
+    -- dio Edgar ('Soria%', no '/Soria%').
+    SELECT CategoriaSinBarra = CASE
+        WHEN LEFT(catn.CategoriaNorm, 1) = N'/' THEN SUBSTRING(catn.CategoriaNorm, 2, 1000)
+        ELSE catn.CategoriaNorm
+    END
+) AS catb
 LEFT JOIN dbo.vw_CorreoQA_CategoriaUnica AS cat
-       ON cat.RutaCompleta = LTRIM(RTRIM(REPLACE(t.Categoria, NCHAR(160), N' ')))
+       ON cat.RutaCompleta = catn.CategoriaNorm
 WHERE t.FechaRegistro IS NOT NULL
-  -- Grupos fuera del alcance de este QA (confirmado con Edgar): no cuentan
-  -- ni para el total de tickets ni para ningun KPI/tabla de este correo.
+  -- Solo tickets cerrados (confirmado con Edgar).
+  AND t.Estado = N'Cerrada'
+  -- Grupos fuera del alcance de este QA: no cuentan ni para el total de
+  -- tickets ni para ningun KPI/tabla de este correo.
   AND LTRIM(RTRIM(ISNULL(t.Grupo, N''))) NOT LIKE N'Datos Maestros%'
   AND LTRIM(RTRIM(ISNULL(t.Grupo, N''))) NOT LIKE N'Servicios al personal%'
-  AND LTRIM(RTRIM(ISNULL(t.Grupo, N''))) <> N'SorIA';
+  AND LTRIM(RTRIM(ISNULL(t.Grupo, N''))) <> N'SorIA'
+  -- Categorias fuera de alcance (independiente del Grupo: un ticket de
+  -- estas categorias puede haber quedado asignado a otro grupo).
+  AND catb.CategoriaSinBarra NOT LIKE N'Soria%'
+  AND catb.CategoriaSinBarra NOT LIKE N'S-Mesa de Servicios al Personal%'
+  AND catb.CategoriaSinBarra NOT LIKE N'S-Datos-Maestros%';
 GO
 
 /* =====================================================================================

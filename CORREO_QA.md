@@ -48,16 +48,20 @@ Esta regla se dedujo comparando fila por fila los 3 archivos de ejemplo en
 `Envio_correos/` — coincide exactamente con la columna `Validacion` que ya
 traen.
 
-**Grupos fuera de alcance:** `dbo.vw_CorreoQA_Base` excluye por completo
-(ni cuentan en el total, ni en ningun KPI/tabla) los tickets de:
-- `Grupo` que empiece con `Datos Maestros`
-- `Grupo` que empiece con `Servicios al personal`
-- `Grupo` exactamente `SorIA`
+**Alcance del reporte:** `dbo.vw_CorreoQA_Base` excluye por completo (ni
+cuentan en el total, ni en ningun KPI/tabla) lo siguiente:
+- Solo tickets con `Estado = 'Cerrada'` — los demas estados no cuentan.
+- `Grupo` que empiece con `Datos Maestros`, que empiece con `Servicios al
+  personal`, o sea exactamente `SorIA`.
+- `Categoria` que empiece con `Soria`, `S-Mesa de Servicios al Personal` o
+  `S-Datos-Maestros` — esta exclusion es **independiente** de la de Grupo,
+  porque un ticket de estas categorias puede haber quedado asignado a otro
+  grupo (por eso las categorias tambien se filtran, no solo el grupo).
 
-Sin esta exclusion, el total de tickets y el conteo de incorrectos salen
-varias veces mas altos que el correo original (se detecto probando: 13,988
-tickets / 3,633 incorrectos contra los 4,154 / 169 esperados del correo del
-12 de agosto).
+La primera prueba sin ninguna de estas exclusiones dio 13,988 tickets /
+3,633 incorrectos contra los 4,154 / 169 esperados del correo del 12 de
+agosto; con solo la exclusion de Grupo bajo a 10,806 / 831 — la exclusion
+de Categoria y el filtro de Estado terminan de cerrar la diferencia.
 
 ## 1) Catalogos: los mantiene tu ETL, no este script
 
