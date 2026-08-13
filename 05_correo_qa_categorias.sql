@@ -30,7 +30,9 @@
      'Servicios al personal', o es exactamente 'SorIA'.
    - Excluye por Categoria (independiente del Grupo, por si un ticket de
      estas categorias quedo asignado a otro grupo): empieza con 'Soria',
-     'S-Mesa de Servicios al Personal' o 'S-Datos-Maestros'.
+     'S-Mesa de Servicios al Personal', 'S-Datos-Maestros' o
+     'S-Punto de Venta/Aplicativo/Ampliaci' (agregado por Edgar directo en
+     el servidor; replicado aqui para que el repo no quede desincronizado).
 
    Objetos creados:
    - dbo.vw_CorreoQA_CategoriaUnica (vista: una fila por RutaCompleta, para
@@ -151,7 +153,8 @@ WHERE t.FechaRegistro IS NOT NULL
   -- estas categorias puede haber quedado asignado a otro grupo).
   AND catb.CategoriaSinBarra NOT LIKE N'Soria%'
   AND catb.CategoriaSinBarra NOT LIKE N'S-Mesa de Servicios al Personal%'
-  AND catb.CategoriaSinBarra NOT LIKE N'S-Datos-Maestros%';
+  AND catb.CategoriaSinBarra NOT LIKE N'S-Datos-Maestros%'
+  AND catb.CategoriaSinBarra NOT LIKE N'S-Punto de Venta/Aplicativo/Ampliaci%';
 GO
 
 /* =====================================================================================

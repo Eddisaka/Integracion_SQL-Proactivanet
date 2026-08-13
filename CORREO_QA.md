@@ -53,10 +53,11 @@ cuentan en el total, ni en ningun KPI/tabla) lo siguiente:
 - Solo tickets con `Estado = 'Cerrada'` — los demas estados no cuentan.
 - `Grupo` que empiece con `Datos Maestros`, que empiece con `Servicios al
   personal`, o sea exactamente `SorIA`.
-- `Categoria` que empiece con `Soria`, `S-Mesa de Servicios al Personal` o
-  `S-Datos-Maestros` — esta exclusion es **independiente** de la de Grupo,
-  porque un ticket de estas categorias puede haber quedado asignado a otro
-  grupo (por eso las categorias tambien se filtran, no solo el grupo).
+- `Categoria` que empiece con `Soria`, `S-Mesa de Servicios al Personal`,
+  `S-Datos-Maestros` o `S-Punto de Venta/Aplicativo/Ampliaci` — esta
+  exclusion es **independiente** de la de Grupo, porque un ticket de estas
+  categorias puede haber quedado asignado a otro grupo (por eso las
+  categorias tambien se filtran, no solo el grupo).
 
 La primera prueba sin ninguna de estas exclusiones dio 13,988 tickets /
 3,633 incorrectos contra los 4,154 / 169 esperados del correo del 12 de
