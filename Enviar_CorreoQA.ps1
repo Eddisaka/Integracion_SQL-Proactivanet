@@ -189,7 +189,16 @@ function Export-Xlsx {
                 [void]$sb.Append("<c r=`"$ref`"><v>$txtNum</v></c>")
             }
             else {
-                $txt = ConvertTo-XmlEscapado $valor.ToString()
+                # Excel rechaza celdas de mas de 32,767 caracteres (las
+                # trunca/repara al abrir, con el aviso "hemos encontrado un
+                # problema con el contenido"). Campos de texto libre largos
+                # (Descripcion, SolucionUsuario, QA_*/QARe_*) a veces los
+                # superan -se vio un caso real de 172,103 caracteres-.
+                $textoCelda = $valor.ToString()
+                if ($textoCelda.Length -gt 32000) {
+                    $textoCelda = $textoCelda.Substring(0, 32000) + " (...texto truncado, superaba el limite de Excel)"
+                }
+                $txt = ConvertTo-XmlEscapado $textoCelda
                 [void]$sb.Append("<c r=`"$ref`" t=`"inlineStr`"><is><t>$txt</t></is></c>")
             }
         }
