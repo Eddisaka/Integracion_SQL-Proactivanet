@@ -101,6 +101,11 @@ y si hay empate la de carga mas reciente) antes de unirla con los tickets.
 | `Cat_detalle.xlsx` | `dbo.usp_CorreoQA_CatalogoCategorias` |
 | `Cat_gruposvalidos.xlsx` | `dbo.usp_CorreoQA_GruposValidos` |
 
+`usp_CorreoQA_PorTecnico` excluye ademas los tickets sin tecnico de 2a
+linea asignado (`Tecnico = 'Sin tecnico'`) — un ticket asi no se le puede
+atribuir a nadie, y ese renglon salia muy por encima de los tecnicos
+reales (61 contra un maximo de 8) en la primera prueba con graficas.
+
 El flujo de Power Automate descrito en la seccion 4 solo llama
 directamente a los ultimos 3 (`_Detalle`, `_CatalogoCategorias`,
 `_GruposValidos`); las imagenes de KPIs/graficas/matrices se resuelven

@@ -248,6 +248,9 @@ BEGIN
     WHERE Validacion = N'Incorrecto'
       AND FechaRegistroDia >= @Fi
       AND FechaRegistroDia <= @Ff
+      -- Un ticket sin tecnico de 2a linea asignado no se le puede atribuir
+      -- a nadie; se excluye de este desglose (confirmado con Edgar).
+      AND Tecnico <> N'Sin tecnico'
     GROUP BY Tecnico
     HAVING COUNT_BIG(*) >= @Minimo
     ORDER BY TicketsIncorrectos DESC, Tecnico;
