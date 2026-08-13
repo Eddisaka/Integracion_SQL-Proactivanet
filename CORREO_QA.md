@@ -126,19 +126,39 @@ dentro de `dbo.usp_CorreoQA_Kpis`.
 ## 3) Ruta activa ahora: PowerShell + Windows Task Scheduler
 
 `Enviar_CorreoQA.ps1` hace todo en un solo script: consulta los
-procedimientos, arma el cuerpo del correo en HTML (tarjetas de KPI + las
-tablas de grupo/tecnico/categorias — no incluye las graficas ni la matriz
-de Power BI, solo texto/tablas) y lo manda por SMTP con los 3 adjuntos
-CSV. Mismo patron operativo que ya usas para `etl_proactivanet.py`
-(Task Scheduler), solo que en PowerShell en vez de Python.
+procedimientos, arma el cuerpo del correo en HTML (tarjetas de KPI +
+graficas de barras por grupo/tecnico incrustadas + tabla de categorias —
+ya no incluye la matriz Fecha x Grupo/Tecnico de Power BI, eso sigue
+pendiente de la ruta con gateway) y lo manda por SMTP con los 3 adjuntos
+en `.xlsx` real. Mismo patron operativo que ya usas para
+`etl_proactivanet.py` (Task Scheduler), solo que en PowerShell en vez de
+Python.
 
-**No hay nada que instalar.** La primera version usaba el modulo
-`Invoke-Sqlcmd`/`SqlServer`, pero en el escritorio virtual no hay salida a
-internet para instalarlo (`Install-Module` falla al no poder bajar el
-proveedor NuGet) ni esta presente el modulo viejo `SQLPS`. El script ahora
-se conecta con `System.Data.SqlClient` directo — viene incluido en .NET
-Framework en cualquier Windows, sin depender de ningun modulo externo (es
-lo mismo que usan los `.ashx` en C#, solo que llamado desde PowerShell).
+**No hay nada que instalar.** Todo usa clases de .NET Framework ya
+incluidas en cualquier Windows — nunca `Install-Module` (en el escritorio
+virtual no hay salida a internet para bajar el proveedor NuGet, y el
+modulo viejo `SQLPS` tampoco esta presente):
+- `System.Data.SqlClient` para la conexion a SQL Server (igual que los
+  `.ashx` en C#, solo que llamado desde PowerShell).
+- `System.IO.Compression` para armar los `.xlsx`. Un `.xlsx` es en
+  realidad un zip con archivos XML adentro; el script arma esos XML a mano
+  y los comprime — no depende de tener Excel instalado ni de un modulo
+  como `ImportExcel` (que de todas formas necesitaria `Install-Module`).
+- `System.Windows.Forms.DataVisualization` para las graficas de barras —
+  se renderizan a PNG en memoria, tampoco requieren Excel ni Power BI.
+- `System.Net.Mail` para el envio. Aqui si hubo que dejar de usar
+  `Send-MailMessage`: ese cmdlet no soporta incrustar imagenes por
+  Content-ID en el cuerpo HTML (que es como se ve la grafica *dentro* del
+  correo en vez de como adjunto aparte), asi que el script arma el correo
+  con `MailMessage`/`SmtpClient`/`LinkedResource` directo — es la misma
+  libreria que usa `Send-MailMessage` por dentro, sin esa limitacion.
+
+**Nota si algo falla en las graficas:** el render usa GDI+, que en algunos
+Windows Server necesita un escritorio interactivo. Si el correo llega sin
+las graficas o el script falla ahi, revisa que la tarea en Task Scheduler
+este como "Ejecutar solo si el usuario inicio sesion" (no "tanto si inicio
+sesion como si no"). Si aun asi da problemas, se puede volver a las tablas
+HTML como respaldo — avisa y lo dejamos configurable.
 
 **1) Configuracion de correo** — copia `config_correo_qa.ejemplo.json`
 como `config_correo_qa.json` (mismo patron que `config.json`: la copia
@@ -158,9 +178,10 @@ real **no** se sube a git, ya esta en `.gitignore`) y llena:
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File Enviar_CorreoQA.ps1
 ```
-Revisa que llegue el correo con los 3 adjuntos y que los numeros
-coincidan con lo que esperas. `config.json` (el bloque `sql`) debe estar
-en la misma carpeta — reusa la conexion que ya usa el ETL/dashboard.
+Revisa que llegue el correo con las graficas incrustadas, los 3 adjuntos
+en `.xlsx` (no `.csv`), y que los numeros coincidan con lo que esperas.
+`config.json` (el bloque `sql`) debe estar en la misma carpeta — reusa la
+conexion que ya usa el ETL/dashboard.
 
 **3) Programar en Task Scheduler:**
 - Programa nueva → Diaria, a la hora que hoy se manda el correo.
@@ -174,11 +195,15 @@ en la misma carpeta — reusa la conexion que ya usa el ETL/dashboard.
   Windows en `config.json`, es la cuenta con la que corre la tarea; si no,
   la cuenta SQL que pusiste en `config.json`).
 
-**Limitacion conocida de esta ruta:** el cuerpo del correo tiene tablas en
-vez de las graficas/matrices de Power BI. Si eso es un problema para quien
-lo recibe, prioriza conseguir el gateway y migrar a la seccion 4; mientras
-tanto, esto ya reemplaza por completo el trabajo manual de armar los 3
-Excel y escribir el correo.
+**Limitacion conocida de esta ruta:** el cuerpo del correo ya trae graficas
+de barras (por grupo y por tecnico) incrustadas, pero no reproduce la
+matriz Fecha x Grupo/Tecnico que Power BI mostraba (imagenes 3 y 4 del
+correo original) — esos datos siguen disponibles via
+`usp_CorreoQA_TendenciaPorGrupo`/`TendenciaPorTecnico` si se necesitan por
+separado. Si esa matriz es indispensable en el cuerpo del correo, prioriza
+conseguir el gateway y migrar a la seccion 4; mientras tanto, esto ya
+reemplaza por completo el trabajo manual de armar los 3 Excel y escribir
+el correo.
 
 ## 4) Ruta futura, cuando exista el gateway: flujo de Power Automate — guia de construccion
 
