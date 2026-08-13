@@ -209,12 +209,12 @@ BEGIN
     DECLARE @Fi DATE = ISNULL(@FechaInicio, DATEADD(DAY, -14, @Ff));
     DECLARE @Ayer DATE = DATEADD(DAY, -1, @Ff);
 
-    -- "Semana anterior" = los 7 dias justo antes de ayer. Ajusta este rango
-    -- si tu definicion real de "semana anterior" es distinta (ej. semana
-    -- calendario lunes-domingo); no hay forma de deducirlo del Excel de
-    -- ejemplo con certeza porque solo trae un corte de un dia.
-    DECLARE @SemanaAntInicio DATE = DATEADD(DAY, -8, @Ayer);
-    DECLARE @SemanaAntFin    DATE = DATEADD(DAY, -1, @Ayer);
+    -- "Semana anterior" NO es un rango de 7 dias acumulados: segun la
+    -- formula real de Power BI (Calendario[Date] = TODAY() - 8), es UN
+    -- SOLO dia -el mismo dia de la semana, 7 dias antes de ayer-. P. ej.
+    -- si ayer fue miercoles 12, semana anterior es miercoles 5, cada uno
+    -- contado por separado (no la suma de toda esa semana).
+    DECLARE @SemanaAnt DATE = DATEADD(DAY, -8, @Ff);
 
     SELECT
         FechaInicio = @Fi,
@@ -237,8 +237,7 @@ BEGIN
         ),
         TicketsIncorrectosSemanaAnterior = (
             SELECT COUNT_BIG(*) FROM dbo.vw_CorreoQA_Base
-            WHERE Validacion = N'Incorrecto'
-              AND CONVERT(date, FechaFirmaSolucion) BETWEEN @SemanaAntInicio AND @SemanaAntFin
+            WHERE Validacion = N'Incorrecto' AND CONVERT(date, FechaFirmaSolucion) = @SemanaAnt
         )
     FROM dbo.vw_CorreoQA_Base
     WHERE FechaRegistroDia >= @Fi
