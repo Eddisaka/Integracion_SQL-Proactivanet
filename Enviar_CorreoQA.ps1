@@ -268,6 +268,10 @@ function New-GraficaBarras {
     $area = New-Object System.Windows.Forms.DataVisualization.Charting.ChartArea("Area1")
     $area.AxisX.Interval = 1
     $area.AxisX.LabelStyle.Angle = -45
+    # Sin lineas de cuadricula: con muchas barras chicas competian visualmente
+    # con las etiquetas de valor encima de cada barra.
+    $area.AxisX.MajorGrid.Enabled = $false
+    $area.AxisY.MajorGrid.Enabled = $false
     $chart.ChartAreas.Add($area)
 
     [void]$chart.Titles.Add($Titulo)
