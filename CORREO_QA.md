@@ -129,6 +129,18 @@ dia, no alcanza para deducir la definicion exacta — si es otra cosa (ej.
 semana calendario lunes-domingo), ajusta `@SemanaAntInicio`/`@SemanaAntFin`
 dentro de `dbo.usp_CorreoQA_Kpis`.
 
+**Ayer / semana anterior se miden por `FechaFirmaSolucion`, no por fecha
+de registro:** las primeras pruebas daban numeros muy distintos a Power BI
+(14 vs 79 en "semana anterior") porque `TicketsIncorrectosAyer` y
+`TicketsIncorrectosSemanaAnterior` filtraban por `FechaRegistroDia`
+(cuando se creo el ticket). Lo que importa para estos dos KPIs es cuando
+el tecnico **cerro** el ticket con la categoria equivocada, que puede ser
+dias o semanas despues de creado — ahora usan
+`CONVERT(date, FechaFirmaSolucion)`. El resto del reporte (el total del
+rango de 15 dias, las barras por grupo/tecnico, etc.) sigue filtrando por
+fecha de registro, que es la pregunta correcta ahi ("de lo que entro en
+este rango, cuanto esta mal categorizado").
+
 ## 3) Ruta activa ahora: PowerShell + Windows Task Scheduler
 
 `Enviar_CorreoQA.ps1` hace todo en un solo script: consulta los

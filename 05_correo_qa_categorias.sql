@@ -226,14 +226,19 @@ BEGIN
             / NULLIF(COUNT_BIG(*), 0)
             AS DECIMAL(6,2)
         ),
+        -- Ayer / semana anterior se miden por FechaFirmaSolucion (cuando el
+        -- tecnico cerro el ticket), no por FechaRegistroDia (cuando se
+        -- creo) -confirmado con Edgar: lo que importa aqui es cuando se
+        -- cometio/detecto la mala categorizacion al cerrar, no cuando
+        -- entro el ticket, que puede ser de dias o semanas antes.
         TicketsIncorrectosAyer = (
             SELECT COUNT_BIG(*) FROM dbo.vw_CorreoQA_Base
-            WHERE Validacion = N'Incorrecto' AND FechaRegistroDia = @Ayer
+            WHERE Validacion = N'Incorrecto' AND CONVERT(date, FechaFirmaSolucion) = @Ayer
         ),
         TicketsIncorrectosSemanaAnterior = (
             SELECT COUNT_BIG(*) FROM dbo.vw_CorreoQA_Base
             WHERE Validacion = N'Incorrecto'
-              AND FechaRegistroDia BETWEEN @SemanaAntInicio AND @SemanaAntFin
+              AND CONVERT(date, FechaFirmaSolucion) BETWEEN @SemanaAntInicio AND @SemanaAntFin
         )
     FROM dbo.vw_CorreoQA_Base
     WHERE FechaRegistroDia >= @Fi
