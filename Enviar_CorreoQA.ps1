@@ -254,30 +254,28 @@ function New-GraficaBarras {
         [int]$Alto = 380
     )
 
+    # Deliberadamente minimalista: solo propiedades basicas y de uso muy
+    # comun de System.Windows.Forms.DataVisualization.Charting. Una version
+    # anterior fallaba con "La propiedad 'Font' no se encuentra en este
+    # objeto" al asignar .Font directo sobre Title/Series -no es una
+    # propiedad valida en esos dos tipos, a diferencia de LabelStyle.Font-.
+    # Se puede afinar tipografia/colores despues, probando de a una.
     $chart = New-Object System.Windows.Forms.DataVisualization.Charting.Chart
     $chart.Width = $Ancho
     $chart.Height = $Alto
     $chart.BackColor = [System.Drawing.Color]::White
-    $chart.AntiAliasing = [System.Windows.Forms.DataVisualization.Charting.AntiAliasingStyles]::All
 
-    $area = New-Object System.Windows.Forms.DataVisualization.Charting.ChartArea
+    $area = New-Object System.Windows.Forms.DataVisualization.Charting.ChartArea("Area1")
     $area.AxisX.Interval = 1
     $area.AxisX.LabelStyle.Angle = -45
-    $area.AxisX.LabelStyle.Font = New-Object System.Drawing.Font("Segoe UI", 8)
-    $area.AxisY.LabelStyle.Font = New-Object System.Drawing.Font("Segoe UI", 8)
-    $area.AxisY.MajorGrid.LineColor = [System.Drawing.ColorTranslator]::FromHtml("#e5e7eb")
     $chart.ChartAreas.Add($area)
 
-    $titulo = New-Object System.Windows.Forms.DataVisualization.Charting.Title($Titulo)
-    $titulo.Font = New-Object System.Drawing.Font("Segoe UI", 12, [System.Drawing.FontStyle]::Bold)
-    $chart.Titles.Add($titulo)
+    [void]$chart.Titles.Add($Titulo)
 
-    $serie = New-Object System.Windows.Forms.DataVisualization.Charting.Series
+    $serie = $chart.Series.Add("Serie1")
     $serie.ChartType = [System.Windows.Forms.DataVisualization.Charting.SeriesChartType]::Column
     $serie.Color = [System.Drawing.ColorTranslator]::FromHtml($ColorHex)
-    $serie["PointWidth"] = "0.6"
     $serie.IsValueShownAsLabel = $true
-    $serie.Font = New-Object System.Drawing.Font("Segoe UI", 8)
 
     foreach ($fila in $Filas) {
         [void]$serie.Points.AddXY($fila.$ColumnaEtiqueta, [double]$fila.$ColumnaValor)
