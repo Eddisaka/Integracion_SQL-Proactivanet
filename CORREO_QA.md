@@ -97,7 +97,7 @@ y si hay empate la de carga mas reciente) antes de unirla con los tickets.
 | Tabla de categorias (imagen 2) | `dbo.usp_CorreoQA_TopCategorias @Top = 10` |
 | Matriz Fecha x Grupo (imagen 3) | `dbo.usp_CorreoQA_TendenciaPorGrupo` (formato largo, no matriz — ver nota abajo) |
 | Matriz Fecha x Tecnico (imagen 4) | `dbo.usp_CorreoQA_TendenciaPorTecnico` (idem) |
-| `TICKETS QA - <fecha>.xlsx` | `dbo.usp_CorreoQA_Detalle` |
+| `TICKETS QA - <fecha>.xlsx` | `dbo.usp_CorreoQA_Detalle` (47 columnas, mismos encabezados que el original — la primera version solo traia 15) |
 | `Cat_detalle.xlsx` | `dbo.usp_CorreoQA_CatalogoCategorias` |
 | `Cat_gruposvalidos.xlsx` | `dbo.usp_CorreoQA_GruposValidos` |
 

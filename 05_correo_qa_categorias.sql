@@ -45,7 +45,8 @@
    - dbo.usp_CorreoQA_TopCategorias       (tabla "categorias con mas incorrectos", imagen 2)
    - dbo.usp_CorreoQA_TendenciaPorGrupo   (serie Fecha x Grupo, para la matriz de imagen 3)
    - dbo.usp_CorreoQA_TendenciaPorTecnico (serie Fecha x Tecnico, para la matriz de imagen 4)
-   - dbo.usp_CorreoQA_Detalle             (reemplazo de TICKETS QA - <fecha>.xlsx)
+   - dbo.usp_CorreoQA_Detalle             (reemplazo de TICKETS QA - <fecha>.xlsx,
+     con las mismas 47 columnas y encabezados del archivo original)
    - dbo.usp_CorreoQA_CatalogoCategorias  (reemplazo de Cat_detalle.xlsx)
    - dbo.usp_CorreoQA_GruposValidos       (reemplazo de Cat_gruposvalidos.xlsx)
 
@@ -113,6 +114,43 @@ SELECT
     t.Sucursal,
     t.Tienda,
     t.Titulo,
+
+    -- Resto de columnas de dbo.Tickets, para que el detalle exportado
+    -- pueda igualar las columnas del TICKETS QA - <fecha>.xlsx original
+    -- (confirmado con Edgar: al reporte automatico le faltaban).
+    t.Prioridad,
+    t.Descripcion,
+    t.SolucionUsuario,
+    t.FechaEstimadaResolucion,
+    t.FechaFirmaSolucion,
+    t.FechaUltimaModificacion,
+    t.FechaFirmaCierre,
+    t.FirmaCierreRevocacion,
+    t.FirmaSolucion,
+    t.ResponsableUltimaModificacion,
+    t.NotificadoPor,
+    t.FechaEstimadaOlaUc,
+    t.TiempoResolucion,
+    t.TiempoAtencionHorasMin,
+    t.TiempoPrimeraRespuestaHorasMin,
+    t.IntentosSolucion,
+    t.TiempoPrimeraRespuesta,
+    t.TiempoAtencion,
+    t.ReasignacionesGrupo,
+    t.Caducada,
+    t.RegistradoPor,
+    t.QA_MensajeError,
+    t.QA_Frecuencia,
+    t.QA_Aplicacion,
+    t.QA_PasoAPaso,
+    t.QARe_Causa,
+    t.QARe_UsuarioConfirmo,
+    t.QARe_AplicaOtrosCasos,
+    t.QARe_GenerarArticulo,
+    t.QARe_VerificoClasificacion,
+    t.QARe_Evidencia,
+    t.QARe_DescripcionSolucion,
+    t.QARe_TipoSolucion,
 
     GrupoCorrecto = cat.GrupoIncidenciasPeticiones,
 
@@ -362,21 +400,56 @@ BEGIN
     DECLARE @Fi DATE = ISNULL(@FechaInicio, DATEADD(DAY, -14, @Ff));
     DECLARE @TopSeguro INT = CASE WHEN @Top IS NULL OR @Top <= 0 THEN 10000 WHEN @Top > 50000 THEN 50000 ELSE @Top END;
 
+    -- Encabezados iguales a los de TICKETS QA - <fecha>.xlsx (el que se
+    -- armaba a mano), para que el archivo se vea igual que el original.
     SELECT TOP (@TopSeguro)
-        CodigoTicket,
-        FechaRegistro,
+        [Fecha de registro]                       = FechaRegistro,
+        [Fecha estimada resolución]                = FechaEstimadaResolucion,
+        [Código]                                   = CodigoTicket,
         Grupo,
-        Tecnico,
+        [Técnico de 2ª línea]                      = Tecnico,
         Estado,
         Subestado,
-        Tipo,
-        TipoRelacion,
-        Titulo,
-        Categoria,
-        GrupoCorrecto,
-        Validacion,
+        Prioridad,
+        [Título]                                   = Titulo,
+        [Descripción]                              = Descripcion,
         Cliente,
         Sucursal,
+        [Categoría]                                = Categoria,
+        [Solución para el usuario]                 = SolucionUsuario,
+        [Fecha firma solución]                     = FechaFirmaSolucion,
+        [Fecha última modificación]                = FechaUltimaModificacion,
+        [Fecha firma cierre]                       = FechaFirmaCierre,
+        [Firma cierre / revocación solución]       = FirmaCierreRevocacion,
+        [Firma solución]                           = FirmaSolucion,
+        [Responsable última modificación]          = ResponsableUltimaModificacion,
+        [Notificado por]                           = NotificadoPor,
+        Tipo,
+        [Fecha estimada OLA / UC]                  = FechaEstimadaOlaUc,
+        [Tiempo de resolución]                     = TiempoResolucion,
+        [Tiempo atención (horas / minutos)]        = TiempoAtencionHorasMin,
+        [Tiempo 1ª respuesta (horas / minutos)]    = TiempoPrimeraRespuestaHorasMin,
+        [Intentos de solución]                     = IntentosSolucion,
+        [Tiempo 1ª respuesta]                      = TiempoPrimeraRespuesta,
+        [Tiempo de atención]                       = TiempoAtencion,
+        [Reasignaciones grupo]                     = ReasignacionesGrupo,
+        Caducada,
+        [Registrado por]                           = RegistradoPor,
+        [Tipo relación]                            = TipoRelacion,
+        [QA - ¿Aparece algún mensaje de error o describe tu necesidad?]                         = QA_MensajeError,
+        [QA - ¿Con qué frecuencia ocurre?]                                                      = QA_Frecuencia,
+        [QA - ¿En qué aplicación estabas cuando sucedió el incidente?]                          = QA_Aplicacion,
+        [QA - Describe paso a paso qué hiciste antes del error o detalla la petición requerida] = QA_PasoAPaso,
+        [QARe - ¿Cuál fue la causa del incidente/petición?]                                     = QARe_Causa,
+        [QARe - ¿El usuario confirmó la solución?]                                              = QARe_UsuarioConfirmo,
+        [QARe - ¿Esta solución aplica para otros casos similares?]                              = QARe_AplicaOtrosCasos,
+        [QARe - ¿Se debe generar o actualizar artículo de conocimiento?]                        = QARe_GenerarArticulo,
+        [QARE - ¿Verificaste la correcta clasificación del ticket?]                             = QARe_VerificoClasificacion,
+        [QARe - Adjunta evidencia de la solución (logs, capturas, validación)]                  = QARe_Evidencia,
+        [QARe - Describe la solución aplicada (pasos claros y replicables)]                     = QARe_DescripcionSolucion,
+        [QARe - Tipo de solución aplicada]                                                      = QARe_TipoSolucion,
+        [Grupo Correcto]                           = GrupoCorrecto,
+        Validacion,
         Tienda
     FROM dbo.vw_CorreoQA_Base
     WHERE FechaRegistroDia >= @Fi
