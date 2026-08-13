@@ -277,8 +277,12 @@ function New-GraficaBarras {
     $serie.Color = [System.Drawing.ColorTranslator]::FromHtml($ColorHex)
     $serie.IsValueShownAsLabel = $true
 
+    # AddXY solo acepta numeros en X (no el nombre del grupo/tecnico como
+    # texto); la forma correcta de graficar categorias es AddY (que
+    # autoincrementa el indice) y despues ponerle el texto en AxisLabel.
     foreach ($fila in $Filas) {
-        [void]$serie.Points.AddXY($fila.$ColumnaEtiqueta, [double]$fila.$ColumnaValor)
+        $indicePunto = $serie.Points.AddY([double]$fila.$ColumnaValor)
+        $serie.Points[$indicePunto].AxisLabel = [string]$fila.$ColumnaEtiqueta
     }
     $chart.Series.Add($serie)
 

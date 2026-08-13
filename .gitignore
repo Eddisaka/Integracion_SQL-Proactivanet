@@ -11,3 +11,5 @@ __pycache__/
 Web.config
 bin/
 obj/
+.vs/
+correo_qa_temp/
