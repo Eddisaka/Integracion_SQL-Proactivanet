@@ -1,0 +1,29 @@
+{
+  "_comentario": "Copia este archivo como config_correo_backlog.json y ajustalo. NO subas config_correo_backlog.json (con SMTP/destinatarios reales) a git -ya cubierto por .gitignore-. La conexion a SQL Server NO va aqui: Enviar_CorreoBacklog.ps1 reusa el bloque \"sql\" de config.json (el mismo que usa etl_proactivanet.py).",
+
+  "destinatarios": [
+    "persona1@soriana.com",
+    "persona2@soriana.com"
+  ],
+  "cc": [],
+  "cco": [],
+  "remitente": "performanceTI@soriana.com",
+
+  "_smtp": "Relay SMTP interno de Soriana, sin SSL ni autenticacion desde IPs de la red corporativa -deja smtp_usuario vacio en ese caso-.",
+  "smtp_servidor": "corpex10.soriana.com",
+  "smtp_puerto": 25,
+  "smtp_usa_ssl": false,
+  "smtp_usuario": "",
+  "smtp_password": "",
+
+  "asunto": "Inc & Req Backlog - {fecha}",
+
+  "_modo_prueba": "Mientras este en true, el correo solo se manda a destinatario_prueba -ignora destinatarios/cc/cco-.",
+  "modo_prueba": true,
+  "destinatario_prueba": "TU_CORREO@soriana.com",
+
+  "_forzar_reproceso": "Ponlo en true solo para reprocesar a mano una fecha que ya tenia un envio exitoso; regresalo a false despues.",
+  "forzar_reproceso": false,
+  "enviar_sin_datos": false,
+  "conservar_archivos_dias": 15
+}

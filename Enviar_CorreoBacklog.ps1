@@ -1,7 +1,41 @@
+<#
+.SINOPSIS
+    Envia el correo diario "Inc & Req Backlog": prepara el corte del dia
+    (dbo.usp_CorreoBacklog_PrepararCorte), arma un .xlsx con 3 hojas
+    (Principal, Comparativa, Datos) y lo manda por SMTP con el resumen en
+    el cuerpo del correo en HTML. Basado en el script original de Daniela;
+    el unico cambio de fondo es la conexion a SQL Server -ver REQUISITOS-,
+    para que use el mismo config.json que ya usan etl_proactivanet.py y
+    Enviar_CorreoQA.ps1 en vez de un archivo de conexion aparte.
+
+.REQUISITOS
+    Ninguno que instalar. Todo usa clases de .NET Framework ya incluidas en
+    cualquier Windows -nada de Install-Module ni de internet-:
+    - System.Data.SqlClient para la conexion a SQL Server.
+    - System.IO.Compression para armar el .xlsx a mano (zip + XML).
+    - System.Net.Mail para el envio.
+
+    Ademas, en la misma carpeta:
+    - config.json (el mismo que usa etl_proactivanet.py, dashboard_api.py y
+      Enviar_CorreoQA.ps1; se lee su bloque "sql").
+    - config_correo_backlog.json (copia de
+      config_correo_backlog.ejemplo.json con destinatarios y datos de SMTP).
+
+.USO
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File Enviar_CorreoBacklog.ps1
+    Para reprocesar una fecha concreta:
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File Enviar_CorreoBacklog.ps1 -FechaCorte "2026-08-13"
+    Programar como tarea diaria en el Programador de tareas de Windows,
+    igual que etl_proactivanet.py y Enviar_CorreoQA.ps1.
+
+.CODIGOS DE SALIDA
+    0: ejecucion y envio exitosos.
+    5: error de configuracion, SQL, Excel o SMTP. Revisar Logs\.
+#>
+
 [CmdletBinding()]
 param(
     [datetime]$FechaCorte = (Get-Date).Date,
-    [string]$RutaConexion = (Join-Path $PSScriptRoot 'conexionsql.json'),
     [string]$RutaCorreo = (Join-Path $PSScriptRoot 'config_correo_backlog.json')
 )
 
@@ -26,12 +60,21 @@ function Xml([object]$Valor) {
     [System.Security.SecurityElement]::Escape($s)
 }
 function Get-ConnectionString($c) {
-    $encrypt = if($c.encriptar){'Yes'}else{'No'}
-    $trust = if($c.confiar_certificado){'Yes'}else{'No'}
-    if($c.autenticacion_windows) {
-        return "Server=$($c.servidor);Database=$($c.base_datos);Integrated Security=SSPI;Encrypt=$encrypt;TrustServerCertificate=$trust;Connection Timeout=$($c.timeout);Application Name=CorreoBacklog;"
+    # Mismo bloque "sql" de config.json que usa Enviar_CorreoQA.ps1 -no un
+    # archivo de conexion aparte-, para no duplicar la cadena/credenciales
+    # en un tercer lugar.
+    $partes = @("Server=$($c.servidor)", "Database=$($c.base_datos)")
+    if ($c.autenticacion_windows) {
+        $partes += 'Integrated Security=True'
+    } else {
+        $partes += "User ID=$($c.usuario)"
+        $partes += "Password=$($c.password)"
     }
-    return "Server=$($c.servidor);Database=$($c.base_datos);User ID=$($c.usuario);Password=$($c.password);Encrypt=$encrypt;TrustServerCertificate=$trust;Connection Timeout=$($c.timeout);Application Name=CorreoBacklog;"
+    $partes += "Encrypt=$(if ($c.encriptar) { 'True' } else { 'False' })"
+    $partes += "TrustServerCertificate=$(if ($c.confiar_certificado) { 'True' } else { 'False' })"
+    $partes += "Connect Timeout=$($c.timeout)"
+    $partes += 'Application Name=CorreoBacklog'
+    return $partes -join ';'
 }
 function Invoke-SpDataSet([string]$Nombre,[hashtable]$Parametros) {
     $cmd = $script:Conexion.CreateCommand()
@@ -133,7 +176,7 @@ function New-Xlsx([string]$Path,[array]$Hojas) {
 
 try {
     Write-Log 'Inicio del proceso.'
-    $cnf=Get-Content -LiteralPath $RutaConexion -Raw -Encoding UTF8 | ConvertFrom-Json
+    $cnf=(Get-Content -LiteralPath (Join-Path $base 'config.json') -Raw -Encoding UTF8 | ConvertFrom-Json).sql
     $mail=Get-Content -LiteralPath $RutaCorreo -Raw -Encoding UTF8 | ConvertFrom-Json
     $script:Conexion=New-Object System.Data.SqlClient.SqlConnection (Get-ConnectionString $cnf)
     $script:Conexion.Open(); Write-Log "Conexion SQL abierta: $($cnf.servidor)/$($cnf.base_datos)."

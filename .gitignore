@@ -2,6 +2,7 @@ config*.json
 !config.ejemplo.json
 !config.soriana*.json
 !config_correo_qa.ejemplo.json
+!config_correo_backlog.ejemplo.json
 *.log
 logs/
 extraccion_*.json
