@@ -94,15 +94,34 @@ EXEC dbo.usp_CorreoBacklog_Backfill @FechaInicio = '2026-01-01';
 ## 4) Correo diario: PowerShell + Windows Task Scheduler
 
 `Enviar_CorreoBacklog.ps1` hace todo en un solo script: prepara el corte de
-hoy, arma el `.xlsx` (hojas Principal/Comparativa/Datos) y el cuerpo HTML
-con las tarjetas de KPI y las tablas, y lo manda por SMTP. Mismo patron que
-`etl_proactivanet.py` y `Enviar_CorreoQA.ps1` -sin nada que instalar, solo
-clases de .NET Framework-.
+hoy, arma el `.xlsx` (hojas Principal/Comparativa/Datos) y un cuerpo de
+correo en HTML a nivel resumen ejecutivo, y lo manda por SMTP. Mismo patron
+que `etl_proactivanet.py` y `Enviar_CorreoQA.ps1` -sin nada que instalar,
+solo clases de .NET Framework-.
 
-**Diferencia con el script original de Daniela:** en vez de un
-`conexionsql.json` aparte, reusa el bloque `"sql"` de `config.json` (el
-mismo que ya usa el ETL y `Enviar_CorreoQA.ps1`) para la conexion a SQL
-Server -una credencial menos que mantener sincronizada-.
+**Diferencias con el script original de Daniela:**
+- En vez de un `conexionsql.json` aparte, reusa el bloque `"sql"` de
+  `config.json` (el mismo que ya usa el ETL y `Enviar_CorreoQA.ps1`) para la
+  conexion a SQL Server -una credencial menos que mantener sincronizada-.
+- El cuerpo del correo se rehizo para verse como el reporte manual
+  ("Inc & Req Backlog") que se enviaba antes a mano, con el mismo enfoque
+  ejecutivo que `Enviar_CorreoQA.ps1`:
+  - Tarjetas de KPI (Backlog, Criticos/Altos/Medios/Bajos, +30 dias,
+    Reasignados, Reabiertos, **% Fuera SLA**).
+  - 4 graficas de barras incrustadas (`System.Windows.Forms.DataVisualization`,
+    igual que QA): **Backlog por lider**, **Backlog por prioridad** (Critica
+    en rojo, Alta en naranja, Media en amarillo, Baja en verde -mismo codigo
+    de colores que ya usaba el Excel manual-), **Antiguedad del backlog** y
+    **Estado SLA** (Dentro en verde, Fuera en rojo).
+  - Tablas de "Top 10 grupos con mas reasignaciones" y "Top 10 grupos con
+    mas tickets reabiertos" (antes solo estaban en el Excel adjunto, no en
+    el cuerpo del correo).
+  - El detalle completo por lider/grupo y la comparativa contra el corte
+    anterior se conservan como tablas mas abajo en el cuerpo (igual que
+    antes), y el Excel adjunto sigue trayendo las 3 hojas completas.
+  - Todos estos totales se calculan en PowerShell a partir de los mismos
+    result sets que ya regresa `usp_CorreoBacklog_Principal` -no se agrego
+    ningun procedimiento SQL nuevo para las graficas-.
 
 **1) Configuracion** — copia `config_correo_backlog.ejemplo.json` como
 `config_correo_backlog.json` (no se sube a git, ya esta en `.gitignore`) y
