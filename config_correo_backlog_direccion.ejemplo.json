@@ -1,0 +1,26 @@
+{
+  "_comentario": "Copia este archivo como config_correo_backlog_direccion.json y ajustalo. NO subas config_correo_backlog_direccion.json (con SMTP/destinatarios reales) a git -ya cubierto por .gitignore-. Normalmente esta lista es mas corta que la de config_correo_backlog.json (detalle): solo Direccion/CIO. La conexion a SQL Server NO va aqui: Enviar_CorreoBacklog_direccion.ps1 reusa el bloque \"sql\" de config.json.",
+
+  "destinatarios": [
+    "director@soriana.com"
+  ],
+  "cc": [],
+  "cco": [],
+  "remitente": "performanceTI@soriana.com",
+
+  "_smtp": "Relay SMTP interno de Soriana, sin SSL ni autenticacion desde IPs de la red corporativa -deja smtp_usuario vacio en ese caso-.",
+  "smtp_servidor": "corpex10.soriana.com",
+  "smtp_puerto": 25,
+  "smtp_usa_ssl": false,
+  "smtp_usuario": "",
+  "smtp_password": "",
+
+  "asunto": "Resumen Ejecutivo Backlog - {fecha}",
+
+  "_modo_prueba": "Mientras este en true, el correo solo se manda a destinatario_prueba -ignora destinatarios/cc/cco-.",
+  "modo_prueba": true,
+  "destinatario_prueba": "TU_CORREO@soriana.com",
+
+  "enviar_sin_datos": false,
+  "conservar_archivos_dias": 15
+}

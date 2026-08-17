@@ -1,18 +1,21 @@
 <#
 .SINOPSIS
-    Envia el correo diario "Inc & Req Backlog": prepara el corte del dia
+    Version "detalle" (foro tecnico/operativo) del correo diario
+    "Inc & Req Backlog": prepara el corte del dia
     (dbo.usp_CorreoBacklog_PrepararCorte), arma un .xlsx con 3 hojas
     (Principal, Comparativa, Datos) y lo manda por SMTP con un resumen
     ejecutivo en el cuerpo del correo -tarjetas de KPI, 4 graficas
     incrustadas (backlog por lider, por prioridad, antiguedad y estado
-    SLA) y tablas de "top" grupos con mas reasignaciones/reabiertos-,
-    mismo patron que Enviar_CorreoQA.ps1. El detalle completo por
-    lider/grupo se queda en tablas mas abajo en el cuerpo y en el Excel
-    adjunto. Basado en el script original de Daniela; el unico cambio de
-    fondo en la parte de datos es la conexion a SQL Server -ver
-    REQUISITOS-, para que use el mismo config.json que ya usan
-    etl_proactivanet.py y Enviar_CorreoQA.ps1 en vez de un archivo de
-    conexion aparte.
+    SLA), tablas de "top" grupos con mas reasignaciones/reabiertos, y el
+    detalle completo por lider/grupo y la comparativa-, mismo patron que
+    Enviar_CorreoQA.ps1. Para el resumen de una sola pantalla dirigido a
+    Direccion (sin el detalle, sin el Excel adjunto) usa
+    Enviar_CorreoBacklog_direccion.ps1 -mismos datos, cuerpo distinto,
+    puede mandarse a una lista de correo distinta-. Basado en el script
+    original de Daniela; el unico cambio de fondo en la parte de datos es
+    la conexion a SQL Server -ver REQUISITOS-, para que use el mismo
+    config.json que ya usan etl_proactivanet.py y Enviar_CorreoQA.ps1 en
+    vez de un archivo de conexion aparte.
 
 .REQUISITOS
     Ninguno que instalar. Todo usa clases de .NET Framework ya incluidas en
@@ -31,9 +34,9 @@
       config_correo_backlog.ejemplo.json con destinatarios y datos de SMTP).
 
 .USO
-    powershell.exe -NoProfile -ExecutionPolicy Bypass -File Enviar_CorreoBacklog.ps1
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File Enviar_CorreoBacklog_detalle.ps1
     Para reprocesar una fecha concreta:
-    powershell.exe -NoProfile -ExecutionPolicy Bypass -File Enviar_CorreoBacklog.ps1 -FechaCorte "2026-08-13"
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File Enviar_CorreoBacklog_detalle.ps1 -FechaCorte "2026-08-13"
     Programar como tarea diaria en el Programador de tareas de Windows,
     igual que etl_proactivanet.py y Enviar_CorreoQA.ps1.
 
