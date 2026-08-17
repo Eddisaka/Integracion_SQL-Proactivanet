@@ -109,8 +109,11 @@ function ConvertTo-HtmlTable([System.Data.DataTable]$Tabla,[int]$Max=200) {
         foreach($c in $Tabla.Columns){
             $v=$Tabla.Rows[$i][$c]
             $color=''
-            if([string]$v -eq '↑'){$color='color:#c00000;font-weight:bold'}
-            elseif([string]$v -eq '↓'){$color='color:#008000;font-weight:bold'}
+            # Flechas por codigo Unicode, no como caracter literal: si el .ps1 se
+            # lee sin BOM (caso normal de Windows PowerShell 5.1 con powershell.exe),
+            # un caracter no-ASCII literal aqui rompe el parseo de todo el archivo.
+            if([string]$v -eq [char]0x2191){$color='color:#c00000;font-weight:bold'}
+            elseif([string]$v -eq [char]0x2193){$color='color:#008000;font-weight:bold'}
             [void]$sb.Append("<td style='border:1px solid #d9e2f3;padding:4px;$color'>$(Html $v)</td>")
         }
         [void]$sb.Append('</tr>')
