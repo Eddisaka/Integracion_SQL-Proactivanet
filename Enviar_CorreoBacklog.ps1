@@ -36,13 +36,18 @@
 [CmdletBinding()]
 param(
     [datetime]$FechaCorte = (Get-Date).Date,
-    [string]$RutaCorreo = (Join-Path $PSScriptRoot 'config_correo_backlog.json')
+    [string]$RutaCorreo = ''
 )
 
 $ErrorActionPreference = 'Stop'
 $script:IdEjecucion = $null
 $script:Conexion = $null
-$base = $PSScriptRoot
+# $PSScriptRoot puede llegar vacio segun como se invoque el script (paso ya
+# visto en pruebas reales); igual que Enviar_CorreoQA.ps1, se resuelve la
+# carpeta a partir de $MyInvocation en vez de confiar en esa variable.
+$base = Split-Path -Parent $MyInvocation.MyCommand.Path
+Set-Location $base
+if ([string]::IsNullOrWhiteSpace($RutaCorreo)) { $RutaCorreo = Join-Path $base 'config_correo_backlog.json' }
 $salida = Join-Path $base 'Salida'
 $logs = Join-Path $base 'Logs'
 New-Item -ItemType Directory -Force -Path $salida,$logs | Out-Null
