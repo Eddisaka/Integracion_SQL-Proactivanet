@@ -285,6 +285,10 @@ function New-GraficaLineas {
         [Parameter(Mandatory)][string]$Titulo,
         [Parameter(Mandatory)][string]$RutaArchivo,
         [switch]$MostrarValores,
+        # Etiqueta solo el primer y ultimo punto de cada linea -el "antes y
+        # despues"-. Con 30 fechas y 7 series, etiquetar todos los puntos
+        # (MostrarValores) queda ilegible.
+        [switch]$ValoresExtremos,
         [switch]$ConLeyenda,
         [int]$Ancho = 900,
         [int]$Alto = 400
@@ -329,6 +333,19 @@ function New-GraficaLineas {
             $idx = $serie.Points.AddY([double]$p.Valor)
             $serie.Points[$idx].AxisLabel = [string]$p.Etiqueta
         }
+
+        if ($ValoresExtremos -and $serie.Points.Count -gt 0) {
+            $ultimo = $serie.Points.Count - 1
+            $serie.Points[0].Label = [string][int]$serie.Points[0].YValues[0]
+            if ($ultimo -gt 0) { $serie.Points[$ultimo].Label = [string][int]$serie.Points[$ultimo].YValues[0] }
+            # La etiqueta toma el color de su linea, para saber cual es cual
+            # cuando varias torres quedan a alturas parecidas.
+            $serie.LabelForeColor = $serie.Color
+            # SmartLabelStyle reacomoda las etiquetas que se encimarian entre
+            # si -es justo el caso de las torres chicas, todas pegadas al 0-.
+            $serie.SmartLabelStyle.Enabled = $true
+        }
+
         if (@($s.Puntos).Count -gt $maxPuntos) { $maxPuntos = @($s.Puntos).Count }
         $indiceSerie++
     }
@@ -530,8 +547,11 @@ try {
     New-GraficaBarras -Filas $porPrioridad -ColumnaEtiqueta 'Etiqueta' -ColumnaValor 'Valor' -Titulo 'Backlog por prioridad' -RutaArchivo $graficaPrioridad -ColoresPorEtiqueta $colorPrioridad
     if($hayAging){New-GraficaBarras -Filas $porAging -ColumnaEtiqueta 'Etiqueta' -ColumnaValor 'Valor' -Titulo 'Antiguedad del backlog' -RutaArchivo $graficaAging -ColorHex '#d97706'}
     if($haySla){New-GraficaBarras -Filas $porSla -ColumnaEtiqueta 'Etiqueta' -ColumnaValor 'Valor' -Titulo 'Estado SLA' -RutaArchivo $graficaSla -ColoresPorEtiqueta $colorSla}
-    if($hayTendencia){New-GraficaLineas -Series $serieTotal -Titulo "Tendencia del backlog total (ultimos $tendenciaDias dias)" -RutaArchivo $graficaTendencia -MostrarValores}
-    if($hayTendenciaLider){New-GraficaLineas -Series $seriesLider -Titulo "Tendencia del backlog por lider (ultimos $tendenciaDias dias)" -RutaArchivo $graficaTendenciaLider -ConLeyenda}
+    # ValoresExtremos (no MostrarValores) en las dos: con la ventana de 30 dias
+    # llena, etiquetar los 30 puntos de cada linea queda ilegible; el primero y
+    # el ultimo son justo el "antes y despues" que interesa.
+    if($hayTendencia){New-GraficaLineas -Series $serieTotal -Titulo "Tendencia del backlog total (ultimos $tendenciaDias dias)" -RutaArchivo $graficaTendencia -ValoresExtremos}
+    if($hayTendenciaLider){New-GraficaLineas -Series $seriesLider -Titulo "Tendencia del backlog por lider (ultimos $tendenciaDias dias)" -RutaArchivo $graficaTendenciaLider -ValoresExtremos -ConLeyenda -Alto 480}
 
     # ============================================================ Cuerpo HTML
     $kpis="<table style='border-collapse:collapse;font-family:Segoe UI,Arial'><tr>"
