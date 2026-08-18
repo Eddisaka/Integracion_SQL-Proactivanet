@@ -167,6 +167,108 @@ function New-GraficaBarras {
     $chart.Dispose()
 }
 
+# Grafica de lineas para las tendencias en el tiempo -misma funcion que usa
+# Enviar_CorreoBacklog_detalle.ps1-. Mismas precauciones que New-GraficaBarras:
+# Points.AddY + AxisLabel (AddXY exige X numerica), y nada de asignar .Font
+# sobre Title/Series.
+function New-GraficaLineas {
+    param(
+        # Array de objetos @{Nombre='...'; Puntos=@(@{Etiqueta='01 Ago'; Valor=123})}
+        [Parameter(Mandatory)]$Series,
+        [Parameter(Mandatory)][string]$Titulo,
+        [Parameter(Mandatory)][string]$RutaArchivo,
+        [switch]$MostrarValores,
+        [switch]$ConLeyenda,
+        [int]$Ancho = 900,
+        [int]$Alto = 400
+    )
+
+    $paleta = @('#2563eb','#dc2626','#16a34a','#d97706','#7c3aed','#0891b2','#db2777','#6b7280')
+
+    $chart = New-Object System.Windows.Forms.DataVisualization.Charting.Chart
+    $chart.Width = $Ancho
+    $chart.Height = $Alto
+    $chart.BackColor = [System.Drawing.Color]::White
+
+    $area = New-Object System.Windows.Forms.DataVisualization.Charting.ChartArea('Area1')
+    $area.AxisX.LabelStyle.Angle = -45
+    $area.AxisX.MajorGrid.Enabled = $false
+    $area.AxisY.MajorGrid.LineColor = [System.Drawing.ColorTranslator]::FromHtml('#e5e7eb')
+    $chart.ChartAreas.Add($area)
+
+    [void]$chart.Titles.Add($Titulo)
+
+    if ($ConLeyenda) {
+        $leyenda = New-Object System.Windows.Forms.DataVisualization.Charting.Legend('Legend1')
+        $leyenda.Docking = [System.Windows.Forms.DataVisualization.Charting.Docking]::Bottom
+        $chart.Legends.Add($leyenda)
+    }
+
+    $indiceSerie = 0
+    $maxPuntos = 0
+    foreach ($s in $Series) {
+        $serie = $chart.Series.Add([string]$s.Nombre)
+        $serie.ChartType = [System.Windows.Forms.DataVisualization.Charting.SeriesChartType]::Line
+        $serie.BorderWidth = 3
+        $serie.Color = [System.Drawing.ColorTranslator]::FromHtml($paleta[$indiceSerie % $paleta.Count])
+        $serie.MarkerStyle = [System.Windows.Forms.DataVisualization.Charting.MarkerStyle]::Circle
+        $serie.MarkerSize = 6
+        if ($MostrarValores) { $serie.IsValueShownAsLabel = $true }
+        if ($ConLeyenda) { $serie.Legend = 'Legend1' }
+
+        foreach ($p in $s.Puntos) {
+            $idx = $serie.Points.AddY([double]$p.Valor)
+            $serie.Points[$idx].AxisLabel = [string]$p.Etiqueta
+        }
+        if (@($s.Puntos).Count -gt $maxPuntos) { $maxPuntos = @($s.Puntos).Count }
+        $indiceSerie++
+    }
+
+    # Con 30 fechas no caben 30 etiquetas: se muestra ~1 de cada N.
+    $area.AxisX.Interval = [Math]::Max(1, [Math]::Ceiling($maxPuntos / 10.0))
+
+    if (Test-Path $RutaArchivo) { Remove-Item $RutaArchivo -Force }
+    $chart.SaveImage($RutaArchivo, [System.Windows.Forms.DataVisualization.Charting.ChartImageFormat]::Png)
+    $chart.Dispose()
+}
+
+# Convierte un result set largo (Fecha, Serie, Valor) en las series que espera
+# New-GraficaLineas, rellenando con 0 las fechas donde una serie no tiene fila.
+function ConvertTo-SeriesTendencia {
+    param(
+        [Parameter(Mandatory)][System.Data.DataTable]$Tabla,
+        [Parameter(Mandatory)][string]$ColumnaFecha,
+        [Parameter(Mandatory)][string]$ColumnaSerie,
+        [Parameter(Mandatory)][string]$ColumnaValor
+    )
+    if ($Tabla.Rows.Count -eq 0) { return @() }
+
+    $cultura = [Globalization.CultureInfo]::GetCultureInfo('es-MX')
+    $mapa = @{}
+    $fechas = New-Object System.Collections.Generic.List[datetime]
+    $nombres = New-Object System.Collections.Generic.List[string]
+
+    foreach ($fila in $Tabla.Rows) {
+        $f = [datetime]$fila[$ColumnaFecha]
+        $n = [string]$fila[$ColumnaSerie]
+        if (-not $fechas.Contains($f)) { [void]$fechas.Add($f) }
+        if (-not $nombres.Contains($n)) { [void]$nombres.Add($n) }
+        $mapa["$($f.ToString('yyyy-MM-dd'))|$n"] = [double]$fila[$ColumnaValor]
+    }
+
+    $fechasOrdenadas = @($fechas | Sort-Object)
+    foreach ($n in $nombres) {
+        $puntos = foreach ($f in $fechasOrdenadas) {
+            $clave = "$($f.ToString('yyyy-MM-dd'))|$n"
+            [PSCustomObject]@{
+                Etiqueta = $f.ToString('dd MMM', $cultura)
+                Valor    = $(if ($mapa.ContainsKey($clave)) { $mapa[$clave] } else { 0 })
+            }
+        }
+        [PSCustomObject]@{ Nombre = $n; Puntos = @($puntos) }
+    }
+}
+
 # Agrupa filas de un DataTable por una columna y suma otra -mismo GROUP BY
 # hecho en PowerShell que usa la version de detalle-.
 function Group-SumaPorColumna {
@@ -244,12 +346,42 @@ try {
     $colorFlecha=if($difTotal -gt 0){'#c00000'}elseif($difTotal -lt 0){'#008000'}else{'#6b7280'}
     $tendenciaTexto=if($fechaAnteriorTexto){"Backlog total: <b>$([int]$totalActual)</b> <span style='color:$colorFlecha;font-weight:bold'>$flechaTotal $([math]::Abs([int]$difTotal))</span> vs. el corte anterior (${fechaAnteriorTexto}: $([int]$totalAnterior))"}else{"Backlog total: <b>$([int]$totalActual)</b> (sin corte anterior para comparar todavia)"}
 
+    # ============================================= Tendencia (historico)
+    # Sale de los snapshots ya guardados: la grafica va a tener tantos puntos
+    # como cortes existan en el rango. Si nunca se corrio
+    # usp_CorreoBacklog_Backfill, solo habra los dias que lleve corriendo el
+    # correo -por eso conviene correrlo una vez, ver CORREO_BACKLOG.md-.
+    # Los defaults evitan que un config viejo (sin estas llaves) rompa el script.
+    $tendenciaDias = if($mail.tendencia_dias){[int]$mail.tendencia_dias}else{30}
+    $tendenciaTopLideres = if($mail.tendencia_top_lideres){[int]$mail.tendencia_top_lideres}else{6}
+    $fechaInicioTendencia = $FechaCorte.AddDays(-1*($tendenciaDias-1))
+
+    $histTotal = Invoke-SpDataSet 'dbo.usp_CorreoBacklog_Historico' @{ '@FechaInicio'=$fechaInicioTendencia; '@FechaFin'=$FechaCorte; '@Granularidad'='Dia' }
+    $histLider = Invoke-SpDataSet 'dbo.usp_CorreoBacklog_HistoricoPorLider' @{ '@FechaInicio'=$fechaInicioTendencia; '@FechaFin'=$FechaCorte; '@TopLideres'=$tendenciaTopLideres }
+
+    $cultura = [Globalization.CultureInfo]::GetCultureInfo('es-MX')
+    $serieTotal = @()
+    if($histTotal.Tables.Count -gt 0 -and $histTotal.Tables[0].Rows.Count -gt 0){
+        $puntosTotal = foreach($fila in $histTotal.Tables[0].Rows){
+            [PSCustomObject]@{ Etiqueta=([datetime]$fila['Periodo']).ToString('dd MMM',$cultura); Valor=[double]$fila['TicketsBacklog'] }
+        }
+        $serieTotal = @([PSCustomObject]@{ Nombre='Backlog total'; Puntos=@($puntosTotal) })
+    }
+    $seriesLider = @()
+    if($histLider.Tables.Count -gt 0 -and $histLider.Tables[0].Rows.Count -gt 0){
+        $seriesLider = @(ConvertTo-SeriesTendencia -Tabla $histLider.Tables[0] -ColumnaFecha 'FechaCorte' -ColumnaSerie 'Lider' -ColumnaValor 'Tickets')
+    }
+    $hayTendencia = (@($serieTotal).Count -gt 0) -and (@($serieTotal[0].Puntos).Count -ge 2)
+    $hayTendenciaLider = (@($seriesLider).Count -gt 0) -and (@($seriesLider[0].Puntos).Count -ge 2)
+
     # ============================================================ Graficas
     Write-Log 'Generando graficas...'
     $graficaLider = Join-Path $carpetaTemp 'grafica_lider.png'
     $graficaPrioridad = Join-Path $carpetaTemp 'grafica_prioridad.png'
     $graficaAging = Join-Path $carpetaTemp 'grafica_aging.png'
     $graficaSla = Join-Path $carpetaTemp 'grafica_sla.png'
+    $graficaTendencia = Join-Path $carpetaTemp 'grafica_tendencia.png'
+    $graficaTendenciaLider = Join-Path $carpetaTemp 'grafica_tendencia_lider.png'
     $hayLider = @($porLider).Count -gt 0
     $hayAging = @($porAging).Count -gt 0
     $haySla = @($porSla).Count -gt 0
@@ -258,6 +390,8 @@ try {
     New-GraficaBarras -Filas $porPrioridad -ColumnaEtiqueta 'Etiqueta' -ColumnaValor 'Valor' -Titulo 'Backlog por prioridad' -RutaArchivo $graficaPrioridad -ColoresPorEtiqueta $colorPrioridad
     if($hayAging){New-GraficaBarras -Filas $porAging -ColumnaEtiqueta 'Etiqueta' -ColumnaValor 'Valor' -Titulo 'Antiguedad del backlog' -RutaArchivo $graficaAging -ColorHex '#d97706'}
     if($haySla){New-GraficaBarras -Filas $porSla -ColumnaEtiqueta 'Etiqueta' -ColumnaValor 'Valor' -Titulo 'Estado SLA' -RutaArchivo $graficaSla -ColoresPorEtiqueta $colorSla}
+    if($hayTendencia){New-GraficaLineas -Series $serieTotal -Titulo "Tendencia del backlog total (ultimos $tendenciaDias dias)" -RutaArchivo $graficaTendencia -MostrarValores}
+    if($hayTendenciaLider){New-GraficaLineas -Series $seriesLider -Titulo "Tendencia del backlog por lider (ultimos $tendenciaDias dias)" -RutaArchivo $graficaTendenciaLider -ConLeyenda}
 
     # ============================================================ Cuerpo HTML
     # Una sola pantalla: tarjetas de KPI + linea de tendencia + 4 graficas.
@@ -271,6 +405,9 @@ try {
     $bloquePrioridad="<img src='cid:graficaPrioridad' alt='Backlog por prioridad' style='max-width:100%;'>"
     $bloqueAging=if($hayAging){"<img src='cid:graficaAging' alt='Antiguedad del backlog' style='max-width:100%;'>"}else{'<p><i>Sin datos.</i></p>'}
     $bloqueSla=if($haySla){"<img src='cid:graficaSla' alt='Estado SLA' style='max-width:100%;'>"}else{'<p><i>Sin datos.</i></p>'}
+    $avisoSinHistorico='<p style="color:#6b7280;font-size:13px"><i>Aun no hay suficientes cortes guardados para dibujar la tendencia (se necesitan al menos dos). Se ira llenando conforme corra el proceso diario, o de inmediato corriendo <b>usp_CorreoBacklog_Backfill</b> una vez.</i></p>'
+    $bloqueTendencia=if($hayTendencia){"<img src='cid:graficaTendencia' alt='Tendencia del backlog total' style='max-width:100%;'>"}else{$avisoSinHistorico}
+    $bloqueTendenciaLider=if($hayTendenciaLider){"<img src='cid:graficaTendenciaLider' alt='Tendencia del backlog por lider' style='max-width:100%;'>"}else{$avisoSinHistorico}
 
     $body=@"
 <html><body style='font-family:Segoe UI,Arial;color:#222'>
@@ -278,6 +415,10 @@ try {
 <p>Buen dia,</p>
 <p style='font-size:14px'>$tendenciaTexto</p>
 $kpis
+<h3 style='color:#1f4e78;margin-top:18px'>Tendencia del backlog total</h3>
+$bloqueTendencia
+<h3 style='color:#1f4e78'>Tendencia por lider (avance de cada torre)</h3>
+$bloqueTendenciaLider
 <table style='width:100%;border-collapse:collapse;margin-top:10px'>
 <tr>
 <td style='width:50%;vertical-align:top;padding:6px'><h3 style='color:#1f4e78'>Backlog por lider</h3>$bloqueLider</td>
@@ -305,6 +446,8 @@ $kpis
     $r=New-Object Net.Mail.LinkedResource($graficaPrioridad,'image/png');$r.ContentId='graficaPrioridad';$vistaHtml.LinkedResources.Add($r)
     if($hayAging){$r=New-Object Net.Mail.LinkedResource($graficaAging,'image/png');$r.ContentId='graficaAging';$vistaHtml.LinkedResources.Add($r)}
     if($haySla){$r=New-Object Net.Mail.LinkedResource($graficaSla,'image/png');$r.ContentId='graficaSla';$vistaHtml.LinkedResources.Add($r)}
+    if($hayTendencia){$r=New-Object Net.Mail.LinkedResource($graficaTendencia,'image/png');$r.ContentId='graficaTendencia';$vistaHtml.LinkedResources.Add($r)}
+    if($hayTendenciaLider){$r=New-Object Net.Mail.LinkedResource($graficaTendenciaLider,'image/png');$r.ContentId='graficaTendenciaLider';$vistaHtml.LinkedResources.Add($r)}
     $msg.AlternateViews.Add($vistaHtml)
 
     # Sin adjunto: este correo no genera Excel a proposito -ver .SINOPSIS-.

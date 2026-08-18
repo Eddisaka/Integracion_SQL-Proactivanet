@@ -32,6 +32,8 @@
    - dbo.usp_CorreoBacklog_FinalizarEjecucion (de Daniela, sin cambios)
    - dbo.usp_CorreoBacklog_Backfill      (nuevo: reconstruye snapshots pasados)
    - dbo.usp_CorreoBacklog_Historico     (nuevo: serie dia/semana/mes para el tablero)
+   - dbo.usp_CorreoBacklog_HistoricoPorLider (nuevo: la misma serie abierta por lider,
+                                          para la grafica de tendencia de los correos)
    - dbo.usp_CorreoBacklog_ResumenActual (nuevo: desglose por C1/Grupo/Prioridad/Aging)
    - dbo.usp_CorreoBacklog_Catalogos     (nuevo: catalogos para los filtros del tablero)
 
@@ -542,6 +544,61 @@ END;
 GO
 
 /* =====================================================================================
+   7b) Historico por lider: la misma serie de tiempo que el punto 7, pero
+       abierta por lider, para la grafica de tendencia de los correos
+       (ver si el backlog de cada torre va a la baja o al alta).
+
+       Solo devuelve los @TopLideres con mas backlog en el corte mas
+       reciente del rango; los demas se suman en una serie 'Otros', para
+       que la grafica no termine con 20 lineas encimadas.
+
+       Igual que el punto 7, se apoya en los snapshots ya guardados: solo
+       va a haber tantos puntos en la grafica como cortes existan en
+       dbo.CorreoBacklogSnapshot dentro del rango -por eso conviene correr
+       usp_CorreoBacklog_Backfill al menos una vez (seccion 6)-.
+   ===================================================================================== */
+CREATE OR ALTER PROCEDURE dbo.usp_CorreoBacklog_HistoricoPorLider
+    @FechaInicio DATE,
+    @FechaFin    DATE,
+    @TopLideres  INT = 6
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DECLARE @Ultima DATE =
+    (
+        SELECT MAX(FechaCorte)
+        FROM dbo.CorreoBacklogSnapshot
+        WHERE FechaCorte >= @FechaInicio AND FechaCorte <= @FechaFin
+    );
+
+    IF @Ultima IS NULL RETURN;
+
+    -- Sin PRIMARY KEY a proposito: si algun renglon historico llegara con
+    -- Lider NULL, un PK aqui tronaria el procedimiento completo.
+    DECLARE @Top TABLE (Lider NVARCHAR(255) NULL);
+
+    INSERT INTO @Top (Lider)
+    SELECT TOP (@TopLideres) Lider
+    FROM dbo.CorreoBacklogSnapshot
+    WHERE FechaCorte = @Ultima
+    GROUP BY Lider
+    ORDER BY COUNT_BIG(*) DESC;
+
+    SELECT
+        s.FechaCorte,
+        Lider = CASE WHEN t.Lider IS NOT NULL THEN s.Lider ELSE N'Otros' END,
+        Tickets = COUNT_BIG(*)
+    FROM dbo.CorreoBacklogSnapshot AS s
+    LEFT JOIN @Top AS t ON t.Lider = s.Lider
+    WHERE s.FechaCorte >= @FechaInicio
+      AND s.FechaCorte <= @FechaFin
+    GROUP BY s.FechaCorte, CASE WHEN t.Lider IS NOT NULL THEN s.Lider ELSE N'Otros' END
+    ORDER BY s.FechaCorte, 2;
+END;
+GO
+
+/* =====================================================================================
    8) Resumen del snapshot mas reciente (o de una fecha especifica):
       volumen por C1, por Grupo, por Prioridad y por Aging. 4 result sets.
    ===================================================================================== */
@@ -604,6 +661,7 @@ GRANT EXECUTE ON dbo.usp_CorreoBacklog_Datos TO [PROACTIVANETAD];
 GRANT EXECUTE ON dbo.usp_CorreoBacklog_FinalizarEjecucion TO [PROACTIVANETAD];
 GRANT EXECUTE ON dbo.usp_CorreoBacklog_Backfill TO [PROACTIVANETAD];
 GRANT EXECUTE ON dbo.usp_CorreoBacklog_Historico TO [PROACTIVANETAD];
+GRANT EXECUTE ON dbo.usp_CorreoBacklog_HistoricoPorLider TO [PROACTIVANETAD];
 GRANT EXECUTE ON dbo.usp_CorreoBacklog_ResumenActual TO [PROACTIVANETAD];
 GRANT EXECUTE ON dbo.usp_CorreoBacklog_Catalogos TO [PROACTIVANETAD];
 */
@@ -626,6 +684,10 @@ EXEC dbo.usp_CorreoBacklog_Historico @FechaInicio = '2026-01-01', @FechaFin = '2
 EXEC dbo.usp_CorreoBacklog_Historico
     @FechaInicio = '2026-01-01', @FechaFin = '2026-12-31',
     @Granularidad = 'Semana', @C1 = N'S-Punto de Venta';
+
+-- Tendencia por lider de los ultimos 30 dias (lo que grafican los correos)
+EXEC dbo.usp_CorreoBacklog_HistoricoPorLider
+    @FechaInicio = '2026-07-19', @FechaFin = '2026-08-18', @TopLideres = 6;
 
 -- Resumen del backlog mas reciente: volumen por C1/Grupo/Prioridad, y aging
 EXEC dbo.usp_CorreoBacklog_ResumenActual;

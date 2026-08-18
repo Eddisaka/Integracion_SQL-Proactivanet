@@ -65,7 +65,10 @@ ya tiene el correo hoy -no se cambio aqui sin confirmarlo primero-.
 En SQL Server Management Studio, conectado a `AZAUDITPRECIOS` /
 `Tickets_Proactivanet`, corre `07_correo_backlog.sql` completo. Es
 idempotente (`CREATE OR ALTER` / `IF OBJECT_ID... IS NULL`), se puede
-volver a correr sin romper nada si ya existian los objetos de Daniela.
+volver a correr sin romper nada si ya existian los objetos de Daniela —
+y hay que volver a correrlo cada vez que el script cambie: la version
+actual agrega `dbo.usp_CorreoBacklog_HistoricoPorLider`, que necesitan las
+graficas de tendencia de los dos correos.
 
 Permisos para la cuenta que usa PowerShell (al final del script, comentados):
 
@@ -79,6 +82,7 @@ GRANT EXECUTE ON dbo.usp_CorreoBacklog_Datos TO [PROACTIVANETAD];
 GRANT EXECUTE ON dbo.usp_CorreoBacklog_FinalizarEjecucion TO [PROACTIVANETAD];
 GRANT EXECUTE ON dbo.usp_CorreoBacklog_Backfill TO [PROACTIVANETAD];
 GRANT EXECUTE ON dbo.usp_CorreoBacklog_Historico TO [PROACTIVANETAD];
+GRANT EXECUTE ON dbo.usp_CorreoBacklog_HistoricoPorLider TO [PROACTIVANETAD];
 GRANT EXECUTE ON dbo.usp_CorreoBacklog_ResumenActual TO [PROACTIVANETAD];
 GRANT EXECUTE ON dbo.usp_CorreoBacklog_Catalogos TO [PROACTIVANETAD];
 ```
@@ -98,12 +102,33 @@ Hay dos scripts, ambos leyendo la misma `dbo.CorreoBacklogSnapshot` /
 
 | Script | Para quien | Contenido | Excel adjunto |
 |---|---|---|---|
-| `Enviar_CorreoBacklog_detalle.ps1` | Foro operativo/tecnico | KPIs, 4 graficas, top reasignaciones/reabiertos, detalle completo por lider/grupo, comparativa completa | Si (Principal/Comparativa/Datos) |
-| `Enviar_CorreoBacklog_direccion.ps1` | Direccion/CIO | KPIs (resumidas), linea de tendencia del total, las mismas 4 graficas -sin tablas de detalle- | No |
+| `Enviar_CorreoBacklog_detalle.ps1` | Foro operativo/tecnico | KPIs, 2 graficas de tendencia + 4 de barras, top reasignaciones/reabiertos, detalle completo por lider/grupo, comparativa completa | Si (Principal/Comparativa/Datos) |
+| `Enviar_CorreoBacklog_direccion.ps1` | Direccion/CIO | KPIs (resumidas), linea de tendencia del total, las mismas 2 graficas de tendencia + 4 de barras -sin tablas de detalle- | No |
 
 Pueden mandarse a listas de correo distintas (cada uno tiene su propio
 archivo de configuracion) y programarse a la misma hora o distinta -no hay
 dependencia de orden entre ellos, ver seccion 5-.
+
+### Graficas de tendencia (en ambos correos)
+
+Las dos responden "¿el backlog va a la baja o al alta?":
+- **Tendencia del backlog total** — una linea con el total por dia.
+- **Tendencia por lider** — una linea por cada uno de los N lideres con mas
+  backlog en el corte mas reciente (`tendencia_top_lideres`, default 6); el
+  resto se suma en una serie `Otros` para que la grafica no quede con 20
+  lineas encimadas. Esta es la que da visibilidad del avance de cada torre.
+
+Ventana configurable con `tendencia_dias` (default 30). Si el archivo de
+configuracion no trae estas llaves, los scripts usan los defaults -no hace
+falta tocar un `config_correo_backlog.json` que ya este en produccion-.
+
+**⚠️ Dependen del historico guardado:** ambas graficas leen los snapshots ya
+existentes en `dbo.CorreoBacklogSnapshot`, asi que solo van a tener tantos
+puntos como cortes existan. Si nunca se corrio
+`usp_CorreoBacklog_Backfill`, al principio solo apareceran los dias que
+lleve corriendo el correo -y con un solo corte los scripts ponen un aviso
+en vez de la grafica, porque una linea necesita al menos dos puntos-. Correr
+el backfill una vez (seccion 3) llena la tendencia de inmediato hacia atras.
 
 ### 4.1) Correo de detalle (foro operativo): PowerShell + Windows Task Scheduler
 
@@ -225,6 +250,7 @@ de detalle o a otra distinta.
 | Elemento del tablero | Procedimiento |
 |---|---|
 | Grafica de historico (eje tiempo dia/semana/mes x cantidad de tickets), filtrable por C1 y/o Grupo | `dbo.usp_CorreoBacklog_Historico @FechaInicio, @FechaFin, @Granularidad = 'Dia'\|'Semana'\|'Mes', @C1, @Grupo` |
+| Serie de tiempo abierta por lider (la que grafican los correos) | `dbo.usp_CorreoBacklog_HistoricoPorLider @FechaInicio, @FechaFin, @TopLideres` |
 | Volumen actual por C1 / Grupo / Prioridad / Aging | `dbo.usp_CorreoBacklog_ResumenActual` → 4 result sets |
 | Catalogos para los filtros (C1, Grupo, Lider) | `dbo.usp_CorreoBacklog_Catalogos` |
 
