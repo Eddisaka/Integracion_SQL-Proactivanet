@@ -190,6 +190,20 @@ agrega el Excel adjunto que generaba la de detalle.
   -antes solo se usaba sumado por bucket-, asi que no hubo que agregar
   nada en SQL.
 
+- Al final, el **listado de tickets con mas de 4 meses en backlog**: una
+  tabla por lider (Ticket, Dias, Registro, Prioridad, Grupo, Tecnico,
+  Subestado, Titulo), con los mas antiguos primero. Si un lider tiene mas de
+  10, se listan solo los 10 mas antiguos y el encabezado lo dice
+  (`-mostrando 10 de 47-`); el resto esta en la hoja Datos del Excel. Los
+  lideres salen ordenados de mas a menos tickets viejos.
+
+  El umbral es `antiguos_dias_minimo` (default **120 dias**, que es
+  justo donde arranca el bucket `+4 meses` de `dbo.vw_Backlog`) y el tope por
+  lider es `antiguos_top_por_lider` (default 10). El titulo de la seccion se
+  calcula del umbral, asi que si lo cambias el texto se ajusta solo. Sale del
+  result set de `usp_CorreoBacklog_Datos` que ya se consulta para armar el
+  Excel -tampoco hubo que agregar SQL para esto-.
+
 **Sobre el Estado SLA:** se quito esa grafica del cuerpo porque casi todo
 el backlog cae en `Fuera SLA` (ver la nota de la seccion 1 sobre tickets
 abiertos sin `FechaFirmaSolucion`), asi que la barra no aportaba y ocupaba

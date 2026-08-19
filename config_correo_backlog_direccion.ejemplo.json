@@ -31,6 +31,10 @@
   "_aging": "Cuantos lideres se muestran como segmento propio en la grafica apilada de antiguedad y en su tabla; el resto se suma en 'Otros'. Si esta llave no existe, el script usa 8.",
   "aging_top_lideres": 8,
 
+  "_antiguos": "Listado final de tickets viejos: a partir de cuantos dias en backlog entran (120 = mas de 4 meses, donde empieza el bucket '+4 meses') y cuantos se listan por lider -los mas antiguos primero-. Defaults si no existen: 120 y 10.",
+  "antiguos_dias_minimo": 120,
+  "antiguos_top_por_lider": 10,
+
   "enviar_sin_datos": false,
   "conservar_archivos_dias": 15
 }

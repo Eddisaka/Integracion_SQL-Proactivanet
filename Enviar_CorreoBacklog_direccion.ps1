@@ -18,8 +18,11 @@
     Renglon 1: Tendencia del backlog total | Tendencia por lider
     Renglon 2: Backlog por lider           | Backlog por prioridad
     Abajo, a todo lo ancho: Antiguedad del backlog por lider (barras
-    apiladas, un color por lider) y debajo su tabla resumen
-    antiguedad x lider.
+    apiladas, un color por lider), debajo su tabla resumen
+    antiguedad x lider, y al final el listado de los tickets con mas de
+    4 meses en backlog -una tabla por lider, con los 10 mas antiguos de
+    cada uno; umbral y tope configurables con antiguos_dias_minimo /
+    antiguos_top_por_lider-.
 
     La grafica de Estado SLA se quito: casi todo el backlog cae en
     'Fuera SLA', asi que la barra no aportaba. El dato sigue en la
@@ -539,6 +542,103 @@ function ConvertTo-TablaAgingHtml {
     $sb.ToString()
 }
 
+# Tickets mas viejos que @DiasMinimo, agrupados por lider y quedandose con
+# los @TopPorLider mas antiguos de cada uno. Sale del mismo result set de
+# usp_CorreoBacklog_Datos que ya se consulta para armar el Excel, asi que no
+# hace falta ninguna consulta extra.
+function Get-TicketsAntiguos {
+    param(
+        [Parameter(Mandatory)][System.Data.DataTable]$Tabla,
+        [int]$DiasMinimo = 120,
+        [int]$TopPorLider = 10
+    )
+    $porLider = @{}
+    foreach ($fila in $Tabla.Rows) {
+        if ($fila['DiasBacklog'] -is [DBNull]) { continue }
+        if ([int]$fila['DiasBacklog'] -le $DiasMinimo) { continue }
+        $l = [string]$fila['Lider']
+        if (-not $porLider.ContainsKey($l)) { $porLider[$l] = New-Object System.Collections.Generic.List[object] }
+        [void]$porLider[$l].Add($fila)
+    }
+    if ($porLider.Count -eq 0) { return @() }
+
+    # Lideres de mayor a menor cantidad de tickets viejos -el que mas arrastra
+    # sale primero-, y dentro de cada uno, del mas antiguo al menos antiguo.
+    $porLider.GetEnumerator() | Sort-Object -Property @{Expression={$_.Value.Count}} -Descending | ForEach-Object {
+        $ordenados = @($_.Value | Sort-Object -Property @{Expression={[int]$_['DiasBacklog']}} -Descending)
+        [PSCustomObject]@{
+            Lider    = $_.Key
+            Total    = $ordenados.Count
+            Mostrados = @($ordenados | Select-Object -First $TopPorLider)
+        }
+    }
+}
+
+# Listado de tickets viejos, una tabla por lider. El nombre del lider se
+# pinta con el mismo color que tiene en la grafica apilada y en la tabla de
+# antiguedad, para poder amarrar las tres vistas.
+function ConvertTo-TablaAntiguosHtml {
+    param(
+        [Parameter(Mandatory)]$Grupos,
+        $Matriz,
+        [int]$DiasMinimo = 120,
+        [int]$TopPorLider = 10
+    )
+    if (-not $Grupos -or @($Grupos).Count -eq 0) {
+        return "<p style='color:#6b7280;font-size:13px'><i>No hay tickets con mas de $DiasMinimo dias en backlog.</i></p>"
+    }
+
+    $paleta = $script:PaletaSeries
+    $sb = New-Object Text.StringBuilder
+    $granTotal = 0
+    foreach ($g in $Grupos) { $granTotal += $g.Total }
+    [void]$sb.Append("<p style='margin:4px 0 10px 0;font-size:12px;color:#6b7280'>$granTotal tickets con mas de $DiasMinimo dias en backlog. Se listan los $TopPorLider mas antiguos de cada lider; el resto esta en la hoja Datos del Excel.</p>")
+
+    foreach ($g in $Grupos) {
+        # Mismo color que en la grafica/tabla de antiguedad. Si el lider quedo
+        # dentro de 'Otros' alla, no hay color que reusar y se usa el azul base.
+        $color = '#1f4e78'
+        if ($null -ne $Matriz) {
+            $idx = [array]::IndexOf([string[]]$Matriz.Lideres, [string]$g.Lider)
+            if ($idx -ge 0) { $color = $paleta[$idx % $paleta.Count] }
+        }
+        $sufijo = if ($g.Total -gt $TopPorLider) { " -mostrando $TopPorLider de $($g.Total)-" } else { " -$($g.Total)-" }
+        [void]$sb.Append("<p style='margin:12px 0 4px 0'><b style='color:$color;font-size:13px'>$(Html $g.Lider)</b><span style='color:#6b7280;font-size:12px'>$(Html $sufijo)</span></p>")
+
+        [void]$sb.Append("<table style='border-collapse:collapse;font-family:Segoe UI,Arial;font-size:11px'><tr>")
+        foreach ($enc in @('Ticket','Dias','Registro','Prioridad','Grupo','Tecnico','Subestado','Titulo')) {
+            [void]$sb.Append("<th style='background:$color;color:white;border:1px solid #b4c6e7;padding:4px 6px'>$(Html $enc)</th>")
+        }
+        [void]$sb.Append('</tr>')
+
+        foreach ($t in $g.Mostrados) {
+            $fecha = ''
+            if ($t['FechaRegistro'] -isnot [DBNull]) { $fecha = ([datetime]$t['FechaRegistro']).ToString('dd/MM/yyyy') }
+            $titulo = [string]$t['Titulo']
+            if ($titulo.Length -gt 70) { $titulo = $titulo.Substring(0, 70) + '...' }
+            $celdas = @(
+                [string]$t['CodigoTicket'],
+                [string][int]$t['DiasBacklog'],
+                $fecha,
+                [string]$t['Prioridad'],
+                [string]$t['Grupo'],
+                [string]$t['TecnicoSegundaLinea'],
+                [string]$t['Subestado'],
+                $titulo
+            )
+            [void]$sb.Append('<tr>')
+            for ($i = 0; $i -lt $celdas.Count; $i++) {
+                # La columna de dias en negritas: es el dato que ordena la tabla.
+                $estilo = if ($i -eq 1) { 'text-align:right;font-weight:bold' } else { '' }
+                [void]$sb.Append("<td style='border:1px solid #d9e2f3;padding:3px 6px;$estilo'>$(Html $celdas[$i])</td>")
+            }
+            [void]$sb.Append('</tr>')
+        }
+        [void]$sb.Append('</table>')
+    }
+    $sb.ToString()
+}
+
 # Agrupa filas de un DataTable por una columna y suma otra -mismo GROUP BY
 # hecho en PowerShell que usa la version de detalle-.
 function Group-SumaPorColumna {
@@ -720,6 +820,16 @@ try {
     $bloquePrioridad="<img src='cid:graficaPrioridad' alt='Backlog por prioridad' style='max-width:100%;'>"
     $bloqueAging=if($hayAging){"<img src='cid:graficaAging' alt='Antiguedad del backlog por lider' style='max-width:100%;'>"}else{'<p><i>Sin datos.</i></p>'}
     $tablaAging=ConvertTo-TablaAgingHtml -Matriz $matrizAging
+    # Listado de los tickets mas viejos, por lider. 120 dias = mas de 4 meses,
+    # que es justo donde empieza el bucket '+4 meses' de dbo.vw_Backlog.
+    $antiguosDias=if($mail.antiguos_dias_minimo){[int]$mail.antiguos_dias_minimo}else{120}
+    $antiguosTop=if($mail.antiguos_top_por_lider){[int]$mail.antiguos_top_por_lider}else{10}
+    $gruposAntiguos=@(Get-TicketsAntiguos -Tabla $datos.Tables[0] -DiasMinimo $antiguosDias -TopPorLider $antiguosTop)
+    $tablaAntiguos=ConvertTo-TablaAntiguosHtml -Grupos $gruposAntiguos -Matriz $matrizAging -DiasMinimo $antiguosDias -TopPorLider $antiguosTop
+    # El titulo se calcula del umbral, para que no diga "4 meses" si alguien
+    # cambia antiguos_dias_minimo en el archivo de configuracion.
+    $mesesAntiguos=[math]::Round($antiguosDias/30.0,0)
+    $tituloAntiguos="Tickets con mas de $mesesAntiguos meses en backlog"
     $avisoSinHistorico='<p style="color:#6b7280;font-size:13px"><i>Aun no hay suficientes cortes guardados para dibujar la tendencia (se necesitan al menos dos). Se ira llenando conforme corra el proceso diario, o de inmediato corriendo <b>usp_CorreoBacklog_Backfill</b> una vez.</i></p>'
     $bloqueTendencia=if($hayTendencia){"<img src='cid:graficaTendencia' alt='Tendencia del backlog total' style='max-width:100%;'>"}else{$avisoSinHistorico}
     $bloqueTendenciaLider=if($hayTendenciaLider){"<img src='cid:graficaTendenciaLider' alt='Tendencia del backlog por lider' style='max-width:100%;'>"}else{$avisoSinHistorico}
@@ -744,6 +854,8 @@ $kpis
 $bloqueAging
 <p style='margin:10px 0 4px 0;font-size:12px;color:#6b7280'>Resumen por antiguedad y lider (los colores corresponden a los de la grafica):</p>
 $tablaAging
+<h3 style='color:#1f4e78;margin-top:22px'>$tituloAntiguos</h3>
+$tablaAntiguos
 <p style='margin-top:16px;font-size:12px;color:#6b7280'>Se adjunta el archivo Excel con las hojas Principal, Comparativa y Datos, donde esta el detalle completo por lider y grupo.</p>
 <p>Saludos.</p>
 </body></html>
