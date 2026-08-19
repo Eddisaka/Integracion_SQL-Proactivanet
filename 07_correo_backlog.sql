@@ -375,9 +375,28 @@ GO
       desde dbo.Tickets, sin pasar por dbo.vw_Backlog (que solo conoce el
       Estado/SLA vigentes ahora mismo y por eso no sirve para el pasado).
 
-      "Estaba en backlog en @F" se define igual que EstaAbierto en
-      dbo.vw_Tickets: ya se habia registrado (FechaRegistro <= @F) y o
-      sigue sin firma de cierre, o la firma de cierre fue DESPUES de @F.
+      "Estaba en backlog en @F" tiene que dar EXACTAMENTE lo mismo que
+      dbo.vw_Backlog cuando @F = hoy; si no, la serie historica y el corte
+      del dia no empatan y la grafica de tendencia muestra un escalon
+      artificial entre el ultimo dia backfilleado y hoy. Por eso:
+
+        - Si el ticket sigue abierto HOY (Estado NOT IN Cerrada/Rechazada,
+          el mismo filtro de dbo.vw_Backlog), estaba abierto en cualquier
+          fecha pasada posterior a su registro.
+        - Si ya esta cerrado, solo cuenta en las fechas ANTERIORES a su
+          FechaFirmaCierre.
+        - Si ya esta cerrado pero NO tiene FechaFirmaCierre, no se puede
+          ubicar en el tiempo y NO se cuenta en ninguna fecha.
+
+      Ese ultimo caso era un bug: la version anterior usaba solo
+      "FechaFirmaCierre IS NULL OR FechaFirmaCierre > @F", asi que todo
+      ticket cerrado o rechazado SIN fecha de firma de cierre se contaba
+      como abierto en TODOS los dias del backfill, para siempre. En la
+      practica eso inflaba el historico a ~25,000 tickets contra los
+      ~5,850 reales del corte de hoy -de ahi el salto radical al llegar a
+      la fecha de hoy, que si sale de dbo.vw_Backlog y si filtra por
+      Estado-.
+
       Aging/AgingSort/DiasBacklog se recalculan con @F en vez de GETDATE().
       EstadoSLA se copia igual que en dbo.vw_Backlog -esa formula compara
       FechaFirmaSolucion contra FechaEstimadaResolucion/OlaUc, campos fijos
@@ -497,7 +516,13 @@ BEGIN
         LEFT JOIN dbo.CatLiderGrupo AS lg ON lg.Grupo = t.Grupo
         WHERE t.FechaRegistro IS NOT NULL
           AND CONVERT(date, t.FechaRegistro) <= @F
-          AND (t.FechaFirmaCierre IS NULL OR CONVERT(date, t.FechaFirmaCierre) > @F);
+          AND (
+                -- Sigue abierto hoy: mismo filtro que usa dbo.vw_Backlog
+                -- -si esta lista cambia alla, hay que cambiarla aqui-.
+                t.Estado NOT IN (N'Cerrada', N'Rechazada')
+                -- O ya cerro, pero despues de la fecha que se esta armando.
+             OR (t.FechaFirmaCierre IS NOT NULL AND CONVERT(date, t.FechaFirmaCierre) > @F)
+              );
 
         SET @F = DATEADD(DAY, 1, @F);
     END;
@@ -699,5 +724,26 @@ EXEC dbo.usp_CorreoBacklog_Catalogos;
 -- conteo directo de tickets abiertos segun dbo.vw_Backlog.
 SELECT SnapshotHoy = (SELECT COUNT(*) FROM dbo.CorreoBacklogSnapshot WHERE FechaCorte = CONVERT(date, GETDATE())),
        DirectoHoy   = (SELECT COUNT(*) FROM dbo.vw_Backlog);
+
+-- ---------------------------------------------------------------------
+-- Diagnostico del "escalon" en la grafica de tendencia
+-- ---------------------------------------------------------------------
+-- 1) Cuantos tickets estaban inflando el historico: cerrados/rechazados
+--    que no tienen FechaFirmaCierre. La version vieja del backfill los
+--    contaba como abiertos en TODAS las fechas pasadas.
+SELECT
+    CerradosSinFechaCierre = SUM(CASE WHEN Estado IN (N'Cerrada', N'Rechazada') AND FechaFirmaCierre IS NULL THEN 1 ELSE 0 END),
+    CerradosConFechaCierre = SUM(CASE WHEN Estado IN (N'Cerrada', N'Rechazada') AND FechaFirmaCierre IS NOT NULL THEN 1 ELSE 0 END),
+    AbiertosHoy            = SUM(CASE WHEN Estado NOT IN (N'Cerrada', N'Rechazada') THEN 1 ELSE 0 END),
+    Total                  = COUNT(*)
+FROM dbo.Tickets;
+
+-- 2) Despues de volver a correr el backfill, la serie no debe tener saltos:
+--    el ultimo dia backfilleado (ayer) y el corte de hoy deben quedar
+--    cerca -la diferencia normal de un dia, no de miles-.
+SELECT TOP (10) FechaCorte, Tickets = COUNT(*)
+FROM dbo.CorreoBacklogSnapshot
+GROUP BY FechaCorte
+ORDER BY FechaCorte DESC;
 
 */

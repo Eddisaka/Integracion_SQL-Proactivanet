@@ -30,15 +30,76 @@ para preparar el corte de **hoy** (o para reprocesar el mismo dia si algo
 fallo), pero no puede reconstruir fechas pasadas.
 
 `usp_CorreoBacklog_Backfill` resuelve esto leyendo directo de `dbo.Tickets`
-+ `dbo.CatLiderGrupo`, con "estaba en backlog en la fecha X" definido igual
-que `EstaAbierto` en `dbo.vw_Tickets`: ya estaba registrado
-(`FechaRegistro <= X`) y o sigue sin firma de cierre, o la firma de cierre
-fue **despues** de X. Aging/AgingSort/DiasBacklog se recalculan con esa
-fecha en vez de `GETDATE()`; `EstadoSLA` se copia igual que en
-`dbo.vw_Backlog` (esa formula compara `FechaFirmaSolucion` contra
-`FechaEstimadaResolucion`/`FechaEstimadaOlaUc`, campos fijos del ticket, no
-depende de `GETDATE()`, asi que da el mismo resultado para hoy y para el
-pasado).
++ `dbo.CatLiderGrupo`. La regla de "estaba en backlog en la fecha X" tiene
+que dar **exactamente** lo mismo que `dbo.vw_Backlog` cuando X = hoy; si no,
+la serie historica y el corte del dia no empatan:
+
+- Si el ticket **sigue abierto hoy** (`Estado NOT IN ('Cerrada','Rechazada')`,
+  el mismo filtro de `dbo.vw_Backlog`), estaba abierto en cualquier fecha
+  pasada posterior a su registro.
+- Si **ya cerro**, solo cuenta en las fechas **anteriores** a su
+  `FechaFirmaCierre`.
+- Si ya cerro pero **no tiene `FechaFirmaCierre`**, no se puede ubicar en el
+  tiempo y no se cuenta en ninguna fecha.
+
+Aging/AgingSort/DiasBacklog se recalculan con esa fecha en vez de
+`GETDATE()`; `EstadoSLA` se copia igual que en `dbo.vw_Backlog` (esa formula
+compara `FechaFirmaSolucion` contra `FechaEstimadaResolucion`/
+`FechaEstimadaOlaUc`, campos fijos del ticket, no depende de `GETDATE()`,
+asi que da el mismo resultado para hoy y para el pasado).
+
+### ⚠️ Si ves un escalon en la grafica de tendencia, es esto
+
+La primera version del backfill usaba solo
+`FechaFirmaCierre IS NULL OR FechaFirmaCierre > X`, sin mirar el `Estado`.
+Con esa regla, **todo ticket cerrado o rechazado que no tenga
+`FechaFirmaCierre` se contaba como abierto en todos los dias del backfill,
+para siempre**. En la practica eso inflaba el historico a ~25,000 tickets
+contra los ~5,850 reales del corte de hoy, y la grafica mostraba una caida
+vertical justo al llegar a la fecha de hoy -que si sale de `dbo.vw_Backlog`
+y si filtra por `Estado`-.
+
+Ya esta corregido. Para arreglar los snapshots que se generaron con la
+version vieja hay que **volver a correr el script y luego el backfill**
+(vuelve a escribir cada fecha, no hace falta borrar nada a mano):
+
+```sql
+-- 1) Reinstalar los objetos (idempotente)
+--    ...corre 07_correo_backlog.sql completo...
+
+-- 2) Regenerar el historico ya con la regla corregida
+EXEC dbo.usp_CorreoBacklog_Backfill @FechaInicio = '2026-01-01';
+
+-- 3) Comprobar que ya no hay escalon: el ultimo dia backfilleado y el
+--    corte de hoy deben quedar cerca, no a miles de diferencia
+SELECT TOP (10) FechaCorte, Tickets = COUNT(*)
+FROM dbo.CorreoBacklogSnapshot
+GROUP BY FechaCorte
+ORDER BY FechaCorte DESC;
+```
+
+Para ver de que tamaño era la poblacion que inflaba el historico:
+
+```sql
+SELECT
+    CerradosSinFechaCierre = SUM(CASE WHEN Estado IN (N'Cerrada', N'Rechazada') AND FechaFirmaCierre IS NULL THEN 1 ELSE 0 END),
+    CerradosConFechaCierre = SUM(CASE WHEN Estado IN (N'Cerrada', N'Rechazada') AND FechaFirmaCierre IS NOT NULL THEN 1 ELSE 0 END),
+    AbiertosHoy            = SUM(CASE WHEN Estado NOT IN (N'Cerrada', N'Rechazada') THEN 1 ELSE 0 END),
+    Total                  = COUNT(*)
+FROM dbo.Tickets;
+```
+
+**Que se espera ver ya corregido:** la serie historica debe bajar de forma
+gradual hacia el pasado reciente -en enero habia menos tickets acumulados
+que hoy- y **conectar sin salto** con el corte de hoy. Los dias hacia
+adelante los sigue generando `usp_CorreoBacklog_PrepararCorte` desde
+`dbo.vw_Backlog`, que ahora usa la misma definicion de "abierto", asi que no
+va a reaparecer el escalon.
+
+**Un efecto secundario esperado y correcto:** el backfill subestima un poco
+las fechas pasadas, porque los tickets cerrados sin `FechaFirmaCierre` no se
+cuentan en ninguna fecha. Es preferible a contarlos siempre; y solo afecta a
+la parte backfilleada, no a los cortes que se capturan dia a dia.
 
 **Limitacion a tener presente:** el backfill usa el Grupo/Lider/Categoria
 **actuales** de cada ticket, no los que tenia en la fecha pasada -si un
