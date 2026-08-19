@@ -95,21 +95,32 @@ GRANT EXECUTE ON dbo.usp_CorreoBacklog_Catalogos TO [PROACTIVANETAD];
 EXEC dbo.usp_CorreoBacklog_Backfill @FechaInicio = '2026-01-01';
 ```
 
-## 4) Dos correos, dos audiencias
+## 4) El correo diario
 
-Hay dos scripts, ambos leyendo la misma `dbo.CorreoBacklogSnapshot` /
-`usp_CorreoBacklog_*`, pensados para foros distintos:
+Un solo script: **`Enviar_CorreoBacklog_direccion.ps1`**. Hubo un momento en
+que existieron dos versiones (una de detalle y una de direccion); se
+fusionaron en esta, que conserva el cuerpo ejecutivo de la de direccion y le
+agrega el Excel adjunto que generaba la de detalle.
 
-| Script | Para quien | Contenido | Excel adjunto |
-|---|---|---|---|
-| `Enviar_CorreoBacklog_detalle.ps1` | Foro operativo/tecnico | KPIs, 2 graficas de tendencia + 4 de barras, top reasignaciones/reabiertos, detalle completo por lider/grupo, comparativa completa | Si (Principal/Comparativa/Datos) |
-| `Enviar_CorreoBacklog_direccion.ps1` | Direccion/CIO | KPIs (resumidas), linea de tendencia del total, las mismas 2 graficas de tendencia + 4 de barras -sin tablas de detalle- | No |
+**Cuerpo del correo (una sola pantalla):**
+- Encabezado con la tendencia del total contra el corte anterior
+  (`Backlog total: 5,853 ↑ 199 vs. el corte anterior`).
+- Tarjetas de KPI: Backlog, Criticos, Altos, +30 dias, Reasignados,
+  Reabiertos y % Fuera SLA.
+- 6 graficas en 3 renglones de 2:
 
-Pueden mandarse a listas de correo distintas (cada uno tiene su propio
-archivo de configuracion) y programarse a la misma hora o distinta -no hay
-dependencia de orden entre ellos, ver seccion 5-.
+  | | Izquierda | Derecha |
+  |---|---|---|
+  | Renglon 1 | Tendencia del backlog total | Tendencia por lider |
+  | Renglon 2 | Backlog por lider | Antiguedad del backlog |
+  | Renglon 3 | Backlog por prioridad | Estado SLA |
 
-### Graficas de tendencia (en ambos correos)
+**Excel adjunto:** `Backlog diario - <fecha>.xlsx`, con las hojas
+Principal / Comparativa / Datos. Ahi vive todo el detalle -por lider y
+grupo, reasignaciones, reabiertos, comparativa completa y datos crudos-
+que a proposito ya no se repite en el cuerpo del correo.
+
+### Graficas de tendencia
 
 Las dos responden "¿el backlog va a la baja o al alta?":
 - **Tendencia del backlog total** — una linea con el total por dia.
@@ -119,8 +130,8 @@ Las dos responden "¿el backlog va a la baja o al alta?":
   lineas encimadas. Esta es la que da visibilidad del avance de cada torre.
 
 Ventana configurable con `tendencia_dias` (default 30). Si el archivo de
-configuracion no trae estas llaves, los scripts usan los defaults -no hace
-falta tocar un `config_correo_backlog.json` que ya este en produccion-.
+configuracion no trae estas llaves, el script usa los defaults -no hace
+falta tocar un archivo de configuracion que ya este en produccion-.
 
 **⚠️ Dependen del historico guardado:** ambas graficas leen los snapshots ya
 existentes en `dbo.CorreoBacklogSnapshot`, asi que solo van a tener tantos
@@ -130,13 +141,13 @@ lleve corriendo el correo -y con un solo corte los scripts ponen un aviso
 en vez de la grafica, porque una linea necesita al menos dos puntos-. Correr
 el backfill una vez (seccion 3) llena la tendencia de inmediato hacia atras.
 
-### 4.1) Correo de detalle (foro operativo): PowerShell + Windows Task Scheduler
+### 4.1) Instalacion y operacion del correo
 
-`Enviar_CorreoBacklog_detalle.ps1` hace todo en un solo script: prepara el
-corte de hoy, arma el `.xlsx` (hojas Principal/Comparativa/Datos) y un
-cuerpo de correo en HTML a nivel resumen ejecutivo, y lo manda por SMTP.
-Mismo patron que `etl_proactivanet.py` y `Enviar_CorreoQA.ps1` -sin nada
-que instalar, solo clases de .NET Framework-.
+`Enviar_CorreoBacklog_direccion.ps1` hace todo en un solo script: prepara el
+corte de hoy, arma el `.xlsx` (hojas Principal/Comparativa/Datos), genera las
+6 graficas y manda el correo por SMTP con el Excel adjunto. Mismo patron que
+`etl_proactivanet.py` y `Enviar_CorreoQA.ps1` -sin nada que instalar, solo
+clases de .NET Framework-.
 
 **Diferencias con el script original de Daniela:**
 - En vez de un `conexionsql.json` aparte, reusa el bloque `"sql"` de
@@ -144,43 +155,35 @@ que instalar, solo clases de .NET Framework-.
   conexion a SQL Server -una credencial menos que mantener sincronizada-.
 - El cuerpo del correo se rehizo para verse como el reporte manual
   ("Inc & Req Backlog") que se enviaba antes a mano, con el mismo enfoque
-  ejecutivo que `Enviar_CorreoQA.ps1`:
-  - Tarjetas de KPI (Backlog, Criticos/Altos/Medios/Bajos, +30 dias,
-    Reasignados, Reabiertos, **% Fuera SLA**).
-  - 4 graficas de barras incrustadas (`System.Windows.Forms.DataVisualization`,
-    igual que QA): **Backlog por lider**, **Backlog por prioridad** (Critica
-    en rojo, Alta en naranja, Media en amarillo, Baja en verde -mismo codigo
-    de colores que ya usaba el Excel manual-), **Antiguedad del backlog** y
-    **Estado SLA** (Dentro en verde, Fuera en rojo).
-  - Tablas de "Top 10 grupos con mas reasignaciones" y "Top 10 grupos con
-    mas tickets reabiertos" (antes solo estaban en el Excel adjunto, no en
-    el cuerpo del correo).
-  - El detalle completo por lider/grupo y la comparativa contra el corte
-    anterior se conservan como tablas mas abajo en el cuerpo (igual que
-    antes), y el Excel adjunto sigue trayendo las 3 hojas completas.
-  - Todos estos totales se calculan en PowerShell a partir de los mismos
-    result sets que ya regresa `usp_CorreoBacklog_Principal` -no se agrego
-    ningun procedimiento SQL nuevo para las graficas-.
+  ejecutivo que `Enviar_CorreoQA.ps1`: tarjetas de KPI (incluida
+  **% Fuera SLA**, que antes nadie calculaba) y las 6 graficas incrustadas.
+  Las de barras usan el mismo codigo de colores del Excel manual: Critica en
+  rojo, Alta en naranja, Media en amarillo, Baja en verde; Dentro SLA en
+  verde y Fuera SLA en rojo.
+- Todos los totales de las graficas se calculan en PowerShell a partir de
+  los result sets que ya regresan `usp_CorreoBacklog_Principal`,
+  `_Historico` y `_HistoricoPorLider`.
 
-**1) Configuracion** — copia `config_correo_backlog.ejemplo.json` como
-`config_correo_backlog.json` (no se sube a git, ya esta en `.gitignore`) y
-llena `destinatarios`/`remitente`/SMTP. `config.json` (el bloque `sql`)
-debe estar en la misma carpeta.
+**1) Configuracion** — copia `config_correo_backlog_direccion.ejemplo.json`
+como `config_correo_backlog_direccion.json` (no se sube a git, ya esta en
+`.gitignore`) y llena `destinatarios`/`remitente`/SMTP. `config.json` (el
+bloque `sql`) debe estar en la misma carpeta.
 
 **2) Prueba segura** — mientras `modo_prueba` este en `true`, el script
 ignora `destinatarios`/`cc`/`cco` y solo manda a `destinatario_prueba`.
 
 **3) Ejecutar manualmente:**
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "Enviar_CorreoBacklog_detalle.ps1"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "Enviar_CorreoBacklog_direccion.ps1"
 ```
 Para reprocesar una fecha concreta:
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "Enviar_CorreoBacklog_detalle.ps1" -FechaCorte "2026-08-13"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "Enviar_CorreoBacklog_direccion.ps1" -FechaCorte "2026-08-13"
 ```
-Si ya existe un envio exitoso para esa fecha, activa temporalmente
-`"forzar_reproceso": true` en `config_correo_backlog.json` y regresalo a
-`false` despues.
+Si ya existe un envio exitoso para esa fecha el script se detiene a
+proposito, para no mandar el correo dos veces al mismo foro. Para
+reprocesarla, activa temporalmente `"forzar_reproceso": true` en
+`config_correo_backlog_direccion.json` y regresalo a `false` despues.
 
 **4) Validaciones posteriores:**
 ```sql
@@ -197,51 +200,11 @@ ultima prueba manual controlada.
 
 **6) Programador de tareas:**
 - Programa: `powershell.exe`
-- Argumentos: `-NoProfile -ExecutionPolicy Bypass -File "C:\ruta\Enviar_CorreoBacklog_detalle.ps1"`
-- Iniciar en: la carpeta donde estan `Enviar_CorreoBacklog_detalle.ps1`, `config.json`
-  y `config_correo_backlog.json`.
+- Argumentos: `-NoProfile -ExecutionPolicy Bypass -File "C:\ruta\Enviar_CorreoBacklog_direccion.ps1"`
+- Iniciar en: la carpeta donde estan `Enviar_CorreoBacklog_direccion.ps1`,
+  `config.json` y `config_correo_backlog_direccion.json`.
 - Cuenta con acceso a SQL Server, permiso de escritura en la carpeta y
   acceso al relay SMTP.
-
-**Codigos de salida:** `0` exitoso, `5` error (revisar `Logs\`).
-
-### 4.2) Correo de direccion (resumen ejecutivo, una sola pantalla)
-
-`Enviar_CorreoBacklog_direccion.ps1` es una version corta pensada para el
-CIO/Direccion: tarjetas de KPI (menos que en el de detalle), una linea de
-tendencia del total contra el corte anterior, y las mismas 4 graficas -sin
-tablas de detalle por lider/grupo, sin comparativa completa, sin top
-reasignaciones/reabiertos, y **sin generar ni adjuntar el Excel**-.
-
-**Por que llama a `usp_CorreoBacklog_PrepararCorte` con `@Forzar=1` siempre:**
-para que no importe el orden en que Task Scheduler dispare los dos correos.
-Si el de detalle ya preparo el corte de hoy, este solo lo vuelve a preparar
-(mismo resultado, `PrepararCorte` es idempotente -borra e inserta de nuevo
-las filas de esa `FechaCorte`-); si este corre primero, lo prepara el. Cada
-uno lleva ademas su propio registro en `dbo.CorreoBacklogEjecucion`
-(`IdEjecucion` distinto), asi que ambos envios quedan auditados por
-separado aunque sea el mismo corte.
-
-**1) Configuracion** — copia `config_correo_backlog_direccion.ejemplo.json`
-como `config_correo_backlog_direccion.json` (no se sube a git) y llena
-`destinatarios`/`remitente`/SMTP -normalmente una lista mas corta que la de
-detalle-. `config.json` (el bloque `sql`) debe estar en la misma carpeta.
-
-**2) Ejecutar manualmente:**
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "Enviar_CorreoBacklog_direccion.ps1"
-```
-Para reprocesar una fecha concreta:
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "Enviar_CorreoBacklog_direccion.ps1" -FechaCorte "2026-08-13"
-```
-
-**3) Programador de tareas:** una tarea aparte de la de detalle -mismo
-patron (Programa `powershell.exe`, Argumentos
-`-NoProfile -ExecutionPolicy Bypass -File "C:\ruta\Enviar_CorreoBacklog_direccion.ps1"`,
-Iniciar en la carpeta con el script + `config.json` +
-`config_correo_backlog_direccion.json`)-. Puede ir a la misma hora que la
-de detalle o a otra distinta.
 
 **Codigos de salida:** `0` exitoso, `5` error (revisar `Logs\`).
 
@@ -265,9 +228,8 @@ el correo -no hace falta correr nada aparte cada vez que
 ## 6) Seguridad
 
 - Cambiar la contraseña SQL que fue compartida durante el desarrollo.
-- No almacenar `config.json`, `config_correo_backlog.json` ni
-  `config_correo_backlog_direccion.json` en Git -los tres ya estan
-  cubiertos por `.gitignore`-.
+- No almacenar `config.json` ni `config_correo_backlog_direccion.json` en
+  Git -ambos ya estan cubiertos por `.gitignore`-.
 - Limitar permisos NTFS de la carpeta.
 - Preferir una cuenta tecnica de minimo privilegio.
 - No imprimir contraseñas ni tokens en los logs.
@@ -275,11 +237,9 @@ el correo -no hace falta correr nada aparte cada vez que
 ## 7) Siguientes pasos
 
 1. Correr `07_correo_backlog.sql` y el backfill inicial (secciones 2-3).
-2. Probar `Enviar_CorreoBacklog_detalle.ps1` en modo de prueba y pasar a
+2. Probar `Enviar_CorreoBacklog_direccion.ps1` en modo de prueba y pasar a
    produccion (seccion 4.1).
-3. Probar `Enviar_CorreoBacklog_direccion.ps1` en modo de prueba y pasar a
-   produccion (seccion 4.2).
-4. Conectar `usp_CorreoBacklog_Historico`/`_ResumenActual`/`_Catalogos` al
+3. Conectar `usp_CorreoBacklog_Historico`/`_ResumenActual`/`_Catalogos` al
    frontend del dashboard (`.ashx`/`dashboard_api.py`, igual que el resto)
    — pendiente de que habiliten la comunicacion App↔BD en el servidor
    nuevo. Mientras tanto, se puede seguir probando estos procedimientos

@@ -1,58 +1,60 @@
 <#
 .SINOPSIS
-    Version "direccion" (resumen ejecutivo de una sola pantalla, para el
-    CIO/Director) del correo diario "Inc & Req Backlog". Usa los mismos
-    datos que Enviar_CorreoBacklog_detalle.ps1 (misma
-    dbo.CorreoBacklogSnapshot, mismos procedimientos SQL) pero con un
-    cuerpo mas corto: tarjetas de KPI, una linea de tendencia del total
-    contra el corte anterior, y las mismas 4 graficas -sin las tablas
-    detalladas por lider/grupo, sin la comparativa completa, sin las
-    tablas de "top" reasignaciones/reabiertos, y SIN adjuntar el Excel-.
-    Pensado para poder mandarse a una lista de correo distinta (mas corta,
-    solo Direccion) que la del correo de detalle, en un horario igual o
-    distinto.
+    Correo diario "Inc & Req Backlog": prepara el corte del dia
+    (dbo.usp_CorreoBacklog_PrepararCorte), arma el .xlsx con 3 hojas
+    (Principal, Comparativa, Datos) y manda por SMTP un resumen ejecutivo
+    de una sola pantalla -tarjetas de KPI, la linea de tendencia del total
+    contra el corte anterior, y 6 graficas acomodadas en 3 renglones de 2-,
+    con el Excel adjunto.
 
-.SOBRE EL CORTE DEL DIA
-    Este script tambien llama a dbo.usp_CorreoBacklog_PrepararCorte, igual
-    que la version de detalle -pero SIEMPRE con @Forzar=1-, para no
-    depender de en que orden se programen los dos correos en el Task
-    Scheduler: si el de detalle ya preparo el corte de hoy, este solo lo
-    vuelve a preparar (mismo resultado, es idempotente); si se llegara a
-    correr primero, prepara el corte el mismo. Ninguno de los dos scripts
-    necesita esperar al otro.
+    Este archivo es la fusion de las dos versiones que existieron antes
+    (detalle y direccion): se conservo el cuerpo ejecutivo de la version
+    de direccion y se le agrego el Excel adjunto que generaba la de
+    detalle. El detalle completo -por lider/grupo, comparativa, datos
+    crudos- vive en las 3 hojas del Excel, no en el cuerpo del correo.
+
+.ORDEN DE LAS GRAFICAS
+    Renglon 1: Tendencia del backlog total | Tendencia por lider
+    Renglon 2: Backlog por lider           | Antiguedad del backlog
+    Renglon 3: Backlog por prioridad       | Estado SLA
 
 .REQUISITOS
-    Igual que Enviar_CorreoBacklog_detalle.ps1, menos System.IO.Compression
-    (no genera Excel):
+    Ninguno que instalar. Todo usa clases de .NET Framework ya incluidas en
+    cualquier Windows -nada de Install-Module ni de internet-:
     - System.Data.SqlClient para la conexion a SQL Server.
-    - System.Windows.Forms.DataVisualization para las 4 graficas de barras.
-    - System.Net.Mail para el envio (AlternateView + LinkedResource).
+    - System.IO.Compression para armar el .xlsx a mano (zip + XML).
+    - System.Windows.Forms.DataVisualization para las 6 graficas.
+    - System.Net.Mail para el envio (AlternateView + LinkedResource para
+      incrustar las graficas por Content-ID; Send-MailMessage no lo soporta).
 
     Ademas, en la misma carpeta:
     - config.json (el mismo que usa etl_proactivanet.py y las otras
       automatizaciones; se lee su bloque "sql").
     - config_correo_backlog_direccion.json (copia de
-      config_correo_backlog_direccion.ejemplo.json -lista de correo y SMTP
-      propios de este correo, normalmente mas corta que la de detalle-).
+      config_correo_backlog_direccion.ejemplo.json, con destinatarios y SMTP).
 
 .USO
     powershell.exe -NoProfile -ExecutionPolicy Bypass -File Enviar_CorreoBacklog_direccion.ps1
     Para reprocesar una fecha concreta:
     powershell.exe -NoProfile -ExecutionPolicy Bypass -File Enviar_CorreoBacklog_direccion.ps1 -FechaCorte "2026-08-13"
-    Se programa como una tarea de Task Scheduler aparte de
-    Enviar_CorreoBacklog_detalle.ps1 -mismo dia, misma hora o distinta,
-    no importa el orden-.
+    Programar como tarea diaria en el Programador de tareas de Windows,
+    igual que etl_proactivanet.py y Enviar_CorreoQA.ps1.
+
+    Si ya hubo un envio exitoso para esa fecha, el script se detiene a
+    proposito -para no mandar el correo dos veces al mismo foro-. Para
+    reprocesarla a mano, pon "forzar_reproceso": true en el archivo de
+    configuracion y regresalo a false despues.
 
 .NOTA
-    Mismo caso que Enviar_CorreoQA.ps1 y Enviar_CorreoBacklog_detalle.ps1:
-    si el Programador de tareas esta configurado como "Ejecutar tanto si
-    el usuario inicio sesion como si no" (sin escritorio interactivo), en
-    algunos Windows el render de graficas (GDI+) puede fallar. Si eso
-    pasa, cambia la tarea a "Ejecutar solo si el usuario inicio sesion".
+    Mismo caso que Enviar_CorreoQA.ps1: si el Programador de tareas esta
+    configurado como "Ejecutar tanto si el usuario inicio sesion como si
+    no" (sin escritorio interactivo), en algunos Windows el render de
+    graficas (GDI+) puede fallar. Si eso pasa, cambia la tarea a "Ejecutar
+    solo si el usuario inicio sesion".
 
 .CODIGOS DE SALIDA
     0: ejecucion y envio exitosos.
-    5: error de configuracion, SQL o SMTP. Revisar Logs\.
+    5: error de configuracion, SQL, Excel o SMTP. Revisar Logs\.
 #>
 
 [CmdletBinding()]
@@ -67,9 +69,10 @@ $script:Conexion = $null
 $base = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $base
 if ([string]::IsNullOrWhiteSpace($RutaCorreo)) { $RutaCorreo = Join-Path $base 'config_correo_backlog_direccion.json' }
+$salida = Join-Path $base 'Salida'
 $logs = Join-Path $base 'Logs'
 $carpetaTemp = Join-Path $base 'correo_backlog_direccion_temp'
-New-Item -ItemType Directory -Force -Path $logs,$carpetaTemp | Out-Null
+New-Item -ItemType Directory -Force -Path $salida,$logs,$carpetaTemp | Out-Null
 $log = Join-Path $logs ("CorreoBacklogDireccion_{0}.log" -f $FechaCorte.ToString('yyyyMMdd'))
 
 function Write-Log([string]$Mensaje,[string]$Nivel='INFO') {
@@ -78,9 +81,14 @@ function Write-Log([string]$Mensaje,[string]$Nivel='INFO') {
     Write-Host $linea
 }
 function Html([object]$Valor) { [System.Net.WebUtility]::HtmlEncode([string]$Valor) }
+function Xml([object]$Valor) {
+    $s=[string]$Valor
+    $s=[regex]::Replace($s,'[\x00-\x08\x0B\x0C\x0E-\x1F]','')
+    [System.Security.SecurityElement]::Escape($s)
+}
 function Get-ConnectionString($c) {
-    # Mismo bloque "sql" de config.json que usan etl_proactivanet.py,
-    # Enviar_CorreoQA.ps1 y Enviar_CorreoBacklog_detalle.ps1.
+    # Mismo bloque "sql" de config.json que usan etl_proactivanet.py y
+    # Enviar_CorreoQA.ps1.
     $partes = @("Server=$($c.servidor)", "Database=$($c.base_datos)")
     if ($c.autenticacion_windows) {
         $partes += 'Integrated Security=True'
@@ -115,12 +123,71 @@ function Invoke-SpNonQuery([string]$Nombre,[hashtable]$Parametros) {
     [void]$cmd.ExecuteNonQuery()
 }
 
+# ==================================================== Generacion del .xlsx
+# Un .xlsx es un zip con XML adentro; se arma a mano para no depender de
+# Excel instalado ni de modulos que requieran Install-Module.
+function Get-ExcelColumnName([int]$Numero) {
+    $nombre=''
+    while($Numero -gt 0){$Numero--; $nombre=[char](65+($Numero % 26))+$nombre; $Numero=[math]::Floor($Numero/26)}
+    $nombre
+}
+function Add-CellXml([Text.StringBuilder]$Sb,[object]$Value,[int]$Style=0) {
+    if($null -eq $Value -or $Value -is [DBNull]) {[void]$Sb.Append("<c s='$Style'/>"); return}
+    if($Value -is [datetime]) {
+        $oa=$Value.ToOADate().ToString([Globalization.CultureInfo]::InvariantCulture)
+        [void]$Sb.Append("<c s='2'><v>$oa</v></c>"); return
+    }
+    if($Value -is [byte] -or $Value -is [int16] -or $Value -is [int32] -or $Value -is [int64] -or $Value -is [decimal] -or $Value -is [double] -or $Value -is [single]) {
+        $n=[Convert]::ToString($Value,[Globalization.CultureInfo]::InvariantCulture)
+        [void]$Sb.Append("<c s='$Style'><v>$n</v></c>"); return
+    }
+    [void]$Sb.Append("<c t='inlineStr' s='$Style'><is><t xml:space='preserve'>$(Xml $Value)</t></is></c>")
+}
+function New-SheetXml([array]$Secciones,[switch]$Filtro) {
+    $sb=New-Object Text.StringBuilder
+    [void]$sb.Append('<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/><sheetData>')
+    $r=1; $maxCols=1; $filterRef=$null
+    foreach($sec in $Secciones){
+        $title=[string]$sec.Titulo; $t=[System.Data.DataTable]$sec.Tabla
+        if($title){[void]$sb.Append("<row r='$r'>"); Add-CellXml $sb $title 3; [void]$sb.Append('</row>'); $r++}
+        if($null -eq $t){$r++;continue}
+        $maxCols=[Math]::Max($maxCols,$t.Columns.Count)
+        $headerRow=$r
+        [void]$sb.Append("<row r='$r'>"); foreach($c in $t.Columns){Add-CellXml $sb $c.ColumnName 1}; [void]$sb.Append('</row>'); $r++
+        foreach($dr in $t.Rows){[void]$sb.Append("<row r='$r'>"); foreach($c in $t.Columns){Add-CellXml $sb $dr[$c] 0}; [void]$sb.Append('</row>'); $r++}
+        if($Filtro -and $Secciones.Count -eq 1){$last=$r-1; $lastCol=Get-ExcelColumnName $t.Columns.Count; $filterRef="A$headerRow`:$lastCol$last"}
+        $r+=2
+    }
+    [void]$sb.Append('</sheetData>')
+    if($filterRef){[void]$sb.Append("<autoFilter ref='$filterRef'/>")}
+    [void]$sb.Append('<pageMargins left="0.3" right="0.3" top="0.5" bottom="0.5" header="0.2" footer="0.2"/></worksheet>')
+    $sb.ToString()
+}
+function New-Xlsx([string]$Path,[array]$Hojas) {
+    Add-Type -AssemblyName System.IO.Compression
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    if(Test-Path $Path){Remove-Item $Path -Force}
+    $fs=[IO.File]::Open($Path,[IO.FileMode]::CreateNew)
+    $zip=New-Object IO.Compression.ZipArchive($fs,[IO.Compression.ZipArchiveMode]::Create,$false)
+    function Put([string]$Name,[string]$Text){$e=$zip.CreateEntry($Name);$s=$e.Open();$w=New-Object IO.StreamWriter($s,(New-Object Text.UTF8Encoding($false)));$w.Write($Text);$w.Dispose();$s.Dispose()}
+    $types='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'
+    for($i=1;$i -le $Hojas.Count;$i++){$types+="<Override PartName='/xl/worksheets/sheet$i.xml' ContentType='application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml'/>"};$types+='</Types>'; Put '[Content_Types].xml' $types
+    Put '_rels/.rels' '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'
+    $wb='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>'
+    $rels='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+    for($i=1;$i -le $Hojas.Count;$i++){$wb+="<sheet name='$(Xml $Hojas[$i-1].Nombre)' sheetId='$i' r:id='rId$i'/>";$rels+="<Relationship Id='rId$i' Type='http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet' Target='worksheets/sheet$i.xml'/>"}
+    $wb+='</sheets><calcPr calcId="0" fullCalcOnLoad="1"/></workbook>';$rels+="<Relationship Id='rId$($Hojas.Count+1)' Type='http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles' Target='styles.xml'/></Relationships>"
+    Put 'xl/workbook.xml' $wb; Put 'xl/_rels/workbook.xml.rels' $rels
+    Put 'xl/styles.xml' '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="3"><font><sz val="10"/><name val="Calibri"/></font><font><b/><color rgb="FFFFFFFF"/><sz val="10"/><name val="Calibri"/></font><font><b/><color rgb="FF1F4E78"/><sz val="14"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF1F4E78"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="4"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFill="1"/><xf numFmtId="22" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0"/></cellXfs></styleSheet>'
+    for($i=1;$i -le $Hojas.Count;$i++){Put "xl/worksheets/sheet$i.xml" (New-SheetXml $Hojas[$i-1].Secciones -Filtro:$Hojas[$i-1].Filtro)}
+    $zip.Dispose();$fs.Dispose()
+}
+
 Add-Type -AssemblyName System.Windows.Forms.DataVisualization
 Add-Type -AssemblyName System.Drawing
 
 # Mismas funciones (y las mismas lecciones ya aprendidas: sin cuadricula,
-# Points.AddY + AxisLabel para categorias) que Enviar_CorreoQA.ps1 y
-# Enviar_CorreoBacklog_detalle.ps1.
+# Points.AddY + AxisLabel para categorias) que Enviar_CorreoQA.ps1.
 function New-GraficaBarras {
     param(
         [Parameter(Mandatory)] $Filas,
@@ -167,10 +234,9 @@ function New-GraficaBarras {
     $chart.Dispose()
 }
 
-# Grafica de lineas para las tendencias en el tiempo -misma funcion que usa
-# Enviar_CorreoBacklog_detalle.ps1-. Mismas precauciones que New-GraficaBarras:
-# Points.AddY + AxisLabel (AddXY exige X numerica), y nada de asignar .Font
-# sobre Title/Series.
+# Grafica de lineas para las tendencias en el tiempo. Mismas precauciones que
+# New-GraficaBarras: Points.AddY + AxisLabel (AddXY exige X numerica), y nada
+# de asignar .Font sobre Title/Series.
 function New-GraficaLineas {
     param(
         # Array de objetos @{Nombre='...'; Puntos=@(@{Etiqueta='01 Ago'; Valor=123})}
@@ -310,15 +376,16 @@ function Group-SumaPorColumna {
 }
 
 try {
-    Write-Log 'Inicio del proceso (direccion).'
+    Write-Log 'Inicio del proceso.'
     $cnf=(Get-Content -LiteralPath (Join-Path $base 'config.json') -Raw -Encoding UTF8 | ConvertFrom-Json).sql
     $mail=Get-Content -LiteralPath $RutaCorreo -Raw -Encoding UTF8 | ConvertFrom-Json
     $script:Conexion=New-Object System.Data.SqlClient.SqlConnection (Get-ConnectionString $cnf)
     $script:Conexion.Open(); Write-Log "Conexion SQL abierta: $($cnf.servidor)/$($cnf.base_datos)."
 
-    # @Forzar=1 siempre -ver .SOBRE EL CORTE DEL DIA arriba-: este correo no
-    # debe fallar solo porque el de detalle ya preparo (o no) el corte de hoy.
-    $prep=Invoke-SpDataSet 'dbo.usp_CorreoBacklog_PrepararCorte' @{ '@FechaCorte'=$FechaCorte; '@Forzar'=$true }
+    # Ahora que este es el unico correo de Backlog, se vuelve a respetar
+    # forzar_reproceso: si ya hubo un envio exitoso para la fecha, el
+    # procedimiento aborta para no mandar el correo dos veces al mismo foro.
+    $prep=Invoke-SpDataSet 'dbo.usp_CorreoBacklog_PrepararCorte' @{ '@FechaCorte'=$FechaCorte; '@Forzar'=[bool]$mail.forzar_reproceso }
     $script:IdEjecucion=[long]$prep.Tables[0].Rows[0].IdEjecucion
     $total=[int]$prep.Tables[0].Rows[0].TotalTickets
     Write-Log "Snapshot preparado. Id=$script:IdEjecucion; tickets=$total."
@@ -326,8 +393,31 @@ try {
 
     $principal=Invoke-SpDataSet 'dbo.usp_CorreoBacklog_Principal' @{ '@FechaCorte'=$FechaCorte }
     $comp=Invoke-SpDataSet 'dbo.usp_CorreoBacklog_Comparativa' @{ '@FechaCorte'=$FechaCorte }
+    $datos=Invoke-SpDataSet 'dbo.usp_CorreoBacklog_Datos' @{ '@FechaCorte'=$FechaCorte }
     $k=$principal.Tables[0].Rows[0]
     $fechaTexto=$FechaCorte.ToString('dd MMMM yyyy',[Globalization.CultureInfo]::GetCultureInfo('es-MX'))
+
+    # ======================================================= Excel adjunto
+    # El cuerpo del correo se queda a nivel resumen; todo el detalle
+    # (por lider/grupo, comparativa y datos crudos) va en estas 3 hojas.
+    $archivo=Join-Path $salida ("Backlog diario - {0}.xlsx" -f $FechaCorte.ToString('dd MMMM yyyy',[Globalization.CultureInfo]::GetCultureInfo('es-MX')))
+    $secciones=@(
+        @{Titulo='KPIs de Backlog';Tabla=$principal.Tables[0]},
+        @{Titulo='Backlog por lider y grupo resolutor';Tabla=$principal.Tables[1]},
+        @{Titulo='Antiguedad';Tabla=$principal.Tables[2]},
+        @{Titulo='Reasignaciones por grupo';Tabla=$principal.Tables[3]},
+        @{Titulo='Reabiertos por grupo';Tabla=$principal.Tables[4]},
+        @{Titulo='Estado SLA';Tabla=$principal.Tables[5]}
+    )
+    New-Xlsx $archivo @(
+        @{Nombre='Principal';Secciones=$secciones;Filtro=$false},
+        @{Nombre='Comparativa';Secciones=@(@{Titulo='Comparativa contra el ultimo corte';Tabla=$comp.Tables[0]});Filtro=$true},
+        @{Nombre='Datos';Secciones=@(@{Titulo='';Tabla=$datos.Tables[0]});Filtro=$true}
+    )
+    if(!(Test-Path $archivo) -or (Get-Item $archivo).Length -lt 1000){throw 'El archivo Excel no se genero correctamente.'}
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $z=[IO.Compression.ZipFile]::OpenRead($archivo);$entries=$z.Entries.Count;$z.Dispose();if($entries -lt 8){throw 'El archivo XLSX no contiene la estructura esperada.'}
+    Write-Log "Excel generado: $archivo"
 
     # ================================================== Agregados para graficas
     # Mismos calculos que la version de detalle, sobre los mismos result sets.
@@ -403,20 +493,26 @@ try {
     $hayAging = @($porAging).Count -gt 0
     $haySla = @($porSla).Count -gt 0
 
-    if($hayLider){New-GraficaBarras -Filas $porLider -ColumnaEtiqueta 'Etiqueta' -ColumnaValor 'Valor' -Titulo 'Backlog por lider' -RutaArchivo $graficaLider -ColorHex '#2563eb'}
-    New-GraficaBarras -Filas $porPrioridad -ColumnaEtiqueta 'Etiqueta' -ColumnaValor 'Valor' -Titulo 'Backlog por prioridad' -RutaArchivo $graficaPrioridad -ColoresPorEtiqueta $colorPrioridad
-    if($hayAging){New-GraficaBarras -Filas $porAging -ColumnaEtiqueta 'Etiqueta' -ColumnaValor 'Valor' -Titulo 'Antiguedad del backlog' -RutaArchivo $graficaAging -ColorHex '#d97706'}
-    if($haySla){New-GraficaBarras -Filas $porSla -ColumnaEtiqueta 'Etiqueta' -ColumnaValor 'Valor' -Titulo 'Estado SLA' -RutaArchivo $graficaSla -ColoresPorEtiqueta $colorSla}
+    # Las 6 graficas se muestran en 3 renglones de 2, asi que todas se
+    # renderizan al mismo ancho (640) para que se vean parejas -antes las de
+    # tendencia eran de 900 y ocupaban el renglon completo-.
+    $anchoGrafica = 640
+    if($hayLider){New-GraficaBarras -Filas $porLider -ColumnaEtiqueta 'Etiqueta' -ColumnaValor 'Valor' -Titulo 'Backlog por lider' -RutaArchivo $graficaLider -ColorHex '#2563eb' -Ancho $anchoGrafica -Alto 400}
+    New-GraficaBarras -Filas $porPrioridad -ColumnaEtiqueta 'Etiqueta' -ColumnaValor 'Valor' -Titulo 'Backlog por prioridad' -RutaArchivo $graficaPrioridad -ColoresPorEtiqueta $colorPrioridad -Ancho $anchoGrafica -Alto 400
+    if($hayAging){New-GraficaBarras -Filas $porAging -ColumnaEtiqueta 'Etiqueta' -ColumnaValor 'Valor' -Titulo 'Antiguedad del backlog' -RutaArchivo $graficaAging -ColorHex '#d97706' -Ancho $anchoGrafica -Alto 400}
+    if($haySla){New-GraficaBarras -Filas $porSla -ColumnaEtiqueta 'Etiqueta' -ColumnaValor 'Valor' -Titulo 'Estado SLA' -RutaArchivo $graficaSla -ColoresPorEtiqueta $colorSla -Ancho $anchoGrafica -Alto 400}
     # ValoresExtremos (no MostrarValores) en las dos: con la ventana de 30 dias
     # llena, etiquetar los 30 puntos de cada linea queda ilegible; el primero y
     # el ultimo son justo el "antes y despues" que interesa.
-    if($hayTendencia){New-GraficaLineas -Series $serieTotal -Titulo "Tendencia del backlog total (ultimos $tendenciaDias dias)" -RutaArchivo $graficaTendencia -ValoresExtremos}
-    if($hayTendenciaLider){New-GraficaLineas -Series $seriesLider -Titulo "Tendencia del backlog por lider (ultimos $tendenciaDias dias)" -RutaArchivo $graficaTendenciaLider -ValoresExtremos -ConLeyenda -Alto 480}
+    # La de lider lleva algo mas de alto por la leyenda de abajo.
+    if($hayTendencia){New-GraficaLineas -Series $serieTotal -Titulo "Tendencia del backlog total (ultimos $tendenciaDias dias)" -RutaArchivo $graficaTendencia -ValoresExtremos -Ancho $anchoGrafica -Alto 400}
+    if($hayTendenciaLider){New-GraficaLineas -Series $seriesLider -Titulo "Tendencia del backlog por lider (ultimos $tendenciaDias dias)" -RutaArchivo $graficaTendenciaLider -ValoresExtremos -ConLeyenda -Ancho $anchoGrafica -Alto 460}
 
     # ============================================================ Cuerpo HTML
-    # Una sola pantalla: tarjetas de KPI + linea de tendencia + 4 graficas.
-    # Sin tablas de detalle por lider/grupo, sin comparativa completa, sin
-    # top reasignaciones/reabiertos -eso se queda en el correo de detalle-.
+    # Una sola pantalla: tarjetas de KPI + linea de tendencia + las 6 graficas
+    # en 3 renglones de 2. Sin tablas de detalle por lider/grupo, sin
+    # comparativa completa, sin top reasignaciones/reabiertos -todo eso va en
+    # las 3 hojas del Excel adjunto-.
     $kpis="<table style='border-collapse:collapse;font-family:Segoe UI,Arial'><tr>"
     $colorPctSla=if($pctFueraSla -le 5){'#16a34a'}elseif($pctFueraSla -le 15){'#d97706'}else{'#dc2626'}
     foreach($x in @(@('Backlog',$k.BacklogTotal,'#1f4e78'),@('Criticos',$k.Criticos,'#dc2626'),@('Altos',$k.Altos,'#f59e0b'),@('+30 dias',$k.Mayor30Dias,'#1f4e78'),@('Reasignados',$k.Reasignados,'#1f4e78'),@('Reabiertos',$k.Reabiertos,'#1f4e78'),@('% Fuera SLA',"$pctFueraSla%",$colorPctSla))){$kpis+="<td style='padding:12px 18px;border:1px solid #b4c6e7;text-align:center'><b style='color:#1f4e78'>$($x[0])</b><br><span style='font-size:24px;color:$($x[2])'>$($x[1])</span></td>"};$kpis+='</tr></table>'
@@ -435,21 +531,21 @@ try {
 <p>Buen dia,</p>
 <p style='font-size:14px'>$tendenciaTexto</p>
 $kpis
-<h3 style='color:#1f4e78;margin-top:18px'>Tendencia del backlog total</h3>
-$bloqueTendencia
-<h3 style='color:#1f4e78'>Tendencia por lider (avance de cada torre)</h3>
-$bloqueTendenciaLider
-<table style='width:100%;border-collapse:collapse;margin-top:10px'>
+<table style='width:100%;border-collapse:collapse;margin-top:14px'>
 <tr>
-<td style='width:50%;vertical-align:top;padding:6px'><h3 style='color:#1f4e78'>Backlog por lider</h3>$bloqueLider</td>
-<td style='width:50%;vertical-align:top;padding:6px'><h3 style='color:#1f4e78'>Backlog por prioridad</h3>$bloquePrioridad</td>
+<td style='width:50%;vertical-align:top;padding:6px'><h3 style='color:#1f4e78'>Tendencia del backlog total</h3>$bloqueTendencia</td>
+<td style='width:50%;vertical-align:top;padding:6px'><h3 style='color:#1f4e78'>Tendencia por lider (avance de cada torre)</h3>$bloqueTendenciaLider</td>
 </tr>
 <tr>
+<td style='width:50%;vertical-align:top;padding:6px'><h3 style='color:#1f4e78'>Backlog por lider</h3>$bloqueLider</td>
 <td style='width:50%;vertical-align:top;padding:6px'><h3 style='color:#1f4e78'>Antiguedad del backlog</h3>$bloqueAging</td>
+</tr>
+<tr>
+<td style='width:50%;vertical-align:top;padding:6px'><h3 style='color:#1f4e78'>Backlog por prioridad</h3>$bloquePrioridad</td>
 <td style='width:50%;vertical-align:top;padding:6px'><h3 style='color:#1f4e78'>Estado SLA</h3>$bloqueSla</td>
 </tr>
 </table>
-<p style='margin-top:16px;font-size:12px;color:#6b7280'>Reporte resumido. El detalle completo por lider/grupo, la comparativa y el Excel se envian por separado en el correo de Backlog operativo.</p>
+<p style='margin-top:16px;font-size:12px;color:#6b7280'>Se adjunta el archivo Excel con las hojas Principal, Comparativa y Datos, donde esta el detalle completo por lider y grupo.</p>
 <p>Saludos.</p>
 </body></html>
 "@
@@ -470,14 +566,15 @@ $bloqueTendenciaLider
     if($hayTendenciaLider){$r=New-Object Net.Mail.LinkedResource($graficaTendenciaLider,'image/png');$r.ContentId='graficaTendenciaLider';$vistaHtml.LinkedResources.Add($r)}
     $msg.AlternateViews.Add($vistaHtml)
 
-    # Sin adjunto: este correo no genera Excel a proposito -ver .SINOPSIS-.
+    [void]$msg.Attachments.Add((New-Object Net.Mail.Attachment($archivo)))
     $smtp=New-Object Net.Mail.SmtpClient($mail.smtp_servidor,[int]$mail.smtp_puerto);$smtp.EnableSsl=[bool]$mail.smtp_usa_ssl
     if($mail.smtp_usuario){$smtp.Credentials=New-Object Net.NetworkCredential($mail.smtp_usuario,$mail.smtp_password)}else{$smtp.UseDefaultCredentials=$true}
     $smtp.Send($msg);$msg.Dispose();$smtp.Dispose()
-    Invoke-SpNonQuery 'dbo.usp_CorreoBacklog_FinalizarEjecucion' @{'@IdEjecucion'=$script:IdEjecucion;'@Exitoso'=$true;'@NombreArchivo'=$null;'@Destinatarios'=($to -join ';');'@MensajeError'=$null}
+    Invoke-SpNonQuery 'dbo.usp_CorreoBacklog_FinalizarEjecucion' @{'@IdEjecucion'=$script:IdEjecucion;'@Exitoso'=$true;'@NombreArchivo'=$archivo;'@Destinatarios'=($to -join ';');'@MensajeError'=$null}
     Write-Log "Correo enviado a $($to -join ';')." 'OK'
 
     $limite=(Get-Date).AddDays(-[int]$mail.conservar_archivos_dias)
+    Get-ChildItem $salida -File | Where-Object LastWriteTime -lt $limite | Remove-Item -Force -ErrorAction SilentlyContinue
     Get-ChildItem $logs -File | Where-Object LastWriteTime -lt $limite | Remove-Item -Force -ErrorAction SilentlyContinue
     exit 0
 }

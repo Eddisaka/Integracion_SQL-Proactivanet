@@ -1,5 +1,5 @@
 {
-  "_comentario": "Copia este archivo como config_correo_backlog_direccion.json y ajustalo. NO subas config_correo_backlog_direccion.json (con SMTP/destinatarios reales) a git -ya cubierto por .gitignore-. Normalmente esta lista es mas corta que la de config_correo_backlog.json (detalle): solo Direccion/CIO. La conexion a SQL Server NO va aqui: Enviar_CorreoBacklog_direccion.ps1 reusa el bloque \"sql\" de config.json.",
+  "_comentario": "Copia este archivo como config_correo_backlog_direccion.json y ajustalo. NO subas config_correo_backlog_direccion.json (con SMTP/destinatarios reales) a git -ya cubierto por .gitignore-. La conexion a SQL Server NO va aqui: Enviar_CorreoBacklog_direccion.ps1 reusa el bloque \"sql\" de config.json.",
 
   "destinatarios": [
     "director@soriana.com"
@@ -15,11 +15,14 @@
   "smtp_usuario": "",
   "smtp_password": "",
 
-  "asunto": "Resumen Ejecutivo Backlog - {fecha}",
+  "asunto": "Inc & Req Backlog - {fecha}",
 
   "_modo_prueba": "Mientras este en true, el correo solo se manda a destinatario_prueba -ignora destinatarios/cc/cco-.",
   "modo_prueba": true,
   "destinatario_prueba": "TU_CORREO@soriana.com",
+
+  "_forzar_reproceso": "Ponlo en true solo para reprocesar a mano una fecha que ya tenia un envio exitoso; regresalo a false despues.",
+  "forzar_reproceso": false,
 
   "_tendencia": "Grafica de tendencia: cuantos dias hacia atras graficar, y cuantos lideres mostrar como linea propia -el resto se suma en 'Otros'-. Si estas llaves no existen en el archivo, el script usa 30 y 6.",
   "tendencia_dias": 30,
