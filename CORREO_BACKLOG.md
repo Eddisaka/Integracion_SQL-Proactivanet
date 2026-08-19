@@ -107,13 +107,33 @@ agrega el Excel adjunto que generaba la de detalle.
   (`Backlog total: 5,853 ↑ 199 vs. el corte anterior`).
 - Tarjetas de KPI: Backlog, Criticos, Altos, +30 dias, Reasignados,
   Reabiertos y % Fuera SLA.
-- 6 graficas en 3 renglones de 2:
+- 4 graficas en 2 renglones de 2:
 
   | | Izquierda | Derecha |
   |---|---|---|
   | Renglon 1 | Tendencia del backlog total | Tendencia por lider |
-  | Renglon 2 | Backlog por lider | Antiguedad del backlog |
-  | Renglon 3 | Backlog por prioridad | Estado SLA |
+  | Renglon 2 | Backlog por lider | Backlog por prioridad |
+
+- Abajo, a todo lo ancho: **Antiguedad del backlog por lider** -barras
+  apiladas, cada barra partida en segmentos de color, uno por lider- y
+  debajo su **tabla resumen antiguedad x lider**, con los encabezados
+  pintados del mismo color que el segmento correspondiente. Solo se
+  etiquetan dentro de la barra los segmentos que midan al menos 5% de la
+  barra mas alta; los mas chicos se leen en la tabla, que trae todos los
+  numeros con sus totales por antiguedad y por lider.
+
+  Cuantos lideres salen como segmento propio se controla con
+  `aging_top_lideres` (default 8); el resto se suma en un segmento
+  `Otros`. Todo esto se calcula en PowerShell a partir del result set 3
+  de `usp_CorreoBacklog_Principal`, que ya traia el desglose por lider
+  -antes solo se usaba sumado por bucket-, asi que no hubo que agregar
+  nada en SQL.
+
+**Sobre el Estado SLA:** se quito esa grafica del cuerpo porque casi todo
+el backlog cae en `Fuera SLA` (ver la nota de la seccion 1 sobre tickets
+abiertos sin `FechaFirmaSolucion`), asi que la barra no aportaba y ocupaba
+espacio. El dato sigue en la tarjeta **% Fuera SLA** y completo en la hoja
+Principal del Excel.
 
 **Excel adjunto:** `Backlog diario - <fecha>.xlsx`, con las hojas
 Principal / Comparativa / Datos. Ahi vive todo el detalle -por lider y

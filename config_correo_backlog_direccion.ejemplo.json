@@ -28,6 +28,9 @@
   "tendencia_dias": 30,
   "tendencia_top_lideres": 6,
 
+  "_aging": "Cuantos lideres se muestran como segmento propio en la grafica apilada de antiguedad y en su tabla; el resto se suma en 'Otros'. Si esta llave no existe, el script usa 8.",
+  "aging_top_lideres": 8,
+
   "enviar_sin_datos": false,
   "conservar_archivos_dias": 15
 }

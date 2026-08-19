@@ -4,8 +4,9 @@
     (dbo.usp_CorreoBacklog_PrepararCorte), arma el .xlsx con 3 hojas
     (Principal, Comparativa, Datos) y manda por SMTP un resumen ejecutivo
     de una sola pantalla -tarjetas de KPI, la linea de tendencia del total
-    contra el corte anterior, y 6 graficas acomodadas en 3 renglones de 2-,
-    con el Excel adjunto.
+    contra el corte anterior, 4 graficas en 2 renglones de 2, y abajo la
+    de antiguedad por lider a todo lo ancho con su tabla resumen-, con el
+    Excel adjunto.
 
     Este archivo es la fusion de las dos versiones que existieron antes
     (detalle y direccion): se conservo el cuerpo ejecutivo de la version
@@ -15,15 +16,21 @@
 
 .ORDEN DE LAS GRAFICAS
     Renglon 1: Tendencia del backlog total | Tendencia por lider
-    Renglon 2: Backlog por lider           | Antiguedad del backlog
-    Renglon 3: Backlog por prioridad       | Estado SLA
+    Renglon 2: Backlog por lider           | Backlog por prioridad
+    Abajo, a todo lo ancho: Antiguedad del backlog por lider (barras
+    apiladas, un color por lider) y debajo su tabla resumen
+    antiguedad x lider.
+
+    La grafica de Estado SLA se quito: casi todo el backlog cae en
+    'Fuera SLA', asi que la barra no aportaba. El dato sigue en la
+    tarjeta "% Fuera SLA" y en la hoja Principal del Excel.
 
 .REQUISITOS
     Ninguno que instalar. Todo usa clases de .NET Framework ya incluidas en
     cualquier Windows -nada de Install-Module ni de internet-:
     - System.Data.SqlClient para la conexion a SQL Server.
     - System.IO.Compression para armar el .xlsx a mano (zip + XML).
-    - System.Windows.Forms.DataVisualization para las 6 graficas.
+    - System.Windows.Forms.DataVisualization para las 5 graficas.
     - System.Net.Mail para el envio (AlternateView + LinkedResource para
       incrustar las graficas por Content-ID; Send-MailMessage no lo soporta).
 
@@ -186,6 +193,12 @@ function New-Xlsx([string]$Path,[array]$Hojas) {
 Add-Type -AssemblyName System.Windows.Forms.DataVisualization
 Add-Type -AssemblyName System.Drawing
 
+# Paleta unica para todo lo que se colorea por serie (lider): las lineas de
+# tendencia, los segmentos de la grafica de antiguedad apilada y los
+# encabezados de la tabla resumen. Asi un lider tiene el mismo color en las
+# tres y se puede seguir de una a otra.
+$script:PaletaSeries = @('#2563eb','#dc2626','#16a34a','#d97706','#7c3aed','#0891b2','#db2777','#6b7280')
+
 # Mismas funciones (y las mismas lecciones ya aprendidas: sin cuadricula,
 # Points.AddY + AxisLabel para categorias) que Enviar_CorreoQA.ps1.
 function New-GraficaBarras {
@@ -253,7 +266,7 @@ function New-GraficaLineas {
         [int]$Alto = 400
     )
 
-    $paleta = @('#2563eb','#dc2626','#16a34a','#d97706','#7c3aed','#0891b2','#db2777','#6b7280')
+    $paleta = $script:PaletaSeries
 
     $chart = New-Object System.Windows.Forms.DataVisualization.Charting.Chart
     $chart.Width = $Ancho
@@ -352,6 +365,180 @@ function ConvertTo-SeriesTendencia {
     }
 }
 
+# Grafica de barras apiladas: una barra por categoria (bucket de antiguedad),
+# partida en segmentos de colores -uno por lider-.
+function New-GraficaBarrasApiladas {
+    param(
+        # Etiquetas del eje X, ya en el orden que deben salir.
+        [Parameter(Mandatory)][string[]]$Categorias,
+        # Array de @{Nombre='Lider'; Valores=@(un numero por categoria)}
+        [Parameter(Mandatory)]$Series,
+        [Parameter(Mandatory)][string]$Titulo,
+        [Parameter(Mandatory)][string]$RutaArchivo,
+        [int]$Ancho = 900,
+        [int]$Alto = 460,
+        # Solo se etiquetan los segmentos que midan al menos este porcentaje
+        # de la barra mas alta; los mas chicos quedarian con el numero
+        # encimado sobre el segmento de arriba -para esos esta la tabla-.
+        [double]$UmbralEtiqueta = 0.05
+    )
+
+    $paleta = $script:PaletaSeries
+
+    $chart = New-Object System.Windows.Forms.DataVisualization.Charting.Chart
+    $chart.Width = $Ancho
+    $chart.Height = $Alto
+    $chart.BackColor = [System.Drawing.Color]::White
+
+    $area = New-Object System.Windows.Forms.DataVisualization.Charting.ChartArea('Area1')
+    $area.AxisX.Interval = 1
+    $area.AxisX.LabelStyle.Angle = -45
+    $area.AxisX.MajorGrid.Enabled = $false
+    $area.AxisY.MajorGrid.LineColor = [System.Drawing.ColorTranslator]::FromHtml('#e5e7eb')
+    $chart.ChartAreas.Add($area)
+
+    [void]$chart.Titles.Add($Titulo)
+
+    $leyenda = New-Object System.Windows.Forms.DataVisualization.Charting.Legend('Legend1')
+    $leyenda.Docking = [System.Windows.Forms.DataVisualization.Charting.Docking]::Bottom
+    $chart.Legends.Add($leyenda)
+
+    # Alto de la barra mas alta = suma de todos los segmentos de esa categoria.
+    $maxTotal = 0.0
+    for ($i = 0; $i -lt $Categorias.Count; $i++) {
+        $t = 0.0
+        foreach ($s in $Series) { $t += [double]$s.Valores[$i] }
+        if ($t -gt $maxTotal) { $maxTotal = $t }
+    }
+
+    $indiceSerie = 0
+    foreach ($s in $Series) {
+        $serie = $chart.Series.Add([string]$s.Nombre)
+        $serie.ChartType = [System.Windows.Forms.DataVisualization.Charting.SeriesChartType]::StackedColumn
+        $serie.Color = [System.Drawing.ColorTranslator]::FromHtml($paleta[$indiceSerie % $paleta.Count])
+        $serie.Legend = 'Legend1'
+        $serie.LabelForeColor = [System.Drawing.Color]::White
+
+        for ($i = 0; $i -lt $Categorias.Count; $i++) {
+            $valor = [double]$s.Valores[$i]
+            $idx = $serie.Points.AddY($valor)
+            $serie.Points[$idx].AxisLabel = $Categorias[$i]
+            if ($maxTotal -gt 0 -and $valor -ge ($maxTotal * $UmbralEtiqueta)) {
+                $serie.Points[$idx].Label = [string][int]$valor
+            }
+        }
+        $indiceSerie++
+    }
+
+    if (Test-Path $RutaArchivo) { Remove-Item $RutaArchivo -Force }
+    $chart.SaveImage($RutaArchivo, [System.Windows.Forms.DataVisualization.Charting.ChartImageFormat]::Png)
+    $chart.Dispose()
+}
+
+# Arma la matriz antiguedad x lider a partir del result set 3 de
+# usp_CorreoBacklog_Principal (Lider, Grupo, Aging, AgingSort, Tickets).
+# No hace falta SQL nuevo: ese procedimiento ya trae el desglose, solo venia
+# usandose sumado por bucket.
+function Group-AgingPorLider {
+    param(
+        [Parameter(Mandatory)][System.Data.DataTable]$Tabla,
+        [int]$TopLideres = 8
+    )
+    if ($Tabla.Rows.Count -eq 0) { return $null }
+
+    $ordenBucket = @{}
+    $totalPorLiderCrudo = @{}
+    foreach ($fila in $Tabla.Rows) {
+        $b = [string]$fila['Aging']
+        $l = [string]$fila['Lider']
+        if (-not $ordenBucket.ContainsKey($b)) { $ordenBucket[$b] = [int]$fila['AgingSort'] }
+        if (-not $totalPorLiderCrudo.ContainsKey($l)) { $totalPorLiderCrudo[$l] = 0.0 }
+        $totalPorLiderCrudo[$l] += [double]$fila['Tickets']
+    }
+    # Los buckets salen en el orden real de antiguedad (AgingSort), no alfabetico.
+    $buckets = @($ordenBucket.GetEnumerator() | Sort-Object Value | ForEach-Object { $_.Key })
+    $top = @($totalPorLiderCrudo.GetEnumerator() | Sort-Object Value -Descending | Select-Object -First $TopLideres | ForEach-Object { $_.Key })
+
+    $valores = @{}
+    $usados = New-Object System.Collections.Generic.List[string]
+    foreach ($fila in $Tabla.Rows) {
+        $b = [string]$fila['Aging']
+        $l = [string]$fila['Lider']
+        if ($top -notcontains $l) { $l = 'Otros' }
+        if (-not $usados.Contains($l)) { [void]$usados.Add($l) }
+        $clave = "$b|$l"
+        if (-not $valores.ContainsKey($clave)) { $valores[$clave] = 0.0 }
+        $valores[$clave] += [double]$fila['Tickets']
+    }
+
+    $totalPorLider = @{}
+    foreach ($l in $usados) {
+        $t = 0.0
+        foreach ($b in $buckets) { $c = "$b|$l"; if ($valores.ContainsKey($c)) { $t += $valores[$c] } }
+        $totalPorLider[$l] = $t
+    }
+    # Lideres de mayor a menor volumen, con 'Otros' siempre hasta el final.
+    $lideres = @($usados | Where-Object { $_ -ne 'Otros' } | Sort-Object -Property @{Expression={$totalPorLider[$_]}} -Descending)
+    if ($usados.Contains('Otros')) { $lideres = @($lideres) + @('Otros') }
+
+    $totalPorBucket = @{}
+    foreach ($b in $buckets) {
+        $t = 0.0
+        foreach ($l in $lideres) { $c = "$b|$l"; if ($valores.ContainsKey($c)) { $t += $valores[$c] } }
+        $totalPorBucket[$b] = $t
+    }
+
+    [PSCustomObject]@{
+        Buckets        = @($buckets)
+        Lideres        = @($lideres)
+        Valores        = $valores
+        TotalPorLider  = $totalPorLider
+        TotalPorBucket = $totalPorBucket
+    }
+}
+
+# Tabla HTML de la matriz antiguedad x lider, con los encabezados pintados
+# del mismo color que el segmento correspondiente en la grafica apilada.
+function ConvertTo-TablaAgingHtml {
+    param([Parameter(Mandatory)]$Matriz)
+
+    if ($null -eq $Matriz) { return '<p><i>Sin datos.</i></p>' }
+    $paleta = $script:PaletaSeries
+    $sb = New-Object Text.StringBuilder
+    [void]$sb.Append("<table style='border-collapse:collapse;font-family:Segoe UI,Arial;font-size:11px'>")
+
+    [void]$sb.Append("<tr><th style='background:#1f4e78;color:white;border:1px solid #b4c6e7;padding:5px;text-align:left'>Antiguedad</th>")
+    $i = 0
+    foreach ($l in $Matriz.Lideres) {
+        $color = $paleta[$i % $paleta.Count]
+        [void]$sb.Append("<th style='background:$color;color:white;border:1px solid #b4c6e7;padding:5px'>$(Html $l)</th>")
+        $i++
+    }
+    [void]$sb.Append("<th style='background:#1f4e78;color:white;border:1px solid #b4c6e7;padding:5px'>Total</th></tr>")
+
+    foreach ($b in $Matriz.Buckets) {
+        [void]$sb.Append("<tr><td style='border:1px solid #d9e2f3;padding:4px;font-weight:bold'>$(Html $b)</td>")
+        foreach ($l in $Matriz.Lideres) {
+            $clave = "$b|$l"
+            $v = if ($Matriz.Valores.ContainsKey($clave)) { [int]$Matriz.Valores[$clave] } else { 0 }
+            $texto = if ($v -eq 0) { '' } else { [string]$v }
+            [void]$sb.Append("<td style='border:1px solid #d9e2f3;padding:4px;text-align:right'>$texto</td>")
+        }
+        [void]$sb.Append("<td style='border:1px solid #d9e2f3;padding:4px;text-align:right;font-weight:bold'>$([int]$Matriz.TotalPorBucket[$b])</td></tr>")
+    }
+
+    [void]$sb.Append("<tr><td style='border:1px solid #d9e2f3;padding:4px;font-weight:bold;background:#eef3fa'>Total</td>")
+    $granTotal = 0
+    foreach ($l in $Matriz.Lideres) {
+        $t = [int]$Matriz.TotalPorLider[$l]; $granTotal += $t
+        [void]$sb.Append("<td style='border:1px solid #d9e2f3;padding:4px;text-align:right;font-weight:bold;background:#eef3fa'>$t</td>")
+    }
+    [void]$sb.Append("<td style='border:1px solid #d9e2f3;padding:4px;text-align:right;font-weight:bold;background:#eef3fa'>$granTotal</td></tr>")
+
+    [void]$sb.Append('</table>')
+    $sb.ToString()
+}
+
 # Agrupa filas de un DataTable por una columna y suma otra -mismo GROUP BY
 # hecho en PowerShell que usa la version de detalle-.
 function Group-SumaPorColumna {
@@ -420,9 +607,13 @@ try {
     Write-Log "Excel generado: $archivo"
 
     # ================================================== Agregados para graficas
-    # Mismos calculos que la version de detalle, sobre los mismos result sets.
+    # Todos salen de los result sets que ya devuelve usp_CorreoBacklog_Principal.
     $porLider = Group-SumaPorColumna -Tabla $principal.Tables[1] -ColumnaGrupo 'Lider' -ColumnaValor 'Total'
-    $porAging = Group-SumaPorColumna -Tabla $principal.Tables[2] -ColumnaGrupo 'Aging' -ColumnaValor 'Tickets' -ColumnaOrden 'AgingSort'
+    # Antiguedad abierta por lider (grafica apilada + tabla resumen).
+    $agingTopLideres = if($mail.aging_top_lideres){[int]$mail.aging_top_lideres}else{8}
+    $matrizAging = Group-AgingPorLider -Tabla $principal.Tables[2] -TopLideres $agingTopLideres
+    # El Estado SLA ya no se grafica -casi todo cae en 'Fuera SLA', asi que la
+    # barra no aportaba-, pero se sigue calculando para la tarjeta % Fuera SLA.
     $porSla   = Group-SumaPorColumna -Tabla $principal.Tables[5] -ColumnaGrupo 'EstadoSLA' -ColumnaValor 'Tickets'
     $porPrioridad = @(
         [PSCustomObject]@{Etiqueta='Critica';Valor=[double]$k.Criticos},
@@ -431,7 +622,6 @@ try {
         [PSCustomObject]@{Etiqueta='Baja';Valor=[double]$k.Bajos}
     )
     $colorPrioridad = @{Critica='#dc2626';Alta='#f59e0b';Media='#eab308';Baja='#16a34a'}
-    $colorSla = @{'Dentro SLA'='#16a34a';'Fuera SLA'='#dc2626';'Dentro SLA(Subestado)'='#0891b2';'Tramite de compra'='#6b7280'}
 
     $totalSla=($porSla | Measure-Object -Property Valor -Sum).Sum
     $fueraSla=($porSla | Where-Object Etiqueta -eq 'Fuera SLA' | Select-Object -First 1).Valor
@@ -486,21 +676,29 @@ try {
     $graficaLider = Join-Path $carpetaTemp 'grafica_lider.png'
     $graficaPrioridad = Join-Path $carpetaTemp 'grafica_prioridad.png'
     $graficaAging = Join-Path $carpetaTemp 'grafica_aging.png'
-    $graficaSla = Join-Path $carpetaTemp 'grafica_sla.png'
     $graficaTendencia = Join-Path $carpetaTemp 'grafica_tendencia.png'
     $graficaTendenciaLider = Join-Path $carpetaTemp 'grafica_tendencia_lider.png'
     $hayLider = @($porLider).Count -gt 0
-    $hayAging = @($porAging).Count -gt 0
-    $haySla = @($porSla).Count -gt 0
+    $hayAging = $null -ne $matrizAging
 
-    # Las 6 graficas se muestran en 3 renglones de 2, asi que todas se
-    # renderizan al mismo ancho (640) para que se vean parejas -antes las de
-    # tendencia eran de 900 y ocupaban el renglon completo-.
+    # Las 4 graficas de los dos primeros renglones van al mismo ancho (640),
+    # dos por renglon. La de antiguedad ocupa el renglon completo abajo, asi
+    # que se renderiza mas ancha.
     $anchoGrafica = 640
     if($hayLider){New-GraficaBarras -Filas $porLider -ColumnaEtiqueta 'Etiqueta' -ColumnaValor 'Valor' -Titulo 'Backlog por lider' -RutaArchivo $graficaLider -ColorHex '#2563eb' -Ancho $anchoGrafica -Alto 400}
     New-GraficaBarras -Filas $porPrioridad -ColumnaEtiqueta 'Etiqueta' -ColumnaValor 'Valor' -Titulo 'Backlog por prioridad' -RutaArchivo $graficaPrioridad -ColoresPorEtiqueta $colorPrioridad -Ancho $anchoGrafica -Alto 400
-    if($hayAging){New-GraficaBarras -Filas $porAging -ColumnaEtiqueta 'Etiqueta' -ColumnaValor 'Valor' -Titulo 'Antiguedad del backlog' -RutaArchivo $graficaAging -ColorHex '#d97706' -Ancho $anchoGrafica -Alto 400}
-    if($haySla){New-GraficaBarras -Filas $porSla -ColumnaEtiqueta 'Etiqueta' -ColumnaValor 'Valor' -Titulo 'Estado SLA' -RutaArchivo $graficaSla -ColoresPorEtiqueta $colorSla -Ancho $anchoGrafica -Alto 400}
+    if($hayAging){
+        # Una serie por lider; cada serie trae un valor por bucket -0 donde ese
+        # lider no tiene tickets-, que es lo que apila StackedColumn.
+        $seriesAging = foreach($l in $matrizAging.Lideres){
+            $vals = foreach($b in $matrizAging.Buckets){
+                $c = "$b|$l"
+                if($matrizAging.Valores.ContainsKey($c)){ [double]$matrizAging.Valores[$c] } else { 0.0 }
+            }
+            [PSCustomObject]@{ Nombre = $l; Valores = @($vals) }
+        }
+        New-GraficaBarrasApiladas -Categorias $matrizAging.Buckets -Series @($seriesAging) -Titulo 'Antiguedad del backlog por lider' -RutaArchivo $graficaAging -Ancho 1000 -Alto 480
+    }
     # ValoresExtremos (no MostrarValores) en las dos: con la ventana de 30 dias
     # llena, etiquetar los 30 puntos de cada linea queda ilegible; el primero y
     # el ultimo son justo el "antes y despues" que interesa.
@@ -509,18 +707,19 @@ try {
     if($hayTendenciaLider){New-GraficaLineas -Series $seriesLider -Titulo "Tendencia del backlog por lider (ultimos $tendenciaDias dias)" -RutaArchivo $graficaTendenciaLider -ValoresExtremos -ConLeyenda -Ancho $anchoGrafica -Alto 460}
 
     # ============================================================ Cuerpo HTML
-    # Una sola pantalla: tarjetas de KPI + linea de tendencia + las 6 graficas
-    # en 3 renglones de 2. Sin tablas de detalle por lider/grupo, sin
-    # comparativa completa, sin top reasignaciones/reabiertos -todo eso va en
-    # las 3 hojas del Excel adjunto-.
+    # Una sola pantalla: tarjetas de KPI + linea de tendencia + 4 graficas en
+    # 2 renglones de 2, y abajo la de antiguedad por lider a todo lo ancho con
+    # su tabla resumen. Sin tablas de detalle por lider/grupo, sin comparativa
+    # completa, sin top reasignaciones/reabiertos -todo eso va en las 3 hojas
+    # del Excel adjunto-.
     $kpis="<table style='border-collapse:collapse;font-family:Segoe UI,Arial'><tr>"
     $colorPctSla=if($pctFueraSla -le 5){'#16a34a'}elseif($pctFueraSla -le 15){'#d97706'}else{'#dc2626'}
     foreach($x in @(@('Backlog',$k.BacklogTotal,'#1f4e78'),@('Criticos',$k.Criticos,'#dc2626'),@('Altos',$k.Altos,'#f59e0b'),@('+30 dias',$k.Mayor30Dias,'#1f4e78'),@('Reasignados',$k.Reasignados,'#1f4e78'),@('Reabiertos',$k.Reabiertos,'#1f4e78'),@('% Fuera SLA',"$pctFueraSla%",$colorPctSla))){$kpis+="<td style='padding:12px 18px;border:1px solid #b4c6e7;text-align:center'><b style='color:#1f4e78'>$($x[0])</b><br><span style='font-size:24px;color:$($x[2])'>$($x[1])</span></td>"};$kpis+='</tr></table>'
 
     $bloqueLider=if($hayLider){"<img src='cid:graficaLider' alt='Backlog por lider' style='max-width:100%;'>"}else{'<p><i>Sin datos.</i></p>'}
     $bloquePrioridad="<img src='cid:graficaPrioridad' alt='Backlog por prioridad' style='max-width:100%;'>"
-    $bloqueAging=if($hayAging){"<img src='cid:graficaAging' alt='Antiguedad del backlog' style='max-width:100%;'>"}else{'<p><i>Sin datos.</i></p>'}
-    $bloqueSla=if($haySla){"<img src='cid:graficaSla' alt='Estado SLA' style='max-width:100%;'>"}else{'<p><i>Sin datos.</i></p>'}
+    $bloqueAging=if($hayAging){"<img src='cid:graficaAging' alt='Antiguedad del backlog por lider' style='max-width:100%;'>"}else{'<p><i>Sin datos.</i></p>'}
+    $tablaAging=ConvertTo-TablaAgingHtml -Matriz $matrizAging
     $avisoSinHistorico='<p style="color:#6b7280;font-size:13px"><i>Aun no hay suficientes cortes guardados para dibujar la tendencia (se necesitan al menos dos). Se ira llenando conforme corra el proceso diario, o de inmediato corriendo <b>usp_CorreoBacklog_Backfill</b> una vez.</i></p>'
     $bloqueTendencia=if($hayTendencia){"<img src='cid:graficaTendencia' alt='Tendencia del backlog total' style='max-width:100%;'>"}else{$avisoSinHistorico}
     $bloqueTendenciaLider=if($hayTendenciaLider){"<img src='cid:graficaTendenciaLider' alt='Tendencia del backlog por lider' style='max-width:100%;'>"}else{$avisoSinHistorico}
@@ -538,13 +737,13 @@ $kpis
 </tr>
 <tr>
 <td style='width:50%;vertical-align:top;padding:6px'><h3 style='color:#1f4e78'>Backlog por lider</h3>$bloqueLider</td>
-<td style='width:50%;vertical-align:top;padding:6px'><h3 style='color:#1f4e78'>Antiguedad del backlog</h3>$bloqueAging</td>
-</tr>
-<tr>
 <td style='width:50%;vertical-align:top;padding:6px'><h3 style='color:#1f4e78'>Backlog por prioridad</h3>$bloquePrioridad</td>
-<td style='width:50%;vertical-align:top;padding:6px'><h3 style='color:#1f4e78'>Estado SLA</h3>$bloqueSla</td>
 </tr>
 </table>
+<h3 style='color:#1f4e78;margin-top:18px'>Antiguedad del backlog por lider</h3>
+$bloqueAging
+<p style='margin:10px 0 4px 0;font-size:12px;color:#6b7280'>Resumen por antiguedad y lider (los colores corresponden a los de la grafica):</p>
+$tablaAging
 <p style='margin-top:16px;font-size:12px;color:#6b7280'>Se adjunta el archivo Excel con las hojas Principal, Comparativa y Datos, donde esta el detalle completo por lider y grupo.</p>
 <p>Saludos.</p>
 </body></html>
@@ -561,7 +760,6 @@ $kpis
     if($hayLider){$r=New-Object Net.Mail.LinkedResource($graficaLider,'image/png');$r.ContentId='graficaLider';$vistaHtml.LinkedResources.Add($r)}
     $r=New-Object Net.Mail.LinkedResource($graficaPrioridad,'image/png');$r.ContentId='graficaPrioridad';$vistaHtml.LinkedResources.Add($r)
     if($hayAging){$r=New-Object Net.Mail.LinkedResource($graficaAging,'image/png');$r.ContentId='graficaAging';$vistaHtml.LinkedResources.Add($r)}
-    if($haySla){$r=New-Object Net.Mail.LinkedResource($graficaSla,'image/png');$r.ContentId='graficaSla';$vistaHtml.LinkedResources.Add($r)}
     if($hayTendencia){$r=New-Object Net.Mail.LinkedResource($graficaTendencia,'image/png');$r.ContentId='graficaTendencia';$vistaHtml.LinkedResources.Add($r)}
     if($hayTendenciaLider){$r=New-Object Net.Mail.LinkedResource($graficaTendenciaLider,'image/png');$r.ContentId='graficaTendenciaLider';$vistaHtml.LinkedResources.Add($r)}
     $msg.AlternateViews.Add($vistaHtml)
