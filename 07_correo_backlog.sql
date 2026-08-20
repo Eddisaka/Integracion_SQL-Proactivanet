@@ -200,7 +200,13 @@ BEGIN
             b.DiasBacklog, b.Aging, b.AgingSort, b.EstadoSLA,
             ISNULL(dbo.fn_CorreoBacklog_CategoriaC1(b.Categoria), N'Sin categoria')
         FROM dbo.vw_Backlog AS b
-        WHERE b.CodigoTicket IS NOT NULL;
+        WHERE b.CodigoTicket IS NOT NULL
+          -- 'Resuelta' NO es backlog: el ticket ya se resolvio y Proactivanet
+          -- lo pasa solo a 'Cerrada' a los ~3 dias. dbo.vw_Backlog solo
+          -- excluye 'Cerrada'/'Rechazada', asi que aqui se quita aparte -no
+          -- se toco la vista para no afectar a sus otros consumidores; ver
+          -- CORREO_BACKLOG.md-. Debe empatar con la lista del Backfill.
+          AND b.Estado <> N'Resuelta';
 
         INSERT dbo.CorreoBacklogEjecucion
             (FechaCorte, FechaCorteAnterior, Estatus, TotalTickets)
@@ -375,18 +381,28 @@ GO
       desde dbo.Tickets, sin pasar por dbo.vw_Backlog (que solo conoce el
       Estado/SLA vigentes ahora mismo y por eso no sirve para el pasado).
 
-      "Estaba en backlog en @F" tiene que dar EXACTAMENTE lo mismo que
-      dbo.vw_Backlog cuando @F = hoy; si no, la serie historica y el corte
-      del dia no empatan y la grafica de tendencia muestra un escalon
-      artificial entre el ultimo dia backfilleado y hoy. Por eso:
+      "Estaba en backlog en @F" tiene que dar EXACTAMENTE lo mismo que el
+      corte del dia (usp_CorreoBacklog_PrepararCorte) cuando @F = hoy; si
+      no, la serie historica y el corte del dia no empatan y la grafica de
+      tendencia muestra un escalon artificial entre el ultimo dia
+      backfilleado y hoy. Por eso:
 
-        - Si el ticket sigue abierto HOY (Estado NOT IN Cerrada/Rechazada,
-          el mismo filtro de dbo.vw_Backlog), estaba abierto en cualquier
-          fecha pasada posterior a su registro.
-        - Si ya esta cerrado, solo cuenta en las fechas ANTERIORES a su
-          FechaFirmaCierre.
-        - Si ya esta cerrado pero NO tiene FechaFirmaCierre, no se puede
+        - Si el ticket sigue abierto HOY -Estado NOT IN Cerrada/Rechazada/
+          Resuelta, la MISMA lista que aplica PrepararCorte-, estaba
+          abierto en cualquier fecha pasada posterior a su registro.
+        - Si ya salio del backlog, cuenta solo en las fechas ANTERIORES a
+          su fecha de salida = COALESCE(FechaFirmaCierre, FechaFirmaSolucion).
+        - Si ya salio pero no tiene ninguna de las dos fechas, no se puede
           ubicar en el tiempo y NO se cuenta en ninguna fecha.
+
+      Por que la fecha de salida es un COALESCE y no solo FechaFirmaCierre:
+      un ticket que hoy esta 'Resuelta' todavia no tiene firma de cierre
+      -Proactivanet lo pasa a 'Cerrada' hasta ~3 dias despues-, pero SI
+      estuvo en backlog hasta el dia que se resolvio. Usando solo
+      FechaFirmaCierre esos tickets desaparecerian de todo el historico y
+      la curva se hundiria sin razon. Como efecto lateral, tambien rescata
+      a los cerrados que quedaron sin FechaFirmaCierre pero si tienen
+      FechaFirmaSolucion, que antes se perdian por completo.
 
       Ese ultimo caso era un bug: la version anterior usaba solo
       "FechaFirmaCierre IS NULL OR FechaFirmaCierre > @F", asi que todo
@@ -517,11 +533,18 @@ BEGIN
         WHERE t.FechaRegistro IS NOT NULL
           AND CONVERT(date, t.FechaRegistro) <= @F
           AND (
-                -- Sigue abierto hoy: mismo filtro que usa dbo.vw_Backlog
-                -- -si esta lista cambia alla, hay que cambiarla aqui-.
-                t.Estado NOT IN (N'Cerrada', N'Rechazada')
-                -- O ya cerro, pero despues de la fecha que se esta armando.
-             OR (t.FechaFirmaCierre IS NOT NULL AND CONVERT(date, t.FechaFirmaCierre) > @F)
+                -- Sigue abierto hoy. Esta lista debe ser identica a la que
+                -- aplica usp_CorreoBacklog_PrepararCorte (dbo.vw_Backlog ya
+                -- quita Cerrada/Rechazada, y el proc quita Resuelta aparte);
+                -- si cambia una, hay que cambiar la otra o vuelve el escalon.
+                t.Estado NOT IN (N'Cerrada', N'Rechazada', N'Resuelta')
+                -- O ya salio del backlog, pero DESPUES de la fecha que se
+                -- esta armando. La fecha de salida es la firma de cierre y,
+                -- si no la tiene, la firma de solucion -que es la que aplica
+                -- a los que hoy estan 'Resuelta': ese ticket si estuvo en
+                -- backlog hasta el dia que se resolvio-.
+             OR (COALESCE(t.FechaFirmaCierre, t.FechaFirmaSolucion) IS NOT NULL
+                 AND CONVERT(date, COALESCE(t.FechaFirmaCierre, t.FechaFirmaSolucion)) > @F)
               );
 
         SET @F = DATEADD(DAY, 1, @F);
@@ -720,22 +743,27 @@ EXEC dbo.usp_CorreoBacklog_ResumenActual;
 -- Catalogos para los filtros
 EXEC dbo.usp_CorreoBacklog_Catalogos;
 
--- Verificacion: el backlog de hoy en el snapshot debe coincidir con un
--- conteo directo de tickets abiertos segun dbo.vw_Backlog.
+-- Verificacion: el backlog de hoy en el snapshot debe coincidir con el
+-- conteo directo. Ojo: hay que restarle los 'Resuelta' a dbo.vw_Backlog,
+-- porque la vista no los excluye -eso lo hace el procedimiento-.
 SELECT SnapshotHoy = (SELECT COUNT(*) FROM dbo.CorreoBacklogSnapshot WHERE FechaCorte = CONVERT(date, GETDATE())),
-       DirectoHoy   = (SELECT COUNT(*) FROM dbo.vw_Backlog);
+       DirectoHoy   = (SELECT COUNT(*) FROM dbo.vw_Backlog WHERE Estado <> N'Resuelta');
+
+-- Cuantos tickets quita la exclusion de 'Resuelta' (los que ya se
+-- resolvieron y estan esperando el cierre automatico de Proactivanet).
+SELECT Resueltos = COUNT(*) FROM dbo.vw_Backlog WHERE Estado = N'Resuelta';
 
 -- ---------------------------------------------------------------------
 -- Diagnostico del "escalon" en la grafica de tendencia
 -- ---------------------------------------------------------------------
--- 1) Cuantos tickets estaban inflando el historico: cerrados/rechazados
---    que no tienen FechaFirmaCierre. La version vieja del backfill los
---    contaba como abiertos en TODAS las fechas pasadas.
+-- 1) Tickets que no se pueden ubicar en el tiempo: ya salieron del backlog
+--    pero no tienen ni firma de cierre ni firma de solucion. Esos quedan
+--    fuera de todas las fechas del backfill.
 SELECT
-    CerradosSinFechaCierre = SUM(CASE WHEN Estado IN (N'Cerrada', N'Rechazada') AND FechaFirmaCierre IS NULL THEN 1 ELSE 0 END),
-    CerradosConFechaCierre = SUM(CASE WHEN Estado IN (N'Cerrada', N'Rechazada') AND FechaFirmaCierre IS NOT NULL THEN 1 ELSE 0 END),
-    AbiertosHoy            = SUM(CASE WHEN Estado NOT IN (N'Cerrada', N'Rechazada') THEN 1 ELSE 0 END),
-    Total                  = COUNT(*)
+    FueraSinNingunaFecha = SUM(CASE WHEN Estado IN (N'Cerrada', N'Rechazada', N'Resuelta') AND COALESCE(FechaFirmaCierre, FechaFirmaSolucion) IS NULL THEN 1 ELSE 0 END),
+    FueraConFecha        = SUM(CASE WHEN Estado IN (N'Cerrada', N'Rechazada', N'Resuelta') AND COALESCE(FechaFirmaCierre, FechaFirmaSolucion) IS NOT NULL THEN 1 ELSE 0 END),
+    EnBacklogHoy         = SUM(CASE WHEN Estado NOT IN (N'Cerrada', N'Rechazada', N'Resuelta') THEN 1 ELSE 0 END),
+    Total                = COUNT(*)
 FROM dbo.Tickets;
 
 -- 2) Despues de volver a correr el backfill, la serie no debe tener saltos:

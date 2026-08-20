@@ -31,16 +31,44 @@ fallo), pero no puede reconstruir fechas pasadas.
 
 `usp_CorreoBacklog_Backfill` resuelve esto leyendo directo de `dbo.Tickets`
 + `dbo.CatLiderGrupo`. La regla de "estaba en backlog en la fecha X" tiene
-que dar **exactamente** lo mismo que `dbo.vw_Backlog` cuando X = hoy; si no,
+que dar **exactamente** lo mismo que el corte del dia cuando X = hoy; si no,
 la serie historica y el corte del dia no empatan:
 
-- Si el ticket **sigue abierto hoy** (`Estado NOT IN ('Cerrada','Rechazada')`,
-  el mismo filtro de `dbo.vw_Backlog`), estaba abierto en cualquier fecha
-  pasada posterior a su registro.
-- Si **ya cerro**, solo cuenta en las fechas **anteriores** a su
-  `FechaFirmaCierre`.
-- Si ya cerro pero **no tiene `FechaFirmaCierre`**, no se puede ubicar en el
-  tiempo y no se cuenta en ninguna fecha.
+- Si el ticket **sigue en backlog hoy**
+  (`Estado NOT IN ('Cerrada','Rechazada','Resuelta')`), estaba en backlog en
+  cualquier fecha pasada posterior a su registro.
+- Si **ya salio**, cuenta solo en las fechas **anteriores** a su fecha de
+  salida = `COALESCE(FechaFirmaCierre, FechaFirmaSolucion)`.
+- Si ya salio pero **no tiene ninguna de las dos fechas**, no se puede ubicar
+  en el tiempo y no se cuenta en ninguna fecha.
+
+### Que cuenta como backlog: los estados excluidos
+
+Se excluyen `Cerrada`, `Rechazada` y **`Resuelta`**. Este ultimo se agrego
+despues: un ticket `Resuelta` ya fue resuelto y Proactivanet lo pasa solo a
+`Cerrada` a los ~3 dias por regla, asi que tenerlo en el backlog inflaba
+todos los numeros del correo.
+
+`dbo.vw_Backlog` solo excluye `Cerrada`/`Rechazada`. **No se modifico la
+vista** -la usan otros consumidores y no esta en este repositorio-, asi que
+`Resuelta` se filtra en `usp_CorreoBacklog_PrepararCorte` al leerla, y la
+misma lista se repite en `usp_CorreoBacklog_Backfill`, que no pasa por la
+vista. **Si algun dia cambia esa lista, hay que cambiarla en los dos lados**
+o vuelve a aparecer un escalon en la grafica de tendencia. Ambos puntos
+estan comentados en `07_correo_backlog.sql` haciendose referencia mutua.
+
+Si prefieres que la exclusion aplique tambien a Power BI y a cualquier otra
+cosa que lea `dbo.vw_Backlog`, hay que agregar `Resuelta` al `WHERE` de la
+vista; en ese caso conviene quitar el filtro del procedimiento para no
+tener la regla en tres lugares.
+
+**Por que la fecha de salida es un `COALESCE` y no solo `FechaFirmaCierre`:**
+un ticket que hoy esta `Resuelta` todavia no tiene firma de cierre, pero si
+estuvo en backlog hasta el dia que se resolvio. Si se usara solo
+`FechaFirmaCierre`, esos tickets desapareceria de todo el historico y la
+curva se hundiria sin razon. Como efecto lateral tambien rescata a los
+cerrados que quedaron sin `FechaFirmaCierre` pero si tienen
+`FechaFirmaSolucion`, que antes se perdian por completo.
 
 Aging/AgingSort/DiasBacklog se recalculan con esa fecha en vez de
 `GETDATE()`; `EstadoSLA` se copia igual que en `dbo.vw_Backlog` (esa formula
@@ -59,9 +87,11 @@ contra los ~5,850 reales del corte de hoy, y la grafica mostraba una caida
 vertical justo al llegar a la fecha de hoy -que si sale de `dbo.vw_Backlog`
 y si filtra por `Estado`-.
 
-Ya esta corregido. Para arreglar los snapshots que se generaron con la
-version vieja hay que **volver a correr el script y luego el backfill**
-(vuelve a escribir cada fecha, no hace falta borrar nada a mano):
+Ya esta corregido. **Cada vez que cambie la regla de que cuenta como
+backlog** -este arreglo, la exclusion de `Resuelta`, o lo que venga- hay que
+**volver a correr el script y luego el backfill**, porque los snapshots ya
+guardados se escribieron con la regla anterior. El backfill reescribe cada
+fecha, no hace falta borrar nada a mano:
 
 ```sql
 -- 1) Reinstalar los objetos (idempotente)
@@ -78,13 +108,17 @@ GROUP BY FechaCorte
 ORDER BY FechaCorte DESC;
 ```
 
-Para ver de que tamaño era la poblacion que inflaba el historico:
+El corte de **hoy** no lo toca el backfill (por diseño llega hasta ayer); se
+corrige solo en la siguiente corrida del correo, o de inmediato con
+`EXEC dbo.usp_CorreoBacklog_PrepararCorte @Forzar = 1;`.
+
+Para ver el tamaño de las poblaciones involucradas:
 
 ```sql
 SELECT
-    CerradosSinFechaCierre = SUM(CASE WHEN Estado IN (N'Cerrada', N'Rechazada') AND FechaFirmaCierre IS NULL THEN 1 ELSE 0 END),
-    CerradosConFechaCierre = SUM(CASE WHEN Estado IN (N'Cerrada', N'Rechazada') AND FechaFirmaCierre IS NOT NULL THEN 1 ELSE 0 END),
-    AbiertosHoy            = SUM(CASE WHEN Estado NOT IN (N'Cerrada', N'Rechazada') THEN 1 ELSE 0 END),
+    FueraSinNingunaFecha = SUM(CASE WHEN Estado IN (N'Cerrada', N'Rechazada', N'Resuelta') AND COALESCE(FechaFirmaCierre, FechaFirmaSolucion) IS NULL THEN 1 ELSE 0 END),
+    FueraConFecha        = SUM(CASE WHEN Estado IN (N'Cerrada', N'Rechazada', N'Resuelta') AND COALESCE(FechaFirmaCierre, FechaFirmaSolucion) IS NOT NULL THEN 1 ELSE 0 END),
+    EnBacklogHoy         = SUM(CASE WHEN Estado NOT IN (N'Cerrada', N'Rechazada', N'Resuelta') THEN 1 ELSE 0 END),
     Total                  = COUNT(*)
 FROM dbo.Tickets;
 ```
