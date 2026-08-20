@@ -49,18 +49,34 @@ despues: un ticket `Resuelta` ya fue resuelto y Proactivanet lo pasa solo a
 `Cerrada` a los ~3 dias por regla, asi que tenerlo en el backlog inflaba
 todos los numeros del correo.
 
-`dbo.vw_Backlog` solo excluye `Cerrada`/`Rechazada`. **No se modifico la
-vista** -la usan otros consumidores y no esta en este repositorio-, asi que
-`Resuelta` se filtra en `usp_CorreoBacklog_PrepararCorte` al leerla, y la
-misma lista se repite en `usp_CorreoBacklog_Backfill`, que no pasa por la
-vista. **Si algun dia cambia esa lista, hay que cambiarla en los dos lados**
-o vuelve a aparecer un escalon en la grafica de tendencia. Ambos puntos
-estan comentados en `07_correo_backlog.sql` haciendose referencia mutua.
+`Resuelta` se agrego al `WHERE` de **`dbo.vw_Backlog`**, para que la
+exclusion aplique a todo lo que lea esa vista -incluido Power BI-, no solo
+al correo. Esa vista **no vive en este repositorio**: solo existe en la base
+de datos, asi que este script no la crea ni la modifica.
 
-Si prefieres que la exclusion aplique tambien a Power BI y a cualquier otra
-cosa que lea `dbo.vw_Backlog`, hay que agregar `Resuelta` al `WHERE` de la
-vista; en ese caso conviene quitar el filtro del procedimiento para no
-tener la regla en tres lugares.
+La regla queda escrita en dos lugares mas, a proposito:
+
+- `usp_CorreoBacklog_PrepararCorte` repite `Estado <> 'Resuelta'` aunque la
+  vista ya lo excluya. Es redundante hoy; sirve como red de seguridad si
+  alguien revierte la vista, y deja la regla visible junto a la del backfill.
+- `usp_CorreoBacklog_Backfill` **tiene** que repetirla porque no pasa por la
+  vista: lee `dbo.Tickets` directo.
+
+**Si algun dia cambia la lista de estados excluidos, hay que cambiarla en
+los tres lados** (vista, corte y backfill) o vuelve a aparecer un escalon en
+la grafica de tendencia donde el historico se junta con el corte del dia.
+Los dos puntos del script estan comentados haciendose referencia mutua.
+
+Como `dbo.vw_Backlog` no esta versionada, conviene tener a la mano quien mas
+la consume antes de volver a tocarla:
+
+```sql
+SELECT referencing_schema_name, referencing_entity_name
+FROM sys.dm_sql_referencing_entities('dbo.vw_Backlog', 'OBJECT');
+```
+
+(Eso cubre objetos dentro de la base. Power BI, Excel o cualquier consulta
+externa no aparecen ahi y hay que revisarlos aparte.)
 
 **Por que la fecha de salida es un `COALESCE` y no solo `FechaFirmaCierre`:**
 un ticket que hoy esta `Resuelta` todavia no tiene firma de cierre, pero si

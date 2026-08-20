@@ -202,10 +202,12 @@ BEGIN
         FROM dbo.vw_Backlog AS b
         WHERE b.CodigoTicket IS NOT NULL
           -- 'Resuelta' NO es backlog: el ticket ya se resolvio y Proactivanet
-          -- lo pasa solo a 'Cerrada' a los ~3 dias. dbo.vw_Backlog solo
-          -- excluye 'Cerrada'/'Rechazada', asi que aqui se quita aparte -no
-          -- se toco la vista para no afectar a sus otros consumidores; ver
-          -- CORREO_BACKLOG.md-. Debe empatar con la lista del Backfill.
+          -- lo pasa solo a 'Cerrada' a los ~3 dias.
+          -- dbo.vw_Backlog YA lo excluye (se agrego a su WHERE), asi que este
+          -- filtro es redundante a proposito: deja la regla visible en el
+          -- mismo archivo que la del Backfill -que no pasa por la vista y
+          -- tiene que repetirla- y protege el corte si alguien revierte la
+          -- vista. Las dos listas deben empatar siempre.
           AND b.Estado <> N'Resuelta';
 
         INSERT dbo.CorreoBacklogEjecucion
@@ -744,14 +746,18 @@ EXEC dbo.usp_CorreoBacklog_ResumenActual;
 EXEC dbo.usp_CorreoBacklog_Catalogos;
 
 -- Verificacion: el backlog de hoy en el snapshot debe coincidir con el
--- conteo directo. Ojo: hay que restarle los 'Resuelta' a dbo.vw_Backlog,
--- porque la vista no los excluye -eso lo hace el procedimiento-.
+-- conteo directo de la vista. El "WHERE Estado <> 'Resuelta'" quedo como
+-- red de seguridad: la vista ya los excluye, asi que hoy no quita nada;
+-- si diera un numero distinto al de la vista sin filtro, alguien le quito
+-- 'Resuelta' al WHERE de dbo.vw_Backlog.
 SELECT SnapshotHoy = (SELECT COUNT(*) FROM dbo.CorreoBacklogSnapshot WHERE FechaCorte = CONVERT(date, GETDATE())),
-       DirectoHoy   = (SELECT COUNT(*) FROM dbo.vw_Backlog WHERE Estado <> N'Resuelta');
+       DirectoHoy   = (SELECT COUNT(*) FROM dbo.vw_Backlog WHERE Estado <> N'Resuelta'),
+       VistaSinFiltro = (SELECT COUNT(*) FROM dbo.vw_Backlog);
 
--- Cuantos tickets quita la exclusion de 'Resuelta' (los que ya se
--- resolvieron y estan esperando el cierre automatico de Proactivanet).
-SELECT Resueltos = COUNT(*) FROM dbo.vw_Backlog WHERE Estado = N'Resuelta';
+-- Cuantos tickets estan hoy en 'Resuelta' (ya resueltos, esperando el
+-- cierre automatico de Proactivanet). Ya no salen de dbo.vw_Backlog, por
+-- eso se cuentan contra dbo.Tickets.
+SELECT Resueltos = COUNT(*) FROM dbo.Tickets WHERE Estado = N'Resuelta';
 
 -- ---------------------------------------------------------------------
 -- Diagnostico del "escalon" en la grafica de tendencia
