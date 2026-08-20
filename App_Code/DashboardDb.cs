@@ -12,6 +12,7 @@ using System.Configuration;
 using System.Data;
 using System.Data.SqlClient;
 using System.Web;
+using System.Web.Script.Serialization;
 
 public static class DashboardDb
 {
@@ -73,7 +74,50 @@ public static class DashboardDb
 
     private static string ConnectionString()
     {
-        return ConfigurationManager.ConnectionStrings["TicketsProactivanet"].ConnectionString;
+        var cs = ConfigurationManager.ConnectionStrings["TicketsProactivanet"];
+        if (cs == null || string.IsNullOrWhiteSpace(cs.ConnectionString))
+        {
+            // Sin este mensaje, la referencia nula reventaba con un
+            // NullReferenceException que no decia nada util: el sintoma en
+            // pantalla era solo "Error al cargar datos".
+            throw new ConfigurationErrorsException(
+                "Falta la cadena de conexion 'TicketsProactivanet' en Web.config. " +
+                "Copia Web.config.ejemplo como Web.config en la raiz del sitio y ajusta el servidor/credenciales.");
+        }
+        return cs.ConnectionString;
+    }
+}
+
+// Envoltura comun de los handlers .ashx: serializa el resultado a JSON y,
+// si algo truena, devuelve el error TAMBIEN como JSON. Antes cualquier
+// excepcion salia como la pagina de error de ASP.NET (HTML); el dashboard
+// intentaba parsearla como JSON, fallaba, y solo podia mostrar un mensaje
+// generico sin decir que estaba mal.
+public static class DashboardHandler
+{
+    public static void Responder(HttpContext context, Func<object> trabajo)
+    {
+        context.Response.ContentType = "application/json; charset=utf-8";
+        // El tablero se refresca a mano; nunca conviene servirlo de cache.
+        context.Response.Cache.SetCacheability(HttpCacheability.NoCache);
+
+        try
+        {
+            var salida = trabajo();
+            context.Response.Write(new JavaScriptSerializer().Serialize(salida));
+        }
+        catch (Exception ex)
+        {
+            context.Response.StatusCode = 500;
+            context.Response.TrySkipIisCustomErrors = true;
+
+            var error = new Dictionary<string, object>
+            {
+                { "error", ex.Message },
+                { "tipo", ex.GetType().Name },
+            };
+            context.Response.Write(new JavaScriptSerializer().Serialize(error));
+        }
     }
 }
 

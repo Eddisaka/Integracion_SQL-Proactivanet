@@ -1,6 +1,5 @@
+# Dependencias del ETL (etl_proactivanet.py) y de los scripts de diagnostico.
+# El tablero web NO necesita Python: corre en IIS con los .ashx (ASP.NET) y
+# App_Code/DashboardDb.cs. Por eso ya no aparecen flask/fastapi/uvicorn aqui.
 requests>=2.31
 pyodbc>=5.0
-fastapi>=0.110
-uvicorn>=0.29
-openpyxl>=3.1
-flask>=3.0

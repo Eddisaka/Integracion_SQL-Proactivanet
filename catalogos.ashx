@@ -3,30 +3,29 @@
 
 using System.Collections.Generic;
 using System.Web;
-using System.Web.Script.Serialization;
 
 public class Catalogos : IHttpHandler
 {
     public void ProcessRequest(HttpContext context)
     {
-        var resultados = DashboardDb.EjecutarMultiple("dbo.usp_Dash_Catalogos", null);
-
-        var grupos = new List<object>();
-        if (resultados.Count > 0)
-            foreach (var fila in resultados[0]) grupos.Add(fila["Grupo"]);
-
-        var tecnicos = new List<object>();
-        if (resultados.Count > 1)
-            foreach (var fila in resultados[1]) tecnicos.Add(fila["Tecnico"]);
-
-        var salida = new Dictionary<string, object>
+        DashboardHandler.Responder(context, delegate
         {
-            { "grupos", grupos },
-            { "tecnicos", tecnicos },
-        };
+            var resultados = DashboardDb.EjecutarMultiple("dbo.usp_Dash_Catalogos", null);
 
-        context.Response.ContentType = "application/json; charset=utf-8";
-        context.Response.Write(new JavaScriptSerializer().Serialize(salida));
+            var grupos = new List<object>();
+            if (resultados.Count > 0)
+                foreach (var fila in resultados[0]) grupos.Add(fila["Grupo"]);
+
+            var tecnicos = new List<object>();
+            if (resultados.Count > 1)
+                foreach (var fila in resultados[1]) tecnicos.Add(fila["Tecnico"]);
+
+            return new Dictionary<string, object>
+            {
+                { "grupos", grupos },
+                { "tecnicos", tecnicos },
+            };
+        });
     }
 
     public bool IsReusable { get { return false; } }

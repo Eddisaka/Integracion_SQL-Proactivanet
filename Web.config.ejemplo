@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Copia este archivo como Web.config en la raiz del sitio de IIS y ajusta la
+  cadena de conexion. Web.config NO se sube a git (esta en .gitignore) porque
+  lleva la contraseña de SQL Server.
+
+  Sin este archivo los handlers .ashx truenan: DashboardDb.ConnectionString()
+  lee ConnectionStrings["TicketsProactivanet"] y, si no existe, la referencia
+  sale NULL y el request devuelve un 500 en HTML. El dashboard, que espera
+  JSON, solo alcanza a mostrar "Error al cargar datos".
+
+  Con este archivo NO hace falta Python: el sitio es 100% ASP.NET
+  (.ashx + App_Code, que IIS compila solo en el primer request).
+-->
+<configuration>
+
+  <connectionStrings>
+    <!--
+      OPCION A (recomendada): autenticacion de Windows. El App Pool de IIS
+      corre con una cuenta de dominio que tiene GRANT EXECUTE sobre los
+      procedimientos usp_Dash_*; no hay contraseña en el archivo.
+
+      Requiere que la identidad del App Pool sea una cuenta de dominio (no
+      ApplicationPoolIdentity), porque tiene que autenticarse contra el
+      servidor de SQL, que esta en otra maquina.
+    -->
+    <add name="TicketsProactivanet"
+         connectionString="Server=AZAUDITPRECIOS;Database=Tickets_Proactivanet;Integrated Security=SSPI;Encrypt=True;TrustServerCertificate=True;Connect Timeout=60;Application Name=TableroProactivanet;"
+         providerName="System.Data.SqlClient" />
+
+    <!--
+      OPCION B: usuario y contraseña de SQL Server. Usa esta si no se puede
+      dar de alta la cuenta del App Pool en SQL. Comenta la de arriba y
+      descomenta esta -no pueden existir dos con el mismo name-.
+
+    <add name="TicketsProactivanet"
+         connectionString="Server=AZAUDITPRECIOS;Database=Tickets_Proactivanet;User ID=PROACTIVANETAD;Password=REEMPLAZAR;Encrypt=True;TrustServerCertificate=True;Connect Timeout=60;Application Name=TableroProactivanet;"
+         providerName="System.Data.SqlClient" />
+    -->
+  </connectionStrings>
+
+  <system.web>
+    <!--
+      targetFramework 4.x: es lo que necesita la compilacion automatica de
+      App_Code/DashboardDb.cs. El App Pool en IIS debe estar en
+      ".NET CLR Version v4.0.30319", modo Integrado.
+    -->
+    <compilation debug="false" targetFramework="4.7.2" />
+    <httpRuntime targetFramework="4.7.2" />
+
+    <!--
+      customErrors Off + este handler devolviendo JSON: si algo falla, el
+      dashboard puede mostrar el mensaje real en pantalla en vez de un
+      "Error al cargar datos" generico. Si prefieres no exponer detalles a
+      quien abra el sitio, cambia a "RemoteOnly" -entonces el detalle solo
+      se ve entrando al servidor, y en el navegador queda el mensaje corto-.
+    -->
+    <customErrors mode="Off" />
+  </system.web>
+
+  <system.webServer>
+    <!--
+      Para que https://tableroproactivanet.soriana.com/ abra el tablero sin
+      escribir el nombre del archivo.
+    -->
+    <defaultDocument>
+      <files>
+        <clear />
+        <add value="dashboard.html" />
+      </files>
+    </defaultDocument>
+
+    <!--
+      El tablero se consulta con el navegador; sin esto IIS puede servir
+      respuestas cacheadas de los .ashx y verse informacion vieja.
+    -->
+    <caching enabled="false" />
+    <httpProtocol>
+      <customHeaders>
+        <add name="Cache-Control" value="no-store" />
+      </customHeaders>
+    </httpProtocol>
+  </system.webServer>
+
+</configuration>

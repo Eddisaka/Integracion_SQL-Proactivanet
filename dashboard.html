@@ -304,9 +304,24 @@ function paramsFiltros() {
 }
 
 async function obtenerJSON(ruta) {
-  const resp = await fetch(ruta);
-  if (!resp.ok) throw new Error(`${ruta} -> HTTP ${resp.status}`);
-  return resp.json();
+  const resp = await fetch(ruta, { cache: 'no-store' });
+  const texto = await resp.text();
+
+  // Los handlers .ashx devuelven el error como JSON ({error, tipo}), asi que
+  // se puede mostrar la causa real en pantalla. Si aun asi llega HTML -por
+  // ejemplo la pagina de error de IIS antes de que ASP.NET tome el request-,
+  // se recorta para que el mensaje siga siendo legible.
+  let datos = null;
+  try { datos = JSON.parse(texto); } catch (e) { /* no era JSON */ }
+
+  if (!resp.ok) {
+    const detalle = (datos && datos.error)
+      ? datos.error
+      : texto.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 300);
+    throw new Error(`${ruta} -> HTTP ${resp.status}. ${detalle}`);
+  }
+  if (datos === null) throw new Error(`${ruta} -> la respuesta no es JSON.`);
+  return datos;
 }
 
 async function cargarCatalogos() {
@@ -483,7 +498,11 @@ async function cargarTodo() {
     renderTablaDetalle(detalle);
     estado.textContent = `Actualizado ${new Date().toLocaleTimeString('es-MX')}`;
   } catch (err) {
-    estado.textContent = 'Error al cargar datos. Revisa que dashboard_api.py este corriendo.';
+    // Se muestra el mensaje real que devolvio el handler .ashx -antes decia
+    // siempre "revisa que dashboard_api.py este corriendo", que ademas ya no
+    // aplica: el sitio corre 100% en ASP.NET, sin Python-.
+    estado.textContent = `Error al cargar datos: ${err.message}`;
+    estado.title = err.message;
     console.error(err);
   }
 }

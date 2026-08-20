@@ -3,28 +3,27 @@
 
 using System.Collections.Generic;
 using System.Web;
-using System.Web.Script.Serialization;
 
 public class Kpis : IHttpHandler
 {
     public void ProcessRequest(HttpContext context)
     {
-        string fi, ff;
-        DashboardParams.RangoFechas(context.Request, out fi, out ff);
-
-        var parametros = new Dictionary<string, object>
+        DashboardHandler.Responder(context, delegate
         {
-            { "FechaInicio", fi },
-            { "FechaFin", ff },
-            { "Grupos", DashboardParams.ListaONulo(context.Request, "grupos") },
-            { "Tecnicos", DashboardParams.ListaONulo(context.Request, "tecnicos") },
-        };
+            string fi, ff;
+            DashboardParams.RangoFechas(context.Request, out fi, out ff);
 
-        var filas = DashboardDb.Ejecutar("dbo.usp_Dash_KpisMulti", parametros);
-        object salida = filas.Count > 0 ? (object)filas[0] : new Dictionary<string, object>();
+            var parametros = new Dictionary<string, object>
+            {
+                { "FechaInicio", fi },
+                { "FechaFin", ff },
+                { "Grupos", DashboardParams.ListaONulo(context.Request, "grupos") },
+                { "Tecnicos", DashboardParams.ListaONulo(context.Request, "tecnicos") },
+            };
 
-        context.Response.ContentType = "application/json; charset=utf-8";
-        context.Response.Write(new JavaScriptSerializer().Serialize(salida));
+            var filas = DashboardDb.Ejecutar("dbo.usp_Dash_KpisMulti", parametros);
+            return filas.Count > 0 ? (object)filas[0] : new Dictionary<string, object>();
+        });
     }
 
     public bool IsReusable { get { return false; } }
