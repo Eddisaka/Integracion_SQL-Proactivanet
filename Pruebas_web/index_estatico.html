@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Backlog de tickets · Mesa de servicio</title>
+<script>/*__DATOS_EMBEBIDOS__*/</script>
+<style>
+/* ============================================================
+   Tablero de operación · sin dependencias externas
+   Tipografía: Segoe UI (texto) + Consolas (cifras tabulares)
+   ============================================================ */
+:root{
+  --fondo:#EBEDEF;
+  --superficie:#FFFFFF;
+  --tinta:#10141A;
+  --tinta-suave:#616D7A;
+  --tinta-tenue:#8A949E;
+  --linea:#D3D9DF;
+  --acento:#E4002B;
+  --edad-1:#1F7A6B;
+  --edad-2:#5C8A3A;
+  --edad-3:#C08A00;
+  --edad-4:#D1541F;
+  --edad-5:#A4161A;
+  --r:3px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--fondo);
+  color:var(--tinta);
+  font-family:"Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif;
+  font-size:14px;line-height:1.45;
+  -webkit-font-smoothing:antialiased;
+}
+.cifra{font-family:Consolas,"SF Mono",Menlo,monospace;font-variant-numeric:tabular-nums}
+.eyebrow{
+  font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--tinta-tenue);
+}
+.envoltura{max-width:1500px;margin:0 auto;padding:0 22px 56px}
+
+/* ---------- Encabezado ---------- */
+.barra{
+  border-bottom:2px solid var(--tinta);
+  padding:20px 0 12px;margin-bottom:20px;
+  display:flex;flex-wrap:wrap;align-items:flex-end;gap:16px;justify-content:space-between;
+}
+.barra h1{
+  margin:0;font-size:25px;font-weight:700;letter-spacing:-.02em;
+}
+.barra h1 span{color:var(--acento)}
+.sello{text-align:right;font-size:11px;color:var(--tinta-suave);line-height:1.6}
+.sello .cifra{font-size:12px;color:var(--tinta)}
+
+/* ---------- Indicadores ---------- */
+.kpis{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));
+  gap:1px;background:var(--linea);border:1px solid var(--linea);margin-bottom:22px;
+}
+.kpi{background:var(--superficie);padding:13px 15px 15px}
+.kpi .valor{font-size:31px;font-weight:600;line-height:1.05;letter-spacing:-.02em;display:block;margin-top:5px}
+.kpi .nota{font-size:11px;color:var(--tinta-suave);margin-top:3px}
+.kpi.destacado{background:var(--tinta);color:#fff}
+.kpi.destacado .eyebrow{color:#96A0AA}
+.kpi.destacado .nota{color:#B4BDC6}
+
+/* ---------- Franja de antigüedad (elemento distintivo) ---------- */
+.franja{background:var(--superficie);border:1px solid var(--linea);padding:15px 17px 17px;margin-bottom:22px}
+.franja-cab{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:11px}
+.franja-cab p{margin:0;font-size:11.5px;color:var(--tinta-suave)}
+.cinta{display:flex;height:42px;width:100%;overflow:hidden;border-radius:var(--r)}
+.tramo{
+  position:relative;display:flex;align-items:center;justify-content:center;
+  color:#fff;font-size:12px;font-weight:600;min-width:2px;
+  transition:filter .15s ease;
+}
+.tramo:hover,.tramo:focus-visible{filter:brightness(1.14);outline:none}
+.tramo span{padding:0 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.leyenda{display:flex;flex-wrap:wrap;gap:16px;margin-top:11px}
+.leyenda div{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--tinta-suave)}
+.punto{width:9px;height:9px;border-radius:2px;flex:none}
+
+/* ---------- Rejilla de paneles ---------- */
+.rejilla{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:16px}
+.panel{background:var(--superficie);border:1px solid var(--linea);padding:15px 17px 17px;min-width:0}
+.panel.ancho{grid-column:1 / -1}
+.panel h2{margin:0 0 2px;font-size:14.5px;font-weight:650}
+.panel .sub{margin:0 0 13px;font-size:11.5px;color:var(--tinta-suave)}
+
+/* ---------- Barras horizontales ---------- */
+.barras{display:flex;flex-direction:column;gap:8px}
+.fila{display:grid;grid-template-columns:1fr 46px;gap:10px;align-items:center}
+.fila .etq{font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fila .num{text-align:right;font-size:12.5px;font-weight:600}
+.pista{grid-column:1 / -1;height:5px;background:#E4E8EC;border-radius:99px;overflow:hidden;margin-top:-4px}
+.relleno{height:100%;background:var(--tinta);border-radius:99px}
+.fila:first-child .relleno{background:var(--acento)}
+
+/* ---------- Tabla ---------- */
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{
+  text-align:left;font-size:10px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--tinta-tenue);font-weight:700;padding:0 9px 7px 0;border-bottom:1px solid var(--linea);
+}
+td{padding:7px 9px 7px 0;border-bottom:1px solid #EDF0F2;vertical-align:top}
+tbody tr:hover{background:#F5F7F8}
+td.dias{font-weight:700;white-space:nowrap}
+.truncar{max-width:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ---------- Estados ---------- */
+.aviso{
+  background:var(--superficie);border:1px solid var(--linea);border-left:3px solid var(--acento);
+  padding:16px 18px;margin-bottom:20px;
+}
+.aviso h2{margin:0 0 6px;font-size:15px}
+.aviso p{margin:0 0 6px;font-size:13px;color:var(--tinta-suave)}
+.aviso code{background:#F0F2F4;padding:1px 5px;border-radius:var(--r);font-size:12px}
+.vacio{color:var(--tinta-tenue);font-size:12.5px;padding:8px 0}
+
+@media (max-width:640px){
+  .barra h1{font-size:20px}
+  .kpi .valor{font-size:26px}
+  .envoltura{padding:0 14px 40px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+@media print{
+  body{background:#fff}
+  .panel,.franja,.kpis{break-inside:avoid}
+}
+</style>
+</head>
+<body>
+<div class="envoltura">
+
+  <header class="barra">
+    <h1>Backlog de tickets <span>·</span> Mesa de servicio</h1>
+    <div class="sello">
+      <div class="eyebrow">Datos al</div>
+      <div class="cifra" id="sello-fecha">—</div>
+    </div>
+  </header>
+
+  <div id="contenido"></div>
+</div>
+
+<script>
+"use strict";
+
+const ORDEN_EDAD = ["0 a 1 dia","1 a 3 dias","3 a 7 dias","7 a 30 dias","mas de 30 dias"];
+const COLOR_EDAD = {
+  "0 a 1 dia":"var(--edad-1)", "1 a 3 dias":"var(--edad-2)", "3 a 7 dias":"var(--edad-3)",
+  "7 a 30 dias":"var(--edad-4)", "mas de 30 dias":"var(--edad-5)"
+};
+
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => (
+  {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const num = (n) => (n ?? 0).toLocaleString("es-MX");
+
+function horasATexto(h){
+  if (h == null) return "—";
+  const d = h / 24;
+  if (d < 1) return Math.round(h) + " h";
+  return (d < 10 ? d.toFixed(1) : Math.round(d)) + " d";
+}
+
+/* ---------------------------------------------------- franja de antigüedad */
+function franjaAntiguedad(filas){
+  const mapa = new Map((filas || []).map(f => [f.Rango, f.Tickets]));
+  const datos = ORDEN_EDAD.map(r => ({rango:r, n:mapa.get(r) || 0}));
+  const total = datos.reduce((a,b) => a + b.n, 0);
+  if (!total) return "";
+
+  const tramos = datos.map(d => {
+    const pct = d.n / total * 100;
+    const texto = pct > 7 ? num(d.n) : "";
+    return `<div class="tramo" style="width:${pct}%;background:${COLOR_EDAD[d.rango]}"
+                 tabindex="0" title="${esc(d.rango)}: ${num(d.n)} tickets (${pct.toFixed(1)}%)">
+              <span class="cifra">${texto}</span></div>`;
+  }).join("");
+
+  const leyenda = datos.map(d => `
+    <div><i class="punto" style="background:${COLOR_EDAD[d.rango]}"></i>
+      ${esc(d.rango)} <b class="cifra">${num(d.n)}</b></div>`).join("");
+
+  const viejos = datos[3].n + datos[4].n;
+  const pctViejos = (viejos / total * 100).toFixed(1);
+
+  return `
+  <section class="franja">
+    <div class="franja-cab">
+      <div>
+        <div class="eyebrow">Antigüedad del backlog abierto</div>
+        <p>Cuánto llevan esperando los ${num(total)} tickets sin cerrar.</p>
+      </div>
+      <p><b class="cifra">${pctViejos}%</b> lleva más de una semana</p>
+    </div>
+    <div class="cinta">${tramos}</div>
+    <div class="leyenda">${leyenda}</div>
+  </section>`;
+}
+
+/* ---------------------------------------------------- indicadores */
+function bloqueKpis(k){
+  if (!k) return "";
+  const balance = (k.Cerrados7d ?? 0) - (k.Nuevos7d ?? 0);
+  const signo = balance >= 0 ? "+" : "";
+  const tarjetas = [
+    {e:"Abiertos ahora", v:num(k.Abiertos), n:`de ${num(k.TotalTickets)} registrados`, dest:true},
+    {e:"Nuevos · 7 días", v:num(k.Nuevos7d), n:"tickets levantados"},
+    {e:"Cerrados · 7 días", v:num(k.Cerrados7d), n:`balance ${signo}${num(balance)}`},
+    {e:"Espera promedio", v:horasATexto(k.EdadMediaHoras), n:"de los tickets abiertos"},
+    {e:"El más antiguo", v:horasATexto(k.MasAntiguoHoras), n:"sin cerrar"}
+  ];
+  return `<section class="kpis">` + tarjetas.map(t => `
+    <div class="kpi${t.dest ? " destacado" : ""}">
+      <div class="eyebrow">${esc(t.e)}</div>
+      <b class="valor cifra">${esc(t.v)}</b>
+      <div class="nota">${esc(t.n)}</div>
+    </div>`).join("") + `</section>`;
+}
+
+/* ---------------------------------------------------- barras horizontales */
+function panelBarras(titulo, sub, filas){
+  if (!filas || !filas.length)
+    return panel(titulo, sub, `<p class="vacio">Sin datos para mostrar.</p>`);
+  const max = Math.max(...filas.map(f => f.Tickets));
+  const cuerpo = `<div class="barras">` + filas.map(f => `
+    <div class="fila">
+      <div class="etq" title="${esc(f.Etiqueta)}">${esc(f.Etiqueta)}</div>
+      <div class="num cifra">${num(f.Tickets)}</div>
+      <div class="pista"><div class="relleno" style="width:${(f.Tickets / max * 100).toFixed(1)}%"></div></div>
+    </div>`).join("") + `</div>`;
+  return panel(titulo, sub, cuerpo);
+}
+
+function panel(titulo, sub, cuerpo, ancho){
+  return `<section class="panel${ancho ? " ancho" : ""}">
+    <h2>${esc(titulo)}</h2><p class="sub">${esc(sub)}</p>${cuerpo}</section>`;
+}
+
+/* ---------------------------------------------------- serie diaria (SVG) */
+function panelSerie(filas){
+  if (!filas || filas.length < 2)
+    return panel("Tickets por día", "Últimos 30 días",
+                 `<p class="vacio">Hacen falta al menos dos días de datos.</p>`, true);
+
+  const W = 1000, H = 190, mI = 42, mD = 12, mS = 14, mB = 26;
+  const max = Math.max(...filas.map(f => f.Tickets)) || 1;
+  const paso = (W - mI - mD) / (filas.length - 1);
+  const x = i => mI + i * paso;
+  const y = v => H - mB - (v / max) * (H - mS - mB);
+
+  const linea = filas.map((f,i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(f.Tickets).toFixed(1)}`).join(" ");
+  const area = `${linea} L${x(filas.length-1).toFixed(1)},${H-mB} L${mI},${H-mB} Z`;
+
+  // ejes: 3 marcas horizontales
+  const marcas = [0, Math.round(max/2), max].map(v => `
+    <line x1="${mI}" y1="${y(v)}" x2="${W-mD}" y2="${y(v)}" stroke="#E4E8EC" stroke-width="1"/>
+    <text x="${mI-7}" y="${y(v)+3.5}" text-anchor="end" font-size="10"
+          fill="#8A949E" font-family="Consolas,monospace">${v}</text>`).join("");
+
+  // etiquetas de fecha: primera, media y última
+  const idx = [0, Math.floor(filas.length/2), filas.length-1];
+  const fechas = idx.map(i => {
+    const d = filas[i].Dia.slice(5).replace("-","/");
+    const anc = i === 0 ? "start" : (i === filas.length-1 ? "end" : "middle");
+    return `<text x="${x(i).toFixed(1)}" y="${H-8}" text-anchor="${anc}" font-size="10"
+             fill="#8A949E" font-family="Consolas,monospace">${d}</text>`;
+  }).join("");
+
+  const puntos = filas.map((f,i) => `
+    <circle cx="${x(i).toFixed(1)}" cy="${y(f.Tickets).toFixed(1)}" r="7" fill="transparent">
+      <title>${f.Dia}: ${num(f.Tickets)} tickets</title></circle>`).join("");
+
+  const svg = `
+  <svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" role="img"
+       aria-label="Tickets registrados por día en los últimos 30 días">
+    ${marcas}
+    <path d="${area}" fill="rgba(228,0,43,.08)"/>
+    <path d="${linea}" fill="none" stroke="var(--acento)" stroke-width="2"
+          stroke-linejoin="round" stroke-linecap="round"/>
+    ${fechas}${puntos}
+  </svg>`;
+  return panel("Tickets registrados por día", "Últimos 30 días · pasa el cursor para ver el detalle", svg, true);
+}
+
+/* ---------------------------------------------------- tabla */
+function panelAntiguos(filas){
+  if (!filas || !filas.length)
+    return panel("Los que más llevan esperando", "Tickets abiertos ordenados por antigüedad",
+                 `<p class="vacio">No hay tickets abiertos.</p>`, true);
+  const cuerpo = `
+  <table>
+    <thead><tr>
+      <th>Días</th><th>Código</th><th>Asunto</th><th>Estado</th><th>Grupo</th><th>Tienda</th>
+    </tr></thead>
+    <tbody>` + filas.map(f => {
+      const d = Number(f.Dias) || 0;
+      const col = d > 30 ? "var(--edad-5)" : d > 7 ? "var(--edad-4)" : "var(--tinta)";
+      return `<tr>
+        <td class="dias cifra" style="color:${col}">${d.toFixed(1)}</td>
+        <td class="cifra">${esc(f.Codigo)}</td>
+        <td class="truncar" title="${esc(f.Titulo)}">${esc(f.Titulo)}</td>
+        <td>${esc(f.Estado)}</td>
+        <td class="truncar" title="${esc(f.Grupo)}">${esc(f.Grupo)}</td>
+        <td class="truncar" title="${esc(f.Tienda)}">${esc(f.Tienda)}</td>
+      </tr>`;
+    }).join("") + `</tbody></table>`;
+  return panel("Los que más llevan esperando", "Tickets abiertos, del más antiguo al más reciente", cuerpo, true);
+}
+
+/* ---------------------------------------------------- ensamblado */
+function pintar(d){
+  document.getElementById("sello-fecha").textContent = d.generado || "—";
+  document.getElementById("contenido").innerHTML =
+    bloqueKpis(d.kpis) +
+    franjaAntiguedad(d.antiguedad) +
+    panelSerie(d.por_dia) +
+    `<div class="rejilla">` +
+      panelBarras("Por grupo asignado", "Tickets abiertos · 10 con más carga", d.por_grupo) +
+      panelBarras("Por tienda", "Tickets abiertos · 10 con más incidencias", d.por_tienda) +
+      panelBarras("Por categoría", "Tickets abiertos agrupados por familia", d.por_categoria) +
+      panelBarras("Por estado", "Situación actual de los tickets abiertos", d.por_estado) +
+      panelBarras("Por prioridad", "Tickets abiertos según su prioridad", d.por_prioridad) +
+    `</div>` +
+    panelAntiguos(d.mas_antiguos);
+}
+
+function fallo(titulo, detalle){
+  document.getElementById("contenido").innerHTML = `
+    <div class="aviso"><h2>${esc(titulo)}</h2><p>${detalle}</p></div>`;
+}
+
+(function inicio(){
+  if (window.DATOS_EMBEBIDOS) { pintar(window.DATOS_EMBEBIDOS); return; }
+  fetch("datos.json", {cache:"no-store"})
+    .then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+    .then(pintar)
+    .catch(err => {
+      const local = location.protocol === "file:";
+      fallo(
+        local ? "Abre el tablero desde un servidor" : "No se pudieron cargar los datos",
+        local
+          ? `El navegador bloquea la lectura de <code>datos.json</code> al abrir el archivo directamente.
+             Desde la carpeta del tablero ejecuta <code>python -m http.server 8080</code> y entra a
+             <code>http://localhost:8080</code>. También puedes generar la versión autocontenida con
+             <code>--embebido</code> y abrirla con doble clic.`
+          : `No se encontró <code>datos.json</code> junto a esta página (${esc(err.message)}).
+             Genera los datos con <code>python generar_datos_dashboard.py --config config.json</code>.`);
+    });
+})();
+</script>
+</body>
+</html>

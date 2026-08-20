@@ -1,0 +1,387 @@
+{
+ "kpis": {
+  "Abiertos": 1247,
+  "TotalTickets": 18432,
+  "Nuevos7d": 892,
+  "Cerrados7d": 946,
+  "EdadMediaHoras": 63.4,
+  "MasAntiguoHoras": 2184.0
+ },
+ "antiguedad": [
+  {
+   "Rango": "0 a 1 dia",
+   "Tickets": 412
+  },
+  {
+   "Rango": "1 a 3 dias",
+   "Tickets": 386
+  },
+  {
+   "Rango": "3 a 7 dias",
+   "Tickets": 231
+  },
+  {
+   "Rango": "7 a 30 dias",
+   "Tickets": 158
+  },
+  {
+   "Rango": "mas de 30 dias",
+   "Tickets": 60
+  }
+ ],
+ "por_dia": [
+  {
+   "Dia": "2026-07-09",
+   "Tickets": 126
+  },
+  {
+   "Dia": "2026-07-10",
+   "Tickets": 104
+  },
+  {
+   "Dia": "2026-07-11",
+   "Tickets": 135
+  },
+  {
+   "Dia": "2026-07-12",
+   "Tickets": 168
+  },
+  {
+   "Dia": "2026-07-13",
+   "Tickets": 91
+  },
+  {
+   "Dia": "2026-07-14",
+   "Tickets": 94
+  },
+  {
+   "Dia": "2026-07-15",
+   "Tickets": 190
+  },
+  {
+   "Dia": "2026-07-16",
+   "Tickets": 153
+  },
+  {
+   "Dia": "2026-07-17",
+   "Tickets": 97
+  },
+  {
+   "Dia": "2026-07-18",
+   "Tickets": 131
+  },
+  {
+   "Dia": "2026-07-19",
+   "Tickets": 159
+  },
+  {
+   "Dia": "2026-07-20",
+   "Tickets": 92
+  },
+  {
+   "Dia": "2026-07-21",
+   "Tickets": 149
+  },
+  {
+   "Dia": "2026-07-22",
+   "Tickets": 112
+  },
+  {
+   "Dia": "2026-07-23",
+   "Tickets": 89
+  },
+  {
+   "Dia": "2026-07-24",
+   "Tickets": 96
+  },
+  {
+   "Dia": "2026-07-25",
+   "Tickets": 140
+  },
+  {
+   "Dia": "2026-07-26",
+   "Tickets": 138
+  },
+  {
+   "Dia": "2026-07-27",
+   "Tickets": 93
+  },
+  {
+   "Dia": "2026-07-28",
+   "Tickets": 115
+  },
+  {
+   "Dia": "2026-07-29",
+   "Tickets": 96
+  },
+  {
+   "Dia": "2026-07-30",
+   "Tickets": 155
+  },
+  {
+   "Dia": "2026-07-31",
+   "Tickets": 139
+  },
+  {
+   "Dia": "2026-08-01",
+   "Tickets": 92
+  },
+  {
+   "Dia": "2026-08-02",
+   "Tickets": 190
+  },
+  {
+   "Dia": "2026-08-03",
+   "Tickets": 157
+  },
+  {
+   "Dia": "2026-08-04",
+   "Tickets": 100
+  },
+  {
+   "Dia": "2026-08-05",
+   "Tickets": 113
+  },
+  {
+   "Dia": "2026-08-06",
+   "Tickets": 165
+  },
+  {
+   "Dia": "2026-08-07",
+   "Tickets": 165
+  }
+ ],
+ "por_estado": [
+  {
+   "Etiqueta": "En proceso",
+   "Tickets": 604
+  },
+  {
+   "Etiqueta": "Abierto",
+   "Tickets": 383
+  },
+  {
+   "Etiqueta": "En espera",
+   "Tickets": 168
+  },
+  {
+   "Etiqueta": "Asignado",
+   "Tickets": 92
+  }
+ ],
+ "por_grupo": [
+  {
+   "Etiqueta": "Soporte POS",
+   "Tickets": 243
+  },
+  {
+   "Etiqueta": "Infraestructura",
+   "Tickets": 188
+  },
+  {
+   "Etiqueta": "Aplicaciones",
+   "Tickets": 153
+  },
+  {
+   "Etiqueta": "Redes",
+   "Tickets": 108
+  },
+  {
+   "Etiqueta": "Mesa de Ayuda",
+   "Tickets": 71
+  },
+  {
+   "Etiqueta": "Seguridad",
+   "Tickets": 65
+  },
+  {
+   "Etiqueta": "Base de Datos",
+   "Tickets": 63
+  }
+ ],
+ "por_tienda": [
+  {
+   "Etiqueta": "879 Plaza Del Parque",
+   "Tickets": 92
+  },
+  {
+   "Etiqueta": "178 Centro",
+   "Tickets": 91
+  },
+  {
+   "Etiqueta": "412 Valle Oriente",
+   "Tickets": 89
+  },
+  {
+   "Etiqueta": "233 Cumbres",
+   "Tickets": 87
+  },
+  {
+   "Etiqueta": "091 Linda Vista",
+   "Tickets": 71
+  },
+  {
+   "Etiqueta": "556 Guadalupe",
+   "Tickets": 57
+  },
+  {
+   "Etiqueta": "704 Apodaca",
+   "Tickets": 41
+  },
+  {
+   "Etiqueta": "318 San Nicolas",
+   "Tickets": 36
+  },
+  {
+   "Etiqueta": "125 Mitras",
+   "Tickets": 33
+  },
+  {
+   "Etiqueta": "640 Escobedo",
+   "Tickets": 31
+  }
+ ],
+ "por_prioridad": [
+  {
+   "Etiqueta": "Media",
+   "Tickets": 631
+  },
+  {
+   "Etiqueta": "Alta",
+   "Tickets": 342
+  },
+  {
+   "Etiqueta": "Baja",
+   "Tickets": 219
+  },
+  {
+   "Etiqueta": "Critica",
+   "Tickets": 55
+  }
+ ],
+ "por_categoria": [
+  {
+   "Etiqueta": "S-Punto de Venta",
+   "Tickets": 352
+  },
+  {
+   "Etiqueta": "S-Infraestructura",
+   "Tickets": 340
+  },
+  {
+   "Etiqueta": "Recursos humanos",
+   "Tickets": 250
+  },
+  {
+   "Etiqueta": "S-Aplicativos",
+   "Tickets": 156
+  },
+  {
+   "Etiqueta": "S-Portal de Servicios TI",
+   "Tickets": 109
+  },
+  {
+   "Etiqueta": "S-Telecomunicaciones",
+   "Tickets": 92
+  }
+ ],
+ "mas_antiguos": [
+  {
+   "Codigo": "INC 2026-100000",
+   "Dias": 91.0,
+   "Estado": "En espera",
+   "Grupo": "Mesa de Ayuda",
+   "Tienda": "233 Cumbres",
+   "Titulo": "Terminal sin conexion a servidor"
+  },
+  {
+   "Codigo": "INC 2026-100137",
+   "Dias": 85.6,
+   "Estado": "En proceso",
+   "Grupo": "Base de Datos",
+   "Tienda": "556 Guadalupe",
+   "Titulo": "Terminal sin conexion a servidor"
+  },
+  {
+   "Codigo": "INC 2026-100274",
+   "Dias": 80.2,
+   "Estado": "En proceso",
+   "Grupo": "Aplicaciones",
+   "Tienda": "091 Linda Vista",
+   "Titulo": "Impresora fiscal no responde"
+  },
+  {
+   "Codigo": "INC 2026-100411",
+   "Dias": 74.8,
+   "Estado": "En espera",
+   "Grupo": "Seguridad",
+   "Tienda": "233 Cumbres",
+   "Titulo": "Caja en modo autonomo intermitente"
+  },
+  {
+   "Codigo": "INC 2026-100548",
+   "Dias": 69.4,
+   "Estado": "En proceso",
+   "Grupo": "Mesa de Ayuda",
+   "Tienda": "318 San Nicolas",
+   "Titulo": "Lentitud en consulta de precios"
+  },
+  {
+   "Codigo": "INC 2026-100685",
+   "Dias": 64.0,
+   "Estado": "En proceso",
+   "Grupo": "Aplicaciones",
+   "Tienda": "640 Escobedo",
+   "Titulo": "Caja en modo autonomo intermitente"
+  },
+  {
+   "Codigo": "INC 2026-100822",
+   "Dias": 58.6,
+   "Estado": "En espera",
+   "Grupo": "Mesa de Ayuda",
+   "Tienda": "704 Apodaca",
+   "Titulo": "Impresora fiscal no responde"
+  },
+  {
+   "Codigo": "INC 2026-100959",
+   "Dias": 53.2,
+   "Estado": "En proceso",
+   "Grupo": "Infraestructura",
+   "Tienda": "318 San Nicolas",
+   "Titulo": "Terminal sin conexion a servidor"
+  },
+  {
+   "Codigo": "INC 2026-101096",
+   "Dias": 47.8,
+   "Estado": "En espera",
+   "Grupo": "Seguridad",
+   "Tienda": "178 Centro",
+   "Titulo": "Error al cerrar turno"
+  },
+  {
+   "Codigo": "INC 2026-101233",
+   "Dias": 42.4,
+   "Estado": "En proceso",
+   "Grupo": "Aplicaciones",
+   "Tienda": "556 Guadalupe",
+   "Titulo": "Error al cerrar turno"
+  },
+  {
+   "Codigo": "INC 2026-101370",
+   "Dias": 37.0,
+   "Estado": "En proceso",
+   "Grupo": "Mesa de Ayuda",
+   "Tienda": "318 San Nicolas",
+   "Titulo": "Caja en modo autonomo intermitente"
+  },
+  {
+   "Codigo": "INC 2026-101507",
+   "Dias": 31.6,
+   "Estado": "En espera",
+   "Grupo": "Aplicaciones",
+   "Tienda": "318 San Nicolas",
+   "Titulo": "Scanner no lee codigos"
+  }
+ ],
+ "generado": "2026-08-07 22:01"
+}

@@ -541,39 +541,7 @@ def cargar_staging(cn: pyodbc.Connection, filas: list[tuple], lote: uuid.UUID, t
 def ejecutar_upsert(cn: pyodbc.Connection, lote: uuid.UUID,
                     sp: str = "dbo.usp_CargarTicketsDesdeStaging") -> tuple[int, int]:
     cur = cn.cursor()
-    try:
-        cur.execute("{CALL " + sp + " (?)}", str(lote))
-    except pyodbc.Error as e:
-        # Un fallo de permisos es muy común aquí. En vez de repetir el mensaje seco de ODBC,
-        # se consulta con QUÉ usuario se está conectando realmente y qué permisos tiene:
-        # casi siempre el GRANT se dio a un principal distinto del que usa la conexión.
-        if "permission was denied" in str(e) or "42000" in str(e):
-            info = []
-            try:
-                c2 = cn.cursor()
-                c2.execute("SELECT SUSER_SNAME(), USER_NAME(), DB_NAME(), "
-                           "HAS_PERMS_BY_NAME(?, 'OBJECT', 'EXECUTE')", sp)
-                login, usuario, bd, puede = c2.fetchone()
-                c2.close()
-                info = [
-                    f"login de conexión (SUSER_SNAME) : {login}",
-                    f"usuario de base (USER_NAME)     : {usuario}",
-                    f"base de datos                   : {bd}",
-                    f"¿tiene EXECUTE sobre {sp}?      : {'SÍ' if puede else 'NO'}",
-                ]
-            except Exception:
-                pass
-            detalle = "\n    ".join(info) if info else "(no se pudo consultar el contexto)"
-            raise RuntimeError(
-                f"Permiso denegado al ejecutar {sp}.\n"
-                f"    {detalle}\n"
-                f"    Otorga el permiso AL USUARIO QUE APARECE ARRIBA, no a otro:\n"
-                f"      GRANT EXECUTE ON {sp} TO [<usuario de base>];\n"
-                f"    Si el usuario mostrado no es el esperado, revisa 'sql.usuario' y "
-                f"'sql.autenticacion_windows' en config.json.\n"
-                f"    Ver 05_diagnostico_permisos.sql para el diagnóstico completo."
-            ) from e
-        raise
+    cur.execute("{CALL " + sp + " (?)}", str(lote))
     fila = cur.fetchone()
     while fila is None and cur.nextset():
         fila = cur.fetchone()
@@ -609,10 +577,6 @@ def resolver_entidades(cfg: dict, pedida: str | None) -> dict:
     'tickets' con las claves de siempre (api.url_cruda_*, mapeo, tabla stg.Tickets).
     """
     ents = cfg.get("entidades")
-    if ents:
-        # Las claves que empiezan con "_" son comentarios del config, no entidades.
-        ents = {k: v for k, v in ents.items()
-                if not k.startswith("_") and isinstance(v, dict)}
     if not ents:
         ents = {
             "tickets": {
