@@ -142,6 +142,7 @@ https://tableroproactivanet.soriana.com/catalogos.ashx
 | Mensaje | Causa |
 |---|---|
 | `Falta la cadena de conexion 'TicketsProactivanet'` | No copiaste `Web.config`, o esta en otra carpeta |
+| `Parser Error` / `Could not load type '...'` | No compila `App_Code/`. Casi siempre falta el bloque `<assemblies>` con `System.Web.Extensions` dentro de `<compilation>` en `Web.config` (viene en `Web.config.ejemplo`): la directiva `<%@ Assembly %>` de un `.ashx` **no** aplica a `App_Code`. Tambien pasa si no copiaste la carpeta `App_Code/` completa |
 | `Login failed for user 'DOMINIO\SERVIDOR$'` | El App Pool usa `ApplicationPoolIdentity` y SQL esta en otro servidor: cambia la identidad a una cuenta de dominio, o usa autenticacion SQL (Opcion B del `Web.config.ejemplo`) |
 | `EXECUTE permission was denied on ... usp_Dash_*` | Falta el `GRANT EXECUTE` del paso 2 para la cuenta del App Pool |
 | `Invalid object name 'dbo.vw_Dash_ProductividadBase'` | No se corrio `04_dashboard_sla.sql` en esa base |

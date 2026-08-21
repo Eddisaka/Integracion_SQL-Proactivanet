@@ -303,6 +303,29 @@ function paramsFiltros() {
   return p;
 }
 
+// Saca el mensaje util de una pagina de error de ASP.NET/IIS. Sin esto, al
+// quitar solo las etiquetas quedaba el CSS de la propia pagina de error
+// ('body {font-family:"Verdana"...') y el mensaje real se perdia.
+function resumirHtmlError(html) {
+  const texto = String(html)
+    // El <head> es puro CSS de la pagina de error: era lo que se colaba antes.
+    .replace(/<head[\s\S]*?<\/head>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<!--[\s\S]*?-->/g, ' ')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  return texto.slice(0, 400) || 'sin detalle en la respuesta';
+}
+
 async function obtenerJSON(ruta) {
   const resp = await fetch(ruta, { cache: 'no-store' });
   const texto = await resp.text();
@@ -315,10 +338,7 @@ async function obtenerJSON(ruta) {
   try { datos = JSON.parse(texto); } catch (e) { /* no era JSON */ }
 
   if (!resp.ok) {
-    const detalle = (datos && datos.error)
-      ? datos.error
-      : texto.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 300);
-    throw new Error(`${ruta} -> HTTP ${resp.status}. ${detalle}`);
+    throw new Error(`${ruta} -> HTTP ${resp.status}. ${(datos && datos.error) || resumirHtmlError(texto)}`);
   }
   if (datos === null) throw new Error(`${ruta} -> la respuesta no es JSON.`);
   return datos;

@@ -45,7 +45,21 @@
       App_Code/DashboardDb.cs. El App Pool en IIS debe estar en
       ".NET CLR Version v4.0.30319", modo Integrado.
     -->
-    <compilation debug="false" targetFramework="4.7.2" />
+    <compilation debug="false" targetFramework="4.7.2">
+      <!--
+        App_Code se compila con las referencias que se declaren AQUI: la
+        directiva <%@ Assembly %> de un .ashx solo aplica a ese archivo, no
+        a App_Code. DashboardDb.cs usa JavaScriptSerializer, que vive en
+        System.Web.Extensions; sin esta linea la compilacion de App_Code
+        falla y todos los .ashx responden "Parser Error".
+
+        La version 4.0.0.0 es la correcta para cualquier .NET Framework 4.x
+        (4.5, 4.6, 4.7, 4.8): el ensamblado no cambio de version.
+      -->
+      <assemblies>
+        <add assembly="System.Web.Extensions, Version=4.0.0.0, Culture=neutral, PublicKeyToken=31BF3856AD364E35" />
+      </assemblies>
+    </compilation>
     <httpRuntime targetFramework="4.7.2" />
 
     <!--

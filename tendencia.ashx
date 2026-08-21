@@ -1,5 +1,4 @@
 <%@ WebHandler Language="C#" Class="Tendencia" %>
-<%@ Assembly Name="System.Web.Extensions" %>
 
 using System.Collections.Generic;
 using System.Web;
