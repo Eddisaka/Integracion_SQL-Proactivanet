@@ -215,6 +215,9 @@
   .grupo-lider { margin: 18px 0 6px; font-size: 0.9rem; font-weight: 700; }
   .grupo-lider .conteo { font-weight: 400; font-size: 0.78rem; color: var(--text-muted); margin-left: 6px; }
   .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; }
+  /* Señal visual de que la celda tiene tooltip; si no, nadie descubre que
+     pasando el raton aparece la descripcion. */
+  .con-hint { cursor: help; border-bottom: 1px dotted var(--text-muted); }
 </style>
 </head>
 <body>
@@ -506,6 +509,30 @@ function renderTablaAging(m) {
 }
 
 // ==================================================== Tickets mas antiguos
+// Las descripciones vienen de Proactivanet con HTML pegado desde Outlook y a
+// veces con caracteres de control de Windows-1252 (el mismo problema que dio
+// lata al generar los .xlsx del correo de QA). En un atributo title= las
+// etiquetas se verian literales, asi que se limpian antes de mostrarlas.
+const LARGO_TOOLTIP = 300;
+
+function limpiarDescripcion(texto) {
+  if (!texto) return '';
+  return String(texto)
+    .replace(/<(br|\/p|\/div|\/tr)\s*\/?>/gi, ' ')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&nbsp;/g, ' ').replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')
+    .replace(/[ --]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function tooltipDescripcion(texto) {
+  const limpio = limpiarDescripcion(texto);
+  if (!limpio) return 'Este ticket no tiene descripcion.';
+  return limpio.length > LARGO_TOOLTIP ? limpio.slice(0, LARGO_TOOLTIP) + '...' : limpio;
+}
+
 function renderAntiguos(datos, topPorLider = 10) {
   const cont = document.getElementById('tabla-antiguos');
   const nota = document.getElementById('nota-antiguos');
@@ -533,7 +560,7 @@ function renderAntiguos(datos, topPorLider = 10) {
     const orden = lista.slice().sort((a, b) => b.DiasBacklog - a.DiasBacklog).slice(0, topPorLider);
     const sufijo = lista.length > topPorLider ? `mostrando ${topPorLider} de ${lista.length}` : `${lista.length}`;
     const filas = orden.map(t => `<tr>
-        <td>${escapeHtml(t.CodigoTicket)}</td>
+        <td class="con-hint" title="${escapeHtml(tooltipDescripcion(t.Descripcion))}">${escapeHtml(t.CodigoTicket)}</td>
         <td class="num"><b>${t.DiasBacklog}</b></td>
         <td>${String(t.FechaRegistro ?? '').slice(0, 10)}</td>
         <td>${escapeHtml(t.Prioridad)}</td>

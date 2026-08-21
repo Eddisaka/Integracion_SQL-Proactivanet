@@ -390,7 +390,13 @@ CREATE OR ALTER PROCEDURE dbo.usp_CorreoBacklog_Datos
     @Lideres NVARCHAR(MAX) = NULL,
     -- Para el tablero: solo tickets con mas de N dias en backlog. NULL = todos,
     -- que es como lo llama el correo para armar la hoja Datos del Excel.
-    @DiasMinimo INT = NULL
+    @DiasMinimo INT = NULL,
+    -- Recorta Descripcion a N caracteres. NULL = completa, que es lo que
+    -- necesita el Excel del correo. El tablero pide un recorte corto porque
+    -- solo la usa para un tooltip, y estas descripciones llegan a tener
+    -- decenas de miles de caracteres -en el correo de QA aparecio una de
+    -- 172,103-: sin recortar, mover eso hasta el navegador seria absurdo.
+    @MaxDescripcion INT = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -400,7 +406,13 @@ BEGIN
         FechaCorte, EstadoSLA, DiasBacklog, Aging, FechaRegistro,
         FechaEstimadaResolucion, FechaEstimadaOlaUc, Prioridad, SLA,
         CodigoTicket, Grupo, Lider, TecnicoSegundaLinea, Estado, Subestado,
-        Titulo, Descripcion, Cliente, Sucursal, Categoria, C1, FechaFirmaSolucion,
+        Titulo,
+        Descripcion = CASE
+            WHEN @MaxDescripcion IS NULL THEN Descripcion
+            WHEN LEN(Descripcion) > @MaxDescripcion THEN LEFT(Descripcion, @MaxDescripcion) + N'...'
+            ELSE Descripcion
+        END,
+        Cliente, Sucursal, Categoria, C1, FechaFirmaSolucion,
         FechaUltimaModificacion, NotificadoPor, Tipo, Caducada,
         IntentosSolucion, ReasignacionesGrupo, AgingSort
     FROM dbo.CorreoBacklogSnapshot

@@ -389,3 +389,40 @@ el correo -no hace falta correr nada aparte cada vez que
    — pendiente de que habiliten la comunicacion App↔BD en el servidor
    nuevo. Mientras tanto, se puede seguir probando estos procedimientos
    directo en SSMS.
+
+## 8) Pendiente: enlazar cada ticket a Proactivanet
+
+En el tablero web seria util que el codigo del ticket fuera un enlace directo
+a su formulario de edicion en Proactivanet:
+
+```text
+https://soriana.proactivanet.com/proactivanet/servicedesk/incidents/formIncidents/formIncidents.paw?id=<GUID>
+```
+
+**El bloqueo:** esa URL identifica el ticket por su **GUID interno**, y ese
+dato no existe en nuestra base. El ETL no lee `/api/Incidents`, lee un reporte
+(`/api/table/data`) que Proactivanet construyo del lado de ellos con columnas
+fijas —fue la salida cuando no nos dieron acceso a su base de datos— y ese
+reporte no incluye el `Id`. Pedirles que lo agreguen no es viable en tiempo
+razonable.
+
+**Lo que si esta disponible:** la API expone el GUID buscando por codigo.
+`GET /api/Incidents` acepta `Code` como parametro y la respuesta trae `Code`
+e `Id` (ver `API.html`). Ademas soporta `$fields`, `$limit` y `$offset`, asi
+que se pueden traer los pares (Code, Id) en bloque y paginados, no de uno en
+uno.
+
+**Opciones, si se retoma:**
+
+1. **Sincronizar los GUID desde el equipo del ETL** (recomendada). Un script
+   que corre despues del ETL, trae los pares (Code, Id) de la API y los
+   guarda en una tabla de mapeo; el tablero solo lee esa tabla. El token
+   sigue viviendo donde ya vive (`PVNET_API_TOKEN` en el equipo del ETL), el
+   servidor web no necesita salida a Proactivanet, y el enlace es instantaneo.
+2. **Resolver el GUID al hacer clic**, con un handler que consulte la API y
+   redirija. No toca base de datos ni ETL, pero **obliga a poner el token en
+   el servidor web** y a abrir salida de ese servidor hacia
+   `soriana.proactivanet.com`, ademas de depender de la API en cada clic.
+
+La 1 evita meter el token en un servidor mas, que es justo la disciplina que
+se ha seguido hasta ahora.

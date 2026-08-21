@@ -17,13 +17,20 @@ public class BacklogAntiguos : IHttpHandler
             p["FechaCorte"] = BacklogUtil.FechaCorte(context.Request);
             p["DiasMinimo"] = DashboardParams.Entero(context.Request, "dias_minimo", 120);
 
+            // Se piden 600 caracteres de descripcion aunque el tooltip muestre
+            // ~300: muchas descripciones vienen con HTML pegado desde Outlook,
+            // asi que al limpiar las etiquetas en el navegador el texto util
+            // se encoge. 600 da margen sin que el JSON crezca de mas.
+            p["MaxDescripcion"] = 600;
+
             var filas = DashboardDb.Ejecutar("dbo.usp_CorreoBacklog_Datos", p);
 
             // Solo las columnas que muestra la tabla; el resto del snapshot
-            // (Descripcion, Categoria completa, etc.) no se usa aqui y pesa.
+            // (Categoria completa, Cliente, etc.) no se usa aqui y pesa.
             var columnas = new[] {
                 "CodigoTicket", "DiasBacklog", "FechaRegistro", "Prioridad",
-                "Grupo", "Lider", "TecnicoSegundaLinea", "Subestado", "Titulo"
+                "Grupo", "Lider", "TecnicoSegundaLinea", "Subestado", "Titulo",
+                "Descripcion"
             };
 
             var salida = new List<Dictionary<string, object>>();

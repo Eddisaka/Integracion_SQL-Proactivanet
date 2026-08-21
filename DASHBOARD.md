@@ -29,6 +29,22 @@ desde SQL Server. Corre **100% en IIS con ASP.NET; no usa Python**.
   tickets con mas de 4 meses. Lee de `dbo.CorreoBacklogSnapshot` a traves
   de los procedimientos `usp_CorreoBacklog_*`.
 
+  En el listado de tickets viejos, **pasar el raton sobre el codigo del
+  ticket muestra su descripcion** (la celda va subrayada con puntos para que
+  se note). Como esas descripciones traen HTML pegado desde Outlook y llegan
+  a tener decenas de miles de caracteres, se recortan a 600 en SQL
+  (`@MaxDescripcion` de `usp_CorreoBacklog_Datos`) y a 300 ya limpias en el
+  navegador. El correo sigue recibiendo la descripcion completa para el
+  Excel: ese parametro por defecto es NULL.
+
+  **Pendiente — enlace al ticket en Proactivanet.** La URL de edicion
+  (`formIncidents.paw?id=<GUID>`) necesita el GUID interno del ticket, que
+  **no esta en la base**: el ETL lee un reporte que Proactivanet expone con
+  columnas fijas y ese reporte no incluye el `Id`. La API si lo da
+  (`GET /api/Incidents?Code=INC 2026-128167` devuelve `Code` e `Id`), pero
+  para usarla habria que decidir de donde se llama; ver la nota al final de
+  `CORREO_BACKLOG.md`.
+
 ### Por que son dos paginas y no pestañas con JavaScript
 
 Cada tablero necesita filtros distintos —el de SLA va por rango de fechas,
