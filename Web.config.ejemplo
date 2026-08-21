@@ -23,20 +23,20 @@
       Requiere que la identidad del App Pool sea una cuenta de dominio (no
       ApplicationPoolIdentity), porque tiene que autenticarse contra el
       servidor de SQL, que esta en otra maquina.
-    -->
+    
     <add name="TicketsProactivanet"
-         connectionString="Server=AZAUDITPRECIOS;Database=Tickets_Proactivanet;Integrated Security=SSPI;Encrypt=True;TrustServerCertificate=True;Connect Timeout=60;Application Name=TableroProactivanet;"
+         connectionString="Server=AZVMBDCENTRALQA;Database=Tickets_Proactivanet;Integrated Security=SSPI;Encrypt=True;TrustServerCertificate=True;Connect Timeout=60;Application Name=TableroProactivanet;"
          providerName="System.Data.SqlClient" />
-
+    -->
     <!--
       OPCION B: usuario y contraseña de SQL Server. Usa esta si no se puede
       dar de alta la cuenta del App Pool en SQL. Comenta la de arriba y
       descomenta esta -no pueden existir dos con el mismo name-.
-
-    <add name="TicketsProactivanet"
-         connectionString="Server=AZAUDITPRECIOS;Database=Tickets_Proactivanet;User ID=PROACTIVANETAD;Password=REEMPLAZAR;Encrypt=True;TrustServerCertificate=True;Connect Timeout=60;Application Name=TableroProactivanet;"
-         providerName="System.Data.SqlClient" />
     -->
+    <add name="TicketsProactivanet"
+         connectionString="Server=AZVMBDCENTRALQA;Database=Tickets_Proactivanet;User ID=PROACTIVANETAD;Password=REEMPLAZAR;Encrypt=True;TrustServerCertificate=True;Connect Timeout=60;Application Name=TableroProactivanet;"
+         providerName="System.Data.SqlClient" />
+    
   </connectionStrings>
 
   <system.web>
