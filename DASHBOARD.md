@@ -71,7 +71,7 @@ confirme si no tienes permisos para activarla tu mismo.
 **1) Copia al sitio de IIS** (la carpeta raiz del sitio o de la aplicacion):
 - `dashboard.html`
 - `catalogos.ashx`, `kpis.ashx`, `tendencia.ashx`, `productividad.ashx`,
-  `distribucion.ashx`, `detalle.ashx`
+  `distribucion.ashx`, `detalle.ashx`, `diagnostico.ashx`
 - la carpeta `App_Code/` completa (con `DashboardDb.cs` adentro)
 - `Web.config.ejemplo` → renombralo a `Web.config` **en el servidor** y
   ajusta la cadena de conexion (servidor, base, autenticacion).
@@ -84,22 +84,56 @@ Windows (`Integrated Security=True`), para no tener que guardar ninguna
 contraseña en el archivo. Eso implica que la **identidad del App Pool**
 (la cuenta con la que corre IIS) necesita permisos en SQL Server:
 
+> **Ojo — a QUE principal se le dan los permisos.** Tiene que ser el mismo
+> con el que la cadena de conexion se autentica, y hay dos casos distintos:
+>
+> - `Integrated Security=SSPI` (Opcion A) → el principal es la **identidad
+>   del App Pool**, un login de Windows: `[SORIANA\CuentaAppPool]`.
+> - `User ID=PROACTIVANETAD` (Opcion B) → el principal es el **login de SQL
+>   Server** `[PROACTIVANETAD]`, **no** el usuario de Windows del mismo
+>   nombre. Son dos principales diferentes aunque se llamen igual.
+>
+> Darle el `GRANT` al principal equivocado produce justo el sintoma
+> confuso: la conexion abre bien (el login existe) pero cada llamada
+> devuelve *"The EXECUTE permission was denied"*. Si no estas seguro de con
+> cual se esta conectando, abre `diagnostico.ashx` (ver "Solucion de
+> problemas") y usa el valor de `LoginQueConecta`.
+
+Lo mas practico es dar el permiso **a nivel de esquema**, asi queda cubierto
+cualquier procedimiento `usp_Dash_*` que se agregue despues sin tener que
+volver a tocar permisos:
+
 ```sql
--- Cambia [DOMINIO\CuentaAppPool] por la identidad real del App Pool
--- (o por su cuenta de servicio, si usan una dedicada)
-GRANT EXECUTE ON dbo.usp_Dash_Catalogos               TO [DOMINIO\CuentaAppPool];
-GRANT EXECUTE ON dbo.usp_Dash_KpisMulti                TO [DOMINIO\CuentaAppPool];
-GRANT EXECUTE ON dbo.usp_Dash_TendenciaMulti           TO [DOMINIO\CuentaAppPool];
-GRANT EXECUTE ON dbo.usp_Dash_ProductividadTecnicoMulti TO [DOMINIO\CuentaAppPool];
-GRANT EXECUTE ON dbo.usp_Dash_DistribucionMulti        TO [DOMINIO\CuentaAppPool];
-GRANT EXECUTE ON dbo.usp_Dash_DetalleMulti             TO [DOMINIO\CuentaAppPool];
+-- [Principal] = el valor de LoginQueConecta que reporta diagnostico.ashx:
+--   autenticacion SQL     -> [PROACTIVANETAD]
+--   autenticacion Windows -> [SORIANA\CuentaAppPool]
+GRANT EXECUTE ON SCHEMA::dbo TO [Principal];
 ```
 
-Si prefieres autenticacion SQL en vez de Windows, cambia
-`Integrated Security=True` por `User ID=...;Password=...` en `Web.config`
-— y si lo haces, cifra esa seccion con `aspnet_regiis.exe -pef` (ver el
-comentario dentro de `Web.config.ejemplo`) en vez de dejar la contraseña en
-texto plano.
+O uno por uno, si prefieres el minimo exacto:
+
+```sql
+GRANT EXECUTE ON dbo.usp_Dash_Catalogos                TO [Principal];
+GRANT EXECUTE ON dbo.usp_Dash_KpisMulti                TO [Principal];
+GRANT EXECUTE ON dbo.usp_Dash_TendenciaMulti           TO [Principal];
+GRANT EXECUTE ON dbo.usp_Dash_ProductividadTecnicoMulti TO [Principal];
+GRANT EXECUTE ON dbo.usp_Dash_DistribucionMulti        TO [Principal];
+GRANT EXECUTE ON dbo.usp_Dash_DetalleMulti             TO [Principal];
+```
+
+**No hace falta que el usuario sea `db_owner` ni dueño de los objetos.**
+Con `EXECUTE` sobre los procedimientos alcanza: como todos pertenecen al
+esquema `dbo` igual que las tablas y vistas que consultan, SQL Server aplica
+*ownership chaining* y no revisa permisos sobre `dbo.Tickets` ni sobre
+`dbo.vw_Dash_ProductividadBase` por separado.
+
+Si usas autenticacion SQL (Opcion B), cifra esa seccion del `Web.config`
+con `aspnet_regiis.exe -pef` en vez de dejar la contraseña en texto plano:
+
+```powershell
+cd C:\Windows\Microsoft.NET\Framework64\v4.0.30319
+.\aspnet_regiis.exe -pef "connectionStrings" "C:\ruta\del\sitio"
+```
 
 **3) En IIS Manager:**
 - Confirma que el **Application Pool** del sitio use ".NET CLR Version
@@ -137,6 +171,32 @@ https://tableroproactivanet.soriana.com/catalogos.ashx
   llego a ASP.NET: revisa que el App Pool este en .NET CLR v4.0 modo
   Integrado y que ASP.NET 4.x este habilitado en el rol de IIS.
 
+**Para problemas de permisos, `diagnostico.ashx` responde la pregunta
+directamente** — con que identidad se esta conectando el sitio y que le
+falta:
+
+```text
+https://tableroproactivanet.soriana.com/diagnostico.ashx
+```
+
+```json
+{
+  "conexion": {
+    "LoginQueConecta": "PROACTIVANETAD",
+    "TipoDeLogin": "SQL Server",
+    "UsuarioEnLaBase": "PROACTIVANETAD",
+    "BaseDeDatos": "Tickets_Proactivanet",
+    "EsDbOwner": 0,
+    "Ejec_Catalogos": 0,
+    "Ejec_Kpis": 0
+  }
+}
+```
+
+`Ejec_* = 1` tiene permiso, `0` le falta — y los `GRANT` van al principal
+que aparece en **`LoginQueConecta`**, que es el dato que suele estar en
+duda. No expone la cadena de conexion ni la contraseña.
+
 **Errores tipicos y que significan:**
 
 | Mensaje | Causa |
@@ -144,7 +204,7 @@ https://tableroproactivanet.soriana.com/catalogos.ashx
 | `Falta la cadena de conexion 'TicketsProactivanet'` | No copiaste `Web.config`, o esta en otra carpeta |
 | `Parser Error` / `Could not load type '...'` | No compila `App_Code/`. Casi siempre falta el bloque `<assemblies>` con `System.Web.Extensions` dentro de `<compilation>` en `Web.config` (viene en `Web.config.ejemplo`): la directiva `<%@ Assembly %>` de un `.ashx` **no** aplica a `App_Code`. Tambien pasa si no copiaste la carpeta `App_Code/` completa |
 | `Login failed for user 'DOMINIO\SERVIDOR$'` | El App Pool usa `ApplicationPoolIdentity` y SQL esta en otro servidor: cambia la identidad a una cuenta de dominio, o usa autenticacion SQL (Opcion B del `Web.config.ejemplo`) |
-| `EXECUTE permission was denied on ... usp_Dash_*` | Falta el `GRANT EXECUTE` del paso 2 para la cuenta del App Pool |
+| `EXECUTE permission was denied on ... usp_Dash_*` | El `GRANT EXECUTE` falta, **o se le dio a otro principal**: con `User ID=` en la cadena de conexion el permiso va al login de SQL `[PROACTIVANETAD]`, no al usuario de Windows `[SORIANA\proactivanetad]`. Abre `diagnostico.ashx` y otorga sobre el valor de `LoginQueConecta`. No se necesita ser `db_owner` |
 | `Invalid object name 'dbo.vw_Dash_ProductividadBase'` | No se corrio `04_dashboard_sla.sql` en esa base |
 | `A network-related ... error occurred` | El servidor de aplicacion no alcanza al de SQL (firewall/puerto 1433 entre servidores) |
 

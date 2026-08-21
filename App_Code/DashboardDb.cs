@@ -72,6 +72,35 @@ public static class DashboardDb
         return resultados.Count > 0 ? resultados[0] : new List<Dictionary<string, object>>();
     }
 
+    // Consulta de texto plano, sin parametros. La usa unicamente
+    // diagnostico.ashx: todo lo demas pasa por stored procedures.
+    public static List<Dictionary<string, object>> EjecutarTexto(string sql)
+    {
+        var filas = new List<Dictionary<string, object>>();
+
+        using (var cn = new SqlConnection(ConnectionString()))
+        using (var cmd = new SqlCommand(sql, cn))
+        {
+            cmd.CommandType = CommandType.Text;
+            cn.Open();
+            using (var reader = cmd.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    var fila = new Dictionary<string, object>();
+                    for (int i = 0; i < reader.FieldCount; i++)
+                    {
+                        object valor = reader.GetValue(i);
+                        fila[reader.GetName(i)] = (valor is DBNull) ? null : valor;
+                    }
+                    filas.Add(fila);
+                }
+            }
+        }
+
+        return filas;
+    }
+
     private static string ConnectionString()
     {
         var cs = ConfigurationManager.ConnectionStrings["TicketsProactivanet"];
