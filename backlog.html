@@ -1,0 +1,709 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tickets Proactivanet — Tablero de Backlog</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #f4f6f8;
+    --panel: #ffffff;
+    --border: #dfe4ea;
+    --text: #1f2937;
+    --text-muted: #6b7280;
+    --blue: #2563eb;
+    --green: #16a34a;
+    --red: #dc2626;
+    --amber: #d97706;
+    --purple: #7c3aed;
+    --cyan: #0891b2;
+    --slate: #64748b;
+    --radius: 10px;
+    --shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Segoe UI", system-ui, -apple-system, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  header {
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  header h1 {
+    font-size: 1.25rem;
+    margin: 0;
+  }
+  header .subtitulo {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+  #estado-carga {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+  }
+  main {
+    padding: 20px 24px 40px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  .filtros {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 16px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 14px;
+    align-items: end;
+    margin-bottom: 20px;
+  }
+  .filtros .campo { display: flex; flex-direction: column; gap: 4px; }
+  .filtros label { font-size: 0.78rem; font-weight: 600; color: var(--text-muted); }
+  .filtros input[type="date"],
+  .filtros select {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 8px;
+    font-size: 0.85rem;
+    background: #fff;
+    color: var(--text);
+  }
+  .filtros select[multiple] { min-height: 92px; }
+  .filtros .rango-rapido { display: flex; gap: 6px; flex-wrap: wrap; }
+  .filtros .rango-rapido button {
+    border: 1px solid var(--border);
+    background: #fff;
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 0.75rem;
+    cursor: pointer;
+  }
+  .filtros .rango-rapido button:hover { background: #eef2f7; }
+  .filtros .acciones { display: flex; gap: 8px; align-items: center; }
+  .btn-primario {
+    background: var(--blue);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 9px 16px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .btn-primario:hover { background: #1d4ed8; }
+  .btn-secundario {
+    background: #fff;
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 9px 14px;
+    font-size: 0.85rem;
+    cursor: pointer;
+  }
+
+  .kpis {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .kpi-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 14px 16px;
+  }
+  .kpi-card .valor { font-size: 1.6rem; font-weight: 700; line-height: 1.1; }
+  .kpi-card .etiqueta { font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; }
+  .kpi-card.ok .valor { color: var(--green); }
+  .kpi-card.warn .valor { color: var(--amber); }
+  .kpi-card.bad .valor { color: var(--red); }
+
+  .graficos {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 16px;
+    min-width: 0;
+  }
+  .panel h2 {
+    font-size: 0.95rem;
+    margin: 0 0 12px;
+  }
+  .panel .lienzo { position: relative; height: 280px; }
+  .panel.ancho { grid-column: 1 / -1; }
+  .panel.ancho .lienzo { height: 320px; }
+
+  .tabla-wrap {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 16px;
+    overflow-x: auto;
+  }
+  .tabla-wrap h2 { font-size: 0.95rem; margin: 0 0 4px; }
+  .tabla-wrap .nota { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 10px; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.8rem; white-space: nowrap; }
+  th, td { padding: 6px 10px; border-bottom: 1px solid var(--border); text-align: left; }
+  th { position: sticky; top: 0; background: var(--panel); font-weight: 600; color: var(--text-muted); }
+  tr:hover td { background: #f8fafc; }
+  .pill { border-radius: 999px; padding: 2px 8px; font-size: 0.72rem; font-weight: 600; }
+  .pill.vencido { background: #fde2e1; color: var(--red); }
+  .pill.dentro { background: #dcfce7; color: var(--green); }
+  .pill.neutro { background: #e5e7eb; color: var(--text-muted); }
+
+  .vacio { color: var(--text-muted); font-size: 0.85rem; padding: 20px; text-align: center; }
+
+  /* Pestañas del encabezado. Cada una es un enlace a su propia pagina: los
+     filtros de cada tablero son distintos, asi que conviven mejor separadas
+     que alternandose con JavaScript en un solo archivo. */
+  .pestanas { display: flex; gap: 4px; margin-top: 10px; }
+  .pestanas a {
+    padding: 7px 16px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-decoration: none;
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+    border-bottom: none;
+    border-radius: 8px 8px 0 0;
+    background: #eef2f7;
+  }
+  .pestanas a:hover { color: var(--text); }
+  .pestanas a.activa {
+    background: var(--panel);
+    color: var(--blue);
+    box-shadow: inset 0 3px 0 var(--blue);
+  }
+</style>
+<style>
+  /* Propios de este tablero */
+  .tendencia-linea { font-size: 0.95rem; margin: 0 0 14px; }
+  .tendencia-linea .delta { font-weight: 700; }
+  .tendencia-linea .sube { color: var(--red); }
+  .tendencia-linea .baja { color: var(--green); }
+  .tendencia-linea .igual { color: var(--text-muted); }
+  .aviso {
+    background: #fffbeb; border: 1px solid #fde68a; color: #92400e;
+    border-radius: var(--radius); padding: 10px 14px; font-size: 0.82rem;
+    margin-bottom: 14px;
+  }
+  .tabla-wrap + .tabla-wrap { margin-top: 16px; }
+  .tabla-wrap td.num, .tabla-wrap th.num { text-align: right; }
+  .grupo-lider { margin: 18px 0 6px; font-size: 0.9rem; font-weight: 700; }
+  .grupo-lider .conteo { font-weight: 400; font-size: 0.78rem; color: var(--text-muted); margin-left: 6px; }
+  .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Tickets Proactivanet</h1>
+    <div class="subtitulo">Base Tickets_Proactivanet · dbo.CorreoBacklogSnapshot</div>
+    <nav class="pestanas">
+      <a href="dashboard.html">SLA y productividad</a>
+      <a href="backlog.html" class="activa">Backlog</a>
+    </nav>
+  </div>
+  <div id="estado-carga"></div>
+</header>
+
+<main>
+  <section class="filtros">
+    <div class="campo">
+      <label for="f-corte">Fecha de corte</label>
+      <select id="f-corte"></select>
+    </div>
+    <div class="campo">
+      <label for="f-dias">Ventana de tendencia</label>
+      <select id="f-dias">
+        <option value="15">Ultimos 15 dias</option>
+        <option value="30" selected>Ultimos 30 dias</option>
+        <option value="90">Ultimos 90 dias</option>
+        <option value="365">Ultimo año</option>
+      </select>
+    </div>
+    <div class="campo">
+      <label for="f-granularidad">Agrupar tendencia por</label>
+      <select id="f-granularidad">
+        <option value="Dia" selected>Dia</option>
+        <option value="Semana">Semana</option>
+        <option value="Mes">Mes</option>
+      </select>
+    </div>
+    <div class="campo">
+      <label for="f-c1">Servicio / C1 (Ctrl+clic para varios)</label>
+      <select id="f-c1" multiple></select>
+    </div>
+    <div class="campo">
+      <label for="f-grupos">Grupos (Ctrl+clic para varios)</label>
+      <select id="f-grupos" multiple></select>
+    </div>
+    <div class="campo">
+      <label for="f-lideres">Lideres (Ctrl+clic para varios)</label>
+      <select id="f-lideres" multiple></select>
+    </div>
+    <div class="campo acciones">
+      <button class="btn-primario" id="btn-aplicar">Aplicar filtros</button>
+      <button class="btn-secundario" id="btn-limpiar">Limpiar</button>
+    </div>
+  </section>
+
+  <div id="aviso-historico"></div>
+  <p class="tendencia-linea" id="tendencia-linea"></p>
+
+  <section class="kpis" id="kpis"></section>
+
+  <section class="graficos">
+    <div class="panel">
+      <h2>Tendencia del backlog total</h2>
+      <div class="lienzo"><canvas id="chart-tendencia"></canvas></div>
+    </div>
+    <div class="panel">
+      <h2>Tendencia por lider (avance de cada torre)</h2>
+      <div class="lienzo"><canvas id="chart-tendencia-lider"></canvas></div>
+    </div>
+    <div class="panel">
+      <h2>Backlog por lider</h2>
+      <div class="lienzo"><canvas id="chart-lider"></canvas></div>
+    </div>
+    <div class="panel">
+      <h2>Backlog por prioridad</h2>
+      <div class="lienzo"><canvas id="chart-prioridad"></canvas></div>
+    </div>
+    <div class="panel ancho">
+      <h2>Antiguedad del backlog por lider</h2>
+      <div class="lienzo"><canvas id="chart-aging"></canvas></div>
+    </div>
+  </section>
+
+  <section class="tabla-wrap">
+    <h2>Resumen por antiguedad y lider</h2>
+    <div class="nota">Los colores corresponden a los de la grafica de arriba.</div>
+    <div id="tabla-aging"></div>
+  </section>
+
+  <section class="tabla-wrap">
+    <h2 id="titulo-antiguos">Tickets con mas de 4 meses en backlog</h2>
+    <div class="nota" id="nota-antiguos"></div>
+    <div id="tabla-antiguos"></div>
+  </section>
+</main>
+<script>
+// Misma paleta que usa el correo, en el mismo orden: un lider conserva su
+// color entre el correo, la grafica apilada y la tabla de resumen.
+const PALETA = ['#2563eb','#dc2626','#16a34a','#d97706','#7c3aed','#0891b2','#db2777','#6b7280'];
+const COLOR_PRIORIDAD = { 'Critica': '#dc2626', 'Crítica': '#dc2626', 'Alta': '#d97706', 'Media': '#eab308', 'Baja': '#16a34a' };
+
+const graficos = {};
+let ordenLideres = [];   // define el color de cada lider en toda la pagina
+
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function colorLider(nombre) {
+  const i = ordenLideres.indexOf(nombre);
+  return i >= 0 ? PALETA[i % PALETA.length] : '#6b7280';
+}
+
+// ============================================================ Acceso a datos
+function resumirHtmlError(html) {
+  const texto = String(html)
+    .replace(/<head[\s\S]*?<\/head>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<!--[\s\S]*?-->/g, ' ')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&nbsp;/g, ' ').replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/\s+/g, ' ').trim();
+  return texto.slice(0, 400) || 'sin detalle en la respuesta';
+}
+
+async function obtenerJSON(ruta) {
+  const resp = await fetch(ruta, { cache: 'no-store' });
+  const texto = await resp.text();
+  let datos = null;
+  try { datos = JSON.parse(texto); } catch (e) { /* no era JSON */ }
+  if (!resp.ok) throw new Error(`${ruta} -> HTTP ${resp.status}. ${(datos && datos.error) || resumirHtmlError(texto)}`);
+  if (datos === null) throw new Error(`${ruta} -> la respuesta no es JSON.`);
+  return datos;
+}
+
+function seleccionados(id) {
+  return Array.from(document.getElementById(id).selectedOptions).map(o => o.value);
+}
+
+function paramsFiltros() {
+  const p = new URLSearchParams();
+  const corte = document.getElementById('f-corte').value;
+  if (corte) p.set('fecha_corte', corte);
+  const c1 = seleccionados('f-c1');
+  const grupos = seleccionados('f-grupos');
+  const lideres = seleccionados('f-lideres');
+  if (c1.length) p.set('c1', c1.join(','));
+  if (grupos.length) p.set('grupos', grupos.join(','));
+  if (lideres.length) p.set('lideres', lideres.join(','));
+  return p;
+}
+
+// ================================================================= Graficas
+function dibujar(id, config) {
+  if (graficos[id]) graficos[id].destroy();
+  graficos[id] = new Chart(document.getElementById(id), config);
+}
+
+const SIN_LEYENDA = { legend: { display: false } };
+const EJE_Y_CERO = { y: { beginAtZero: true, ticks: { precision: 0 } } };
+
+function renderTendenciaTotal(filas) {
+  dibujar('chart-tendencia', {
+    type: 'line',
+    data: {
+      labels: filas.map(f => String(f.Periodo).slice(0, 10)),
+      datasets: [{
+        label: 'Backlog', data: filas.map(f => f.TicketsBacklog),
+        borderColor: PALETA[0], backgroundColor: PALETA[0],
+        borderWidth: 3, tension: 0.25, pointRadius: 3,
+      }],
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: SIN_LEYENDA, scales: EJE_Y_CERO },
+  });
+}
+
+// Convierte el formato largo (FechaCorte, Lider, Tickets) en una serie por
+// lider, rellenando con 0 las fechas donde un lider no tiene filas -si no,
+// las lineas quedan desalineadas entre si-.
+function renderTendenciaLider(filas) {
+  const fechas = [...new Set(filas.map(f => String(f.FechaCorte).slice(0, 10)))].sort();
+  const nombres = [...new Set(filas.map(f => f.Lider))];
+  const mapa = new Map(filas.map(f => [`${String(f.FechaCorte).slice(0,10)}|${f.Lider}`, f.Tickets]));
+
+  dibujar('chart-tendencia-lider', {
+    type: 'line',
+    data: {
+      labels: fechas,
+      datasets: nombres.map(n => ({
+        label: n,
+        data: fechas.map(f => mapa.get(`${f}|${n}`) ?? 0),
+        borderColor: colorLider(n), backgroundColor: colorLider(n),
+        borderWidth: 2, tension: 0.25, pointRadius: 2,
+      })),
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } } },
+      scales: EJE_Y_CERO,
+    },
+  });
+}
+
+function renderBarras(id, etiquetas, valores, colores) {
+  dibujar(id, {
+    type: 'bar',
+    data: { labels: etiquetas, datasets: [{ data: valores, backgroundColor: colores }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: SIN_LEYENDA, scales: EJE_Y_CERO },
+  });
+}
+
+// Barras apiladas: una barra por bucket de antiguedad, partida por lider.
+function renderAgingApilado(matriz) {
+  dibujar('chart-aging', {
+    type: 'bar',
+    data: {
+      labels: matriz.buckets,
+      datasets: matriz.lideres.map(l => ({
+        label: l,
+        data: matriz.buckets.map(b => matriz.valores.get(`${b}|${l}`) ?? 0),
+        backgroundColor: colorLider(l),
+      })),
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } } },
+      scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } } },
+    },
+  });
+}
+
+// ============================================== Agregaciones (matriz aging)
+// Mismo calculo que hace el correo en PowerShell: agrupa el result set de
+// antiguedad (Lider, Grupo, Aging, AgingSort, Tickets) en una matriz
+// bucket x lider, con los N lideres mas grandes y el resto en 'Otros'.
+function construirMatrizAging(filas, topLideres = 8) {
+  if (!filas.length) return null;
+
+  const ordenBucket = new Map();
+  const totalCrudo = new Map();
+  for (const f of filas) {
+    if (!ordenBucket.has(f.Aging)) ordenBucket.set(f.Aging, f.AgingSort);
+    totalCrudo.set(f.Lider, (totalCrudo.get(f.Lider) ?? 0) + f.Tickets);
+  }
+  // Los buckets van en orden real de antiguedad (AgingSort), no alfabetico.
+  const buckets = [...ordenBucket.entries()].sort((a, b) => a[1] - b[1]).map(e => e[0]);
+  const top = new Set([...totalCrudo.entries()].sort((a, b) => b[1] - a[1]).slice(0, topLideres).map(e => e[0]));
+
+  const valores = new Map();
+  const usados = [];
+  for (const f of filas) {
+    const l = top.has(f.Lider) ? f.Lider : 'Otros';
+    if (!usados.includes(l)) usados.push(l);
+    const clave = `${f.Aging}|${l}`;
+    valores.set(clave, (valores.get(clave) ?? 0) + f.Tickets);
+  }
+
+  const totalPorLider = new Map(usados.map(l =>
+    [l, buckets.reduce((acc, b) => acc + (valores.get(`${b}|${l}`) ?? 0), 0)]));
+  const lideres = usados.filter(l => l !== 'Otros').sort((a, b) => totalPorLider.get(b) - totalPorLider.get(a));
+  if (usados.includes('Otros')) lideres.push('Otros');
+
+  const totalPorBucket = new Map(buckets.map(b =>
+    [b, lideres.reduce((acc, l) => acc + (valores.get(`${b}|${l}`) ?? 0), 0)]));
+
+  return { buckets, lideres, valores, totalPorLider, totalPorBucket };
+}
+
+function renderTablaAging(m) {
+  const cont = document.getElementById('tabla-aging');
+  if (!m) { cont.innerHTML = '<div class="vacio">Sin datos para este corte.</div>'; return; }
+
+  const th = m.lideres.map(l =>
+    `<th class="num" style="color:${colorLider(l)}"><span class="swatch" style="background:${colorLider(l)}"></span>${escapeHtml(l)}</th>`).join('');
+  const filas = m.buckets.map(b => {
+    const celdas = m.lideres.map(l => {
+      const v = m.valores.get(`${b}|${l}`) ?? 0;
+      return `<td class="num">${v || ''}</td>`;
+    }).join('');
+    return `<tr><td><b>${escapeHtml(b)}</b></td>${celdas}<td class="num"><b>${m.totalPorBucket.get(b)}</b></td></tr>`;
+  }).join('');
+  const totales = m.lideres.map(l => `<td class="num"><b>${m.totalPorLider.get(l)}</b></td>`).join('');
+  const granTotal = m.lideres.reduce((a, l) => a + m.totalPorLider.get(l), 0);
+
+  cont.innerHTML = `<table><thead><tr><th>Antiguedad</th>${th}<th class="num">Total</th></tr></thead>`
+    + `<tbody>${filas}<tr><td><b>Total</b></td>${totales}<td class="num"><b>${granTotal}</b></td></tr></tbody></table>`;
+}
+
+// ==================================================== Tickets mas antiguos
+function renderAntiguos(datos, topPorLider = 10) {
+  const cont = document.getElementById('tabla-antiguos');
+  const nota = document.getElementById('nota-antiguos');
+  const meses = Math.round(datos.diasMinimo / 30);
+  document.getElementById('titulo-antiguos').textContent = `Tickets con mas de ${meses} meses en backlog`;
+
+  const tickets = datos.tickets ?? [];
+  if (!tickets.length) {
+    nota.textContent = '';
+    cont.innerHTML = `<div class="vacio">No hay tickets con mas de ${datos.diasMinimo} dias en backlog.</div>`;
+    return;
+  }
+
+  const porLider = new Map();
+  for (const t of tickets) {
+    if (!porLider.has(t.Lider)) porLider.set(t.Lider, []);
+    porLider.get(t.Lider).push(t);
+  }
+  // Primero el lider que mas arrastra; dentro, del mas antiguo al menos.
+  const grupos = [...porLider.entries()].sort((a, b) => b[1].length - a[1].length);
+
+  nota.textContent = `${tickets.length} tickets con mas de ${datos.diasMinimo} dias. Se listan los ${topPorLider} mas antiguos de cada lider.`;
+
+  cont.innerHTML = grupos.map(([lider, lista]) => {
+    const orden = lista.slice().sort((a, b) => b.DiasBacklog - a.DiasBacklog).slice(0, topPorLider);
+    const sufijo = lista.length > topPorLider ? `mostrando ${topPorLider} de ${lista.length}` : `${lista.length}`;
+    const filas = orden.map(t => `<tr>
+        <td>${escapeHtml(t.CodigoTicket)}</td>
+        <td class="num"><b>${t.DiasBacklog}</b></td>
+        <td>${String(t.FechaRegistro ?? '').slice(0, 10)}</td>
+        <td>${escapeHtml(t.Prioridad)}</td>
+        <td>${escapeHtml(t.Grupo)}</td>
+        <td>${escapeHtml(t.TecnicoSegundaLinea)}</td>
+        <td>${escapeHtml(t.Subestado)}</td>
+        <td>${escapeHtml(String(t.Titulo ?? '').slice(0, 70))}</td>
+      </tr>`).join('');
+    return `<div class="grupo-lider" style="color:${colorLider(lider)}">
+        <span class="swatch" style="background:${colorLider(lider)}"></span>${escapeHtml(lider)}
+        <span class="conteo">${sufijo}</span></div>
+      <table><thead><tr><th>Ticket</th><th class="num">Dias</th><th>Registro</th><th>Prioridad</th>
+        <th>Grupo</th><th>Tecnico</th><th>Subestado</th><th>Titulo</th></tr></thead>
+      <tbody>${filas}</tbody></table>`;
+  }).join('');
+}
+
+// ======================================================================= KPIs
+function renderKpis(k, pctFueraSla) {
+  const claseSla = pctFueraSla <= 5 ? 'ok' : (pctFueraSla <= 15 ? 'warn' : 'bad');
+  const tarjetas = [
+    ['Backlog', k.BacklogTotal ?? 0, ''],
+    ['Criticos', k.Criticos ?? 0, 'bad'],
+    ['Altos', k.Altos ?? 0, 'warn'],
+    ['+30 dias', k.Mayor30Dias ?? 0, ''],
+    ['Reasignados', k.Reasignados ?? 0, ''],
+    ['Reabiertos', k.Reabiertos ?? 0, ''],
+    ['% Fuera SLA', `${pctFueraSla}%`, claseSla],
+  ];
+  document.getElementById('kpis').innerHTML = tarjetas.map(([etiqueta, valor, clase]) =>
+    `<div class="kpi-card ${clase}"><div class="valor">${valor}</div><div class="etiqueta">${etiqueta}</div></div>`
+  ).join('');
+}
+
+// =============================================================== Orquestacion
+function sumaPor(filas, campoClave, campoValor) {
+  const m = new Map();
+  for (const f of filas) m.set(f[campoClave], (m.get(f[campoClave]) ?? 0) + f[campoValor]);
+  return m;
+}
+
+async function cargarCatalogos() {
+  const c = await obtenerJSON('backlog_catalogos.ashx');
+  const llenar = (id, valores) => {
+    document.getElementById(id).innerHTML =
+      valores.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
+  };
+  llenar('f-c1', c.c1 ?? []);
+  llenar('f-grupos', c.grupos ?? []);
+  llenar('f-lideres', c.lideres ?? []);
+
+  // Las fechas vienen de la mas reciente a la mas vieja: la primera queda
+  // seleccionada, que es el corte con el que abre el tablero.
+  const fechas = (c.fechas ?? []).map(f => String(f).slice(0, 10));
+  document.getElementById('f-corte').innerHTML =
+    fechas.map(f => `<option value="${f}">${f}</option>`).join('');
+
+  const aviso = document.getElementById('aviso-historico');
+  if (!fechas.length) {
+    aviso.innerHTML = '<div class="aviso">No hay ningun corte guardado en <b>dbo.CorreoBacklogSnapshot</b>. '
+      + 'Corre <b>usp_CorreoBacklog_Backfill</b> y el correo diario para que se llene.</div>';
+  } else if (fechas.length < 2) {
+    aviso.innerHTML = '<div class="aviso">Solo hay un corte guardado, asi que las graficas de tendencia van a salir vacias. '
+      + 'Corre <b>usp_CorreoBacklog_Backfill</b> para llenar el historico hacia atras.</div>';
+  } else {
+    aviso.innerHTML = '';
+  }
+}
+
+async function cargarTodo() {
+  const estado = document.getElementById('estado-carga');
+  estado.textContent = 'Cargando...';
+  try {
+    const p = paramsFiltros();
+    const qs = p.toString();
+    const qsHist = new URLSearchParams(p);
+    qsHist.set('dias', document.getElementById('f-dias').value);
+    qsHist.set('granularidad', document.getElementById('f-granularidad').value);
+
+    const [resumen, historico, antiguos] = await Promise.all([
+      obtenerJSON(`backlog_resumen.ashx?${qs}`),
+      obtenerJSON(`backlog_historico.ashx?${qsHist.toString()}`),
+      obtenerJSON(`backlog_antiguos.ashx?${qs}`),
+    ]);
+
+    // El orden de lideres se fija UNA vez, con el corte actual, y de ahi
+    // salen los colores de las tres vistas (tendencia, apilada y tablas).
+    const totalPorLider = sumaPor(resumen.prioridad ?? [], 'Lider', 'Total');
+    ordenLideres = [...totalPorLider.entries()].sort((a, b) => b[1] - a[1]).map(e => e[0]);
+
+    // % Fuera SLA: mismo calculo que el correo, sobre el result set de SLA.
+    const porSla = sumaPor(resumen.sla ?? [], 'EstadoSLA', 'Tickets');
+    const totalSla = [...porSla.values()].reduce((a, b) => a + b, 0);
+    const fueraSla = porSla.get('Fuera SLA') ?? 0;
+    const pctFueraSla = totalSla > 0 ? Math.round(1000 * fueraSla / totalSla) / 10 : 0;
+
+    renderKpis(resumen.kpis ?? {}, pctFueraSla);
+
+    // Variacion contra el corte anterior: los dos ultimos puntos de la serie
+    // ya filtrada, en vez de usp_CorreoBacklog_Comparativa -que ignora los
+    // filtros y daria un delta que no cuadra con lo que se ve-.
+    const serie = historico.total ?? [];
+    const linea = document.getElementById('tendencia-linea');
+    if (serie.length >= 2) {
+      const actual = serie[serie.length - 1].TicketsBacklog;
+      const previo = serie[serie.length - 2].TicketsBacklog;
+      const dif = actual - previo;
+      const clase = dif > 0 ? 'sube' : (dif < 0 ? 'baja' : 'igual');
+      const flecha = dif > 0 ? '↑' : (dif < 0 ? '↓' : '→');
+      linea.innerHTML = `Backlog total: <b>${actual}</b> `
+        + `<span class="delta ${clase}">${flecha} ${Math.abs(dif)}</span> `
+        + `vs. el periodo anterior (${String(serie[serie.length - 2].Periodo).slice(0, 10)}: ${previo})`;
+    } else if (serie.length === 1) {
+      linea.innerHTML = `Backlog total: <b>${serie[0].TicketsBacklog}</b> (sin periodo anterior para comparar todavia)`;
+    } else {
+      linea.textContent = '';
+    }
+
+    renderTendenciaTotal(serie);
+    renderTendenciaLider(historico.porLider ?? []);
+
+    const porLider = [...totalPorLider.entries()].sort((a, b) => b[1] - a[1]);
+    renderBarras('chart-lider', porLider.map(e => e[0]), porLider.map(e => e[1]),
+      porLider.map(e => colorLider(e[0])));
+
+    const k = resumen.kpis ?? {};
+    const prioridades = [['Critica', k.Criticos ?? 0], ['Alta', k.Altos ?? 0],
+                         ['Media', k.Medios ?? 0], ['Baja', k.Bajos ?? 0]];
+    renderBarras('chart-prioridad', prioridades.map(e => e[0]), prioridades.map(e => e[1]),
+      prioridades.map(e => COLOR_PRIORIDAD[e[0]]));
+
+    const matriz = construirMatrizAging(resumen.aging ?? []);
+    if (matriz) renderAgingApilado(matriz);
+    renderTablaAging(matriz);
+
+    renderAntiguos(antiguos);
+
+    estado.textContent = `Actualizado ${new Date().toLocaleTimeString('es-MX')}`;
+  } catch (err) {
+    estado.textContent = `Error al cargar datos: ${err.message}`;
+    estado.title = err.message;
+    console.error(err);
+  }
+}
+
+document.getElementById('btn-aplicar').addEventListener('click', cargarTodo);
+document.getElementById('btn-limpiar').addEventListener('click', () => {
+  for (const id of ['f-c1', 'f-grupos', 'f-lideres']) {
+    Array.from(document.getElementById(id).options).forEach(o => { o.selected = false; });
+  }
+  document.getElementById('f-dias').value = '30';
+  document.getElementById('f-granularidad').value = 'Dia';
+  cargarTodo();
+});
+// Cambiar el corte o la ventana recarga de inmediato: son de un solo clic y
+// esperar a "Aplicar filtros" se siente roto.
+for (const id of ['f-corte', 'f-dias', 'f-granularidad']) {
+  document.getElementById(id).addEventListener('change', cargarTodo);
+}
+
+(async function inicio() {
+  try {
+    await cargarCatalogos();
+  } catch (err) {
+    document.getElementById('estado-carga').textContent = `Error al cargar catalogos: ${err.message}`;
+    console.error(err);
+    return;
+  }
+  await cargarTodo();
+})();
+</script>
+</body>
+</html>

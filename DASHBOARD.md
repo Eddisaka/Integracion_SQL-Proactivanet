@@ -20,8 +20,24 @@ desde SQL Server. Corre **100% en IIS con ASP.NET; no usa Python**.
   en el servidor**; sin ese archivo el sitio carga pero ningun dato aparece
   (ver "Solucion de problemas"). `Web.config` esta en `.gitignore`, no se
   sube con credenciales.
-- **`dashboard.html`** — el tablero: filtros, tarjetas KPI, 5 graficos
-  (Chart.js via CDN) y una tabla de detalle.
+- **`dashboard.html`** — pestaña **SLA y productividad**: filtros, tarjetas
+  KPI, 5 graficos (Chart.js via CDN) y una tabla de detalle.
+- **`backlog.html`** + **`backlog_*.ashx`** — pestaña **Backlog**, con la
+  misma estructura que el correo diario (ver `CORREO_BACKLOG.md`): KPIs,
+  tendencia total y por lider, backlog por lider y por prioridad,
+  antiguedad apilada por lider con su tabla resumen, y el listado de
+  tickets con mas de 4 meses. Lee de `dbo.CorreoBacklogSnapshot` a traves
+  de los procedimientos `usp_CorreoBacklog_*`.
+
+### Por que son dos paginas y no pestañas con JavaScript
+
+Cada tablero necesita filtros distintos —el de SLA va por rango de fechas,
+grupos y tecnicos; el de Backlog por fecha de corte, C1, grupo y lider—, asi
+que alternarlos dentro de un mismo archivo obligaria a esconder y mostrar dos
+barras de filtros y a duplicar la logica de carga. Separados, cada pagina
+queda con lo suyo y ademas el tablero de Backlog tiene **URL propia** para
+compartirla directo con Direccion. Visualmente igual se ven como pestañas:
+la barra del encabezado esta en las dos paginas y marca la activa.
 
 > **Nota historica:** existio un `dashboard_api.py` (API en Flask) para
 > probar el tablero en local sin IIS. Se elimino: el servidor destino no
@@ -33,7 +49,10 @@ desde SQL Server. Corre **100% en IIS con ASP.NET; no usa Python**.
 ```powershell
 # Ejecutar en SSMS o sqlcmd, sobre Tickets_Proactivanet
 # (requiere que ya exista dbo.Tickets con datos, del ETL)
-sqlcmd -S AZAUDITPRECIOS -d Tickets_Proactivanet -i 04_dashboard_sla.sql
+sqlcmd -S AZVMBDCENTRALQA -d Tickets_Proactivanet -i 04_dashboard_sla.sql
+
+# Para la pestaña de Backlog (tambien la usa el correo diario)
+sqlcmd -S AZVMBDCENTRALQA -d Tickets_Proactivanet -i 07_correo_backlog.sql
 ```
 
 Despues, desplegar en IIS (seccion mas abajo).
@@ -72,6 +91,8 @@ confirme si no tienes permisos para activarla tu mismo.
 - `dashboard.html`
 - `catalogos.ashx`, `kpis.ashx`, `tendencia.ashx`, `productividad.ashx`,
   `distribucion.ashx`, `detalle.ashx`, `diagnostico.ashx`
+- `backlog.html` y `backlog_catalogos.ashx`, `backlog_resumen.ashx`,
+  `backlog_historico.ashx`, `backlog_antiguos.ashx` (pestaña de Backlog)
 - la carpeta `App_Code/` completa (con `DashboardDb.cs` adentro)
 - `Web.config.ejemplo` → renombralo a `Web.config` **en el servidor** y
   ajusta la cadena de conexion (servidor, base, autenticacion).

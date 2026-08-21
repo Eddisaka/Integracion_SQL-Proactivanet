@@ -117,6 +117,48 @@ public static class DashboardDb
     }
 }
 
+// Utilidades de los handlers del tablero de Backlog.
+public static class BacklogUtil
+{
+    // Saca una sola columna de uno de los result sets como lista plana.
+    // Los catalogos devuelven 4 result sets de una columna cada uno; asi el
+    // JSON queda como ["Grupo A","Grupo B"] en vez de [{"Grupo":"Grupo A"}].
+    public static List<object> Columna(
+        List<List<Dictionary<string, object>>> resultados, int indice, string columna)
+    {
+        var salida = new List<object>();
+        if (resultados == null || indice >= resultados.Count) return salida;
+
+        foreach (var fila in resultados[indice])
+        {
+            object valor;
+            if (fila.TryGetValue(columna, out valor) && valor != null)
+                salida.Add(valor);
+        }
+        return salida;
+    }
+
+    // Los filtros del tablero viajan como listas separadas por coma
+    // (multiselect). Vacio = sin filtro, que es NULL para los procedimientos.
+    public static Dictionary<string, object> Filtros(HttpRequest request)
+    {
+        return new Dictionary<string, object>
+        {
+            { "C1",      DashboardParams.ListaONulo(request, "c1") },
+            { "Grupos",  DashboardParams.ListaONulo(request, "grupos") },
+            { "Lideres", DashboardParams.ListaONulo(request, "lideres") },
+        };
+    }
+
+    // Fecha de corte del query string. Vacia = NULL, y el procedimiento usa
+    // el corte mas reciente disponible.
+    public static object FechaCorte(HttpRequest request)
+    {
+        var valor = request.QueryString["fecha_corte"];
+        return string.IsNullOrWhiteSpace(valor) ? null : (object)valor;
+    }
+}
+
 // Envoltura comun de los handlers .ashx: serializa el resultado a JSON y,
 // si algo truena, devuelve el error TAMBIEN como JSON. Antes cualquier
 // excepcion salia como la pagina de error de ASP.NET (HTML); el dashboard

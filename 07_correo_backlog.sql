@@ -149,6 +149,27 @@ END;
 GO
 
 /* =====================================================================================
+   3b) Parte una lista separada por comas ('Laura,Jesus') en filas, para los
+       filtros multiselect del tablero. Existe una equivalente en
+       04_dashboard_sla.sql (fn_Dash_SplitList); se hace una propia aqui para
+       que 07 no dependa de que 04 este desplegado.
+
+       Convencion en todos los procedimientos: NULL o cadena vacia = sin
+       filtro (todos). Asi el correo, que llama sin estos parametros, sigue
+       comportandose exactamente igual que antes.
+   ===================================================================================== */
+CREATE OR ALTER FUNCTION dbo.fn_CorreoBacklog_SplitList (@Lista NVARCHAR(MAX))
+RETURNS TABLE
+AS
+RETURN
+(
+    SELECT Valor = LTRIM(RTRIM(value))
+    FROM STRING_SPLIT(ISNULL(@Lista, N''), N',')
+    WHERE LTRIM(RTRIM(value)) <> N''
+);
+GO
+
+/* =====================================================================================
    4) Corte del dia -de Daniela-, ahora calculando tambien C1. Sigue leyendo
       de dbo.vw_Backlog: esta es la fuente correcta para "hoy" (Estado y SLA
       vigentes en tiempo real). No sirve para fechas pasadas -ver el
@@ -230,10 +251,32 @@ GO
    5) Contenido del correo -de Daniela, sin cambios-.
    ===================================================================================== */
 CREATE OR ALTER PROCEDURE dbo.usp_CorreoBacklog_Principal
-    @FechaCorte DATE
+    -- NULL = el corte mas reciente, que es como lo abre el tablero. El correo
+    -- siempre la manda explicita, asi que para el no cambia nada.
+    @FechaCorte DATE = NULL,
+    -- Filtros del tablero. NULL/vacio = sin filtro, que es como lo llama el
+    -- correo: sigue devolviendo exactamente lo mismo que antes.
+    @C1     NVARCHAR(MAX) = NULL,
+    @Grupos NVARCHAR(MAX) = NULL,
+    @Lideres NVARCHAR(MAX) = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
+    DECLARE @F DATE = ISNULL(@FechaCorte, (SELECT MAX(FechaCorte) FROM dbo.CorreoBacklogSnapshot));
+
+    -- Se filtra una sola vez a una tabla temporal y los 6 result sets salen
+    -- de ahi: evita repetir las mismas tres condiciones seis veces y que se
+    -- desincronicen al editarlas.
+    IF OBJECT_ID('tempdb..#Corte') IS NOT NULL DROP TABLE #Corte;
+
+    SELECT CodigoTicket, Lider, Grupo, C1, Prioridad, Aging, AgingSort,
+           EstadoSLA, DiasBacklog, ReasignacionesGrupo, IntentosSolucion
+    INTO #Corte
+    FROM dbo.CorreoBacklogSnapshot
+    WHERE FechaCorte = @F
+      AND (NULLIF(LTRIM(RTRIM(@C1)), N'')      IS NULL OR C1    IN (SELECT Valor FROM dbo.fn_CorreoBacklog_SplitList(@C1)))
+      AND (NULLIF(LTRIM(RTRIM(@Grupos)), N'')  IS NULL OR Grupo IN (SELECT Valor FROM dbo.fn_CorreoBacklog_SplitList(@Grupos)))
+      AND (NULLIF(LTRIM(RTRIM(@Lideres)), N'') IS NULL OR Lider IN (SELECT Valor FROM dbo.fn_CorreoBacklog_SplitList(@Lideres)));
 
     /* Result set 1: KPI generales */
     SELECT
@@ -245,7 +288,7 @@ BEGIN
         Mayor30Dias = SUM(CASE WHEN DiasBacklog > 30 THEN 1 ELSE 0 END),
         Reasignados = SUM(CASE WHEN ISNULL(ReasignacionesGrupo,0) > 1 THEN 1 ELSE 0 END),
         Reabiertos = SUM(CASE WHEN ISNULL(IntentosSolucion,0) > 1 THEN 1 ELSE 0 END)
-    FROM dbo.CorreoBacklogSnapshot WHERE FechaCorte = @FechaCorte;
+    FROM #Corte;
 
     /* Result set 2: prioridad por lider y grupo */
     SELECT
@@ -255,38 +298,37 @@ BEGIN
         Media = SUM(CASE WHEN Prioridad = N'Media' THEN 1 ELSE 0 END),
         Baja = SUM(CASE WHEN Prioridad = N'Baja' THEN 1 ELSE 0 END),
         Total = COUNT(*)
-    FROM dbo.CorreoBacklogSnapshot
-    WHERE FechaCorte = @FechaCorte
+    FROM #Corte
     GROUP BY Lider, Grupo
     ORDER BY Lider, COUNT(*) DESC, Grupo;
 
     /* Result set 3: antiguedad por lider y grupo */
     SELECT Lider, Grupo, Aging, AgingSort, Tickets = COUNT(*)
-    FROM dbo.CorreoBacklogSnapshot
-    WHERE FechaCorte = @FechaCorte
+    FROM #Corte
     GROUP BY Lider, Grupo, Aging, AgingSort
     ORDER BY Lider, Grupo, AgingSort;
 
     /* Result set 4: reasignaciones */
     SELECT Lider, Grupo, NumeroReasignaciones = ReasignacionesGrupo, Tickets = COUNT(*)
-    FROM dbo.CorreoBacklogSnapshot
-    WHERE FechaCorte = @FechaCorte AND ISNULL(ReasignacionesGrupo,0) > 1
+    FROM #Corte
+    WHERE ISNULL(ReasignacionesGrupo,0) > 1
     GROUP BY Lider, Grupo, ReasignacionesGrupo
     ORDER BY Lider, Grupo, ReasignacionesGrupo;
 
     /* Result set 5: reabiertos */
     SELECT Lider, Grupo, IntentosSolucion, Tickets = COUNT(*)
-    FROM dbo.CorreoBacklogSnapshot
-    WHERE FechaCorte = @FechaCorte AND ISNULL(IntentosSolucion,0) > 1
+    FROM #Corte
+    WHERE ISNULL(IntentosSolucion,0) > 1
     GROUP BY Lider, Grupo, IntentosSolucion
     ORDER BY Lider, Grupo, IntentosSolucion;
 
     /* Result set 6: SLA con la clasificacion vigente */
     SELECT Lider, Grupo, EstadoSLA, Tickets = COUNT(*)
-    FROM dbo.CorreoBacklogSnapshot
-    WHERE FechaCorte = @FechaCorte
+    FROM #Corte
     GROUP BY Lider, Grupo, EstadoSLA
     ORDER BY Lider, Grupo, EstadoSLA;
+
+    DROP TABLE #Corte;
 END;
 GO
 
@@ -342,10 +384,18 @@ END;
 GO
 
 CREATE OR ALTER PROCEDURE dbo.usp_CorreoBacklog_Datos
-    @FechaCorte DATE
+    @FechaCorte DATE = NULL,   -- NULL = el corte mas reciente
+    @C1     NVARCHAR(MAX) = NULL,
+    @Grupos NVARCHAR(MAX) = NULL,
+    @Lideres NVARCHAR(MAX) = NULL,
+    -- Para el tablero: solo tickets con mas de N dias en backlog. NULL = todos,
+    -- que es como lo llama el correo para armar la hoja Datos del Excel.
+    @DiasMinimo INT = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
+    DECLARE @F DATE = ISNULL(@FechaCorte, (SELECT MAX(FechaCorte) FROM dbo.CorreoBacklogSnapshot));
+
     SELECT
         FechaCorte, EstadoSLA, DiasBacklog, Aging, FechaRegistro,
         FechaEstimadaResolucion, FechaEstimadaOlaUc, Prioridad, SLA,
@@ -354,7 +404,11 @@ BEGIN
         FechaUltimaModificacion, NotificadoPor, Tipo, Caducada,
         IntentosSolucion, ReasignacionesGrupo, AgingSort
     FROM dbo.CorreoBacklogSnapshot
-    WHERE FechaCorte=@FechaCorte
+    WHERE FechaCorte = @F
+      AND (@DiasMinimo IS NULL OR DiasBacklog > @DiasMinimo)
+      AND (NULLIF(LTRIM(RTRIM(@C1)), N'')      IS NULL OR C1    IN (SELECT Valor FROM dbo.fn_CorreoBacklog_SplitList(@C1)))
+      AND (NULLIF(LTRIM(RTRIM(@Grupos)), N'')  IS NULL OR Grupo IN (SELECT Valor FROM dbo.fn_CorreoBacklog_SplitList(@Grupos)))
+      AND (NULLIF(LTRIM(RTRIM(@Lideres)), N'') IS NULL OR Lider IN (SELECT Valor FROM dbo.fn_CorreoBacklog_SplitList(@Lideres)))
     ORDER BY Lider, Grupo, AgingSort, FechaRegistro;
 END;
 GO
@@ -566,8 +620,12 @@ CREATE OR ALTER PROCEDURE dbo.usp_CorreoBacklog_Historico
     @FechaInicio  DATE,
     @FechaFin     DATE,
     @Granularidad NVARCHAR(10) = N'Dia',   -- 'Dia' | 'Semana' | 'Mes'
-    @C1           NVARCHAR(255) = NULL,
-    @Grupo        NVARCHAR(255) = NULL
+    -- Listas separadas por coma para empatar con los multiselect del tablero.
+    -- Antes eran valores sueltos; una lista de un solo elemento se comporta
+    -- igual, asi que las llamadas anteriores siguen funcionando.
+    @C1      NVARCHAR(MAX) = NULL,
+    @Grupos  NVARCHAR(MAX) = NULL,
+    @Lideres NVARCHAR(MAX) = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -582,8 +640,9 @@ BEGIN
     FROM dbo.CorreoBacklogSnapshot
     WHERE FechaCorte >= @FechaInicio
       AND FechaCorte <= @FechaFin
-      AND (@C1 IS NULL OR C1 = @C1)
-      AND (@Grupo IS NULL OR Grupo = @Grupo)
+      AND (NULLIF(LTRIM(RTRIM(@C1)), N'')      IS NULL OR C1    IN (SELECT Valor FROM dbo.fn_CorreoBacklog_SplitList(@C1)))
+      AND (NULLIF(LTRIM(RTRIM(@Grupos)), N'')  IS NULL OR Grupo IN (SELECT Valor FROM dbo.fn_CorreoBacklog_SplitList(@Grupos)))
+      AND (NULLIF(LTRIM(RTRIM(@Lideres)), N'') IS NULL OR Lider IN (SELECT Valor FROM dbo.fn_CorreoBacklog_SplitList(@Lideres)))
     GROUP BY CASE @Granularidad
             WHEN N'Semana' THEN DATEADD(DAY, (DATEDIFF(DAY, 0, FechaCorte) / 7) * 7, 0)
             WHEN N'Mes'    THEN DATEFROMPARTS(YEAR(FechaCorte), MONTH(FechaCorte), 1)
@@ -610,19 +669,35 @@ GO
 CREATE OR ALTER PROCEDURE dbo.usp_CorreoBacklog_HistoricoPorLider
     @FechaInicio DATE,
     @FechaFin    DATE,
-    @TopLideres  INT = 6
+    @TopLideres  INT = 6,
+    @C1      NVARCHAR(MAX) = NULL,
+    @Grupos  NVARCHAR(MAX) = NULL,
+    @Lideres NVARCHAR(MAX) = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
 
-    DECLARE @Ultima DATE =
-    (
-        SELECT MAX(FechaCorte)
-        FROM dbo.CorreoBacklogSnapshot
-        WHERE FechaCorte >= @FechaInicio AND FechaCorte <= @FechaFin
-    );
+    -- Se aplica el filtro una vez y de ahi salen tanto el Top como la serie:
+    -- si el Top se calculara sobre el total sin filtrar, al filtrar por un
+    -- C1 podrian salir lideres que en ese C1 no tienen ni un ticket.
+    IF OBJECT_ID('tempdb..#Rango') IS NOT NULL DROP TABLE #Rango;
 
-    IF @Ultima IS NULL RETURN;
+    SELECT FechaCorte, Lider
+    INTO #Rango
+    FROM dbo.CorreoBacklogSnapshot
+    WHERE FechaCorte >= @FechaInicio
+      AND FechaCorte <= @FechaFin
+      AND (NULLIF(LTRIM(RTRIM(@C1)), N'')      IS NULL OR C1    IN (SELECT Valor FROM dbo.fn_CorreoBacklog_SplitList(@C1)))
+      AND (NULLIF(LTRIM(RTRIM(@Grupos)), N'')  IS NULL OR Grupo IN (SELECT Valor FROM dbo.fn_CorreoBacklog_SplitList(@Grupos)))
+      AND (NULLIF(LTRIM(RTRIM(@Lideres)), N'') IS NULL OR Lider IN (SELECT Valor FROM dbo.fn_CorreoBacklog_SplitList(@Lideres)));
+
+    DECLARE @Ultima DATE = (SELECT MAX(FechaCorte) FROM #Rango);
+
+    IF @Ultima IS NULL
+    BEGIN
+        DROP TABLE #Rango;
+        RETURN;
+    END;
 
     -- Sin PRIMARY KEY a proposito: si algun renglon historico llegara con
     -- Lider NULL, un PK aqui tronaria el procedimiento completo.
@@ -630,7 +705,7 @@ BEGIN
 
     INSERT INTO @Top (Lider)
     SELECT TOP (@TopLideres) Lider
-    FROM dbo.CorreoBacklogSnapshot
+    FROM #Rango
     WHERE FechaCorte = @Ultima
     GROUP BY Lider
     ORDER BY COUNT_BIG(*) DESC;
@@ -639,12 +714,12 @@ BEGIN
         s.FechaCorte,
         Lider = CASE WHEN t.Lider IS NOT NULL THEN s.Lider ELSE N'Otros' END,
         Tickets = COUNT_BIG(*)
-    FROM dbo.CorreoBacklogSnapshot AS s
+    FROM #Rango AS s
     LEFT JOIN @Top AS t ON t.Lider = s.Lider
-    WHERE s.FechaCorte >= @FechaInicio
-      AND s.FechaCorte <= @FechaFin
     GROUP BY s.FechaCorte, CASE WHEN t.Lider IS NOT NULL THEN s.Lider ELSE N'Otros' END
     ORDER BY s.FechaCorte, 2;
+
+    DROP TABLE #Rango;
 END;
 GO
 
@@ -653,49 +728,63 @@ GO
       volumen por C1, por Grupo, por Prioridad y por Aging. 4 result sets.
    ===================================================================================== */
 CREATE OR ALTER PROCEDURE dbo.usp_CorreoBacklog_ResumenActual
-    @FechaCorte DATE = NULL
+    @FechaCorte DATE = NULL,
+    @C1      NVARCHAR(MAX) = NULL,
+    @Grupos  NVARCHAR(MAX) = NULL,
+    @Lideres NVARCHAR(MAX) = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
     DECLARE @F DATE = ISNULL(@FechaCorte, (SELECT MAX(FechaCorte) FROM dbo.CorreoBacklogSnapshot));
 
-    SELECT Dimension = N'C1', Valor = C1, Tickets = COUNT_BIG(*)
+    IF OBJECT_ID('tempdb..#Res') IS NOT NULL DROP TABLE #Res;
+
+    SELECT C1, Grupo, Lider, Prioridad, Aging, AgingSort
+    INTO #Res
     FROM dbo.CorreoBacklogSnapshot
     WHERE FechaCorte = @F
-    GROUP BY C1
-    ORDER BY Tickets DESC;
+      AND (NULLIF(LTRIM(RTRIM(@C1)), N'')      IS NULL OR C1    IN (SELECT Valor FROM dbo.fn_CorreoBacklog_SplitList(@C1)))
+      AND (NULLIF(LTRIM(RTRIM(@Grupos)), N'')  IS NULL OR Grupo IN (SELECT Valor FROM dbo.fn_CorreoBacklog_SplitList(@Grupos)))
+      AND (NULLIF(LTRIM(RTRIM(@Lideres)), N'') IS NULL OR Lider IN (SELECT Valor FROM dbo.fn_CorreoBacklog_SplitList(@Lideres)));
+
+    SELECT Dimension = N'C1', Valor = C1, Tickets = COUNT_BIG(*)
+    FROM #Res GROUP BY C1 ORDER BY Tickets DESC;
 
     SELECT Dimension = N'Grupo', Valor = Grupo, Tickets = COUNT_BIG(*)
-    FROM dbo.CorreoBacklogSnapshot
-    WHERE FechaCorte = @F
-    GROUP BY Grupo
-    ORDER BY Tickets DESC;
+    FROM #Res GROUP BY Grupo ORDER BY Tickets DESC;
 
     SELECT Dimension = N'Prioridad', Valor = Prioridad, Tickets = COUNT_BIG(*)
-    FROM dbo.CorreoBacklogSnapshot
-    WHERE FechaCorte = @F
-    GROUP BY Prioridad
-    ORDER BY Tickets DESC;
+    FROM #Res GROUP BY Prioridad ORDER BY Tickets DESC;
 
     SELECT Dimension = N'Aging', Valor = Aging, Tickets = COUNT_BIG(*)
-    FROM dbo.CorreoBacklogSnapshot
-    WHERE FechaCorte = @F
-    GROUP BY Aging, AgingSort
-    ORDER BY MIN(AgingSort);
+    FROM #Res GROUP BY Aging, AgingSort ORDER BY MIN(AgingSort);
+
+    -- Result set 5: por lider, que es como lo grafica el correo.
+    SELECT Dimension = N'Lider', Valor = Lider, Tickets = COUNT_BIG(*)
+    FROM #Res GROUP BY Lider ORDER BY Tickets DESC;
+
+    DROP TABLE #Res;
 END;
 GO
 
 /* =====================================================================================
-   9) Catalogos de C1, Grupo y Lider para poblar los filtros del tablero.
+   9) Catalogos para poblar los filtros del tablero: C1, Grupo, Lider y las
+      fechas de corte que existen en el snapshot -el tablero abre en la mas
+      reciente y permite retroceder a cualquiera de las anteriores-.
    ===================================================================================== */
 CREATE OR ALTER PROCEDURE dbo.usp_CorreoBacklog_Catalogos
 AS
 BEGIN
     SET NOCOUNT ON;
 
-    SELECT DISTINCT C1 FROM dbo.CorreoBacklogSnapshot ORDER BY C1;
-    SELECT DISTINCT Grupo FROM dbo.CorreoBacklogSnapshot ORDER BY Grupo;
-    SELECT DISTINCT Lider FROM dbo.CorreoBacklogSnapshot ORDER BY Lider;
+    SELECT DISTINCT C1 FROM dbo.CorreoBacklogSnapshot WHERE C1 IS NOT NULL ORDER BY C1;
+    SELECT DISTINCT Grupo FROM dbo.CorreoBacklogSnapshot WHERE Grupo IS NOT NULL ORDER BY Grupo;
+    SELECT DISTINCT Lider FROM dbo.CorreoBacklogSnapshot WHERE Lider IS NOT NULL ORDER BY Lider;
+
+    -- De la mas reciente hacia atras: la primera fila es la que abre el tablero.
+    SELECT DISTINCT FechaCorte
+    FROM dbo.CorreoBacklogSnapshot
+    ORDER BY FechaCorte DESC;
 END;
 GO
 
@@ -714,6 +803,10 @@ GRANT EXECUTE ON dbo.usp_CorreoBacklog_Historico TO [PROACTIVANETAD];
 GRANT EXECUTE ON dbo.usp_CorreoBacklog_HistoricoPorLider TO [PROACTIVANETAD];
 GRANT EXECUTE ON dbo.usp_CorreoBacklog_ResumenActual TO [PROACTIVANETAD];
 GRANT EXECUTE ON dbo.usp_CorreoBacklog_Catalogos TO [PROACTIVANETAD];
+
+-- O de una vez, que ademas cubre cualquier procedimiento que se agregue
+-- despues (es lo que ya se aplico en el servidor para el tablero web):
+-- GRANT EXECUTE ON SCHEMA::dbo TO [PROACTIVANETAD];
 */
 
 /* =====================================================================================
