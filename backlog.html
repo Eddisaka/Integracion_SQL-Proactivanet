@@ -522,7 +522,7 @@ function limpiarDescripcion(texto) {
     .replace(/<[^>]*>/g, ' ')
     .replace(/&nbsp;/g, ' ').replace(/&quot;/g, '"').replace(/&#39;/g, "'")
     .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')
-    .replace(/[ --]/g, ' ')
+    .replace(/[\x00-\x1F\x7F-\x9F]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
