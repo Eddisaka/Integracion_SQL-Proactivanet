@@ -384,45 +384,112 @@ el correo -no hace falta correr nada aparte cada vez que
 1. Correr `07_correo_backlog.sql` y el backfill inicial (secciones 2-3).
 2. Probar `Enviar_CorreoBacklog_direccion.ps1` en modo de prueba y pasar a
    produccion (seccion 4.1).
-3. Conectar `usp_CorreoBacklog_Historico`/`_ResumenActual`/`_Catalogos` al
-   frontend del dashboard (`.ashx`/`dashboard_api.py`, igual que el resto)
-   — pendiente de que habiliten la comunicacion App↔BD en el servidor
-   nuevo. Mientras tanto, se puede seguir probando estos procedimientos
-   directo en SSMS.
+3. Correr `08_ids_proactivanet.sql` y la carga inicial de
+   `sincronizar_ids.py --completo` para que el tablero enlace cada ticket a
+   Proactivanet (seccion 8), y agregar el script al Task Scheduler despues
+   del ETL diario.
 
-## 8) Pendiente: enlazar cada ticket a Proactivanet
+## 8) Enlace de cada ticket a Proactivanet (GUID)
 
-En el tablero web seria util que el codigo del ticket fuera un enlace directo
-a su formulario de edicion en Proactivanet:
+En el tablero web (`backlog.html`), el codigo de los tickets de la tabla
+"Tickets con mas de N meses en backlog" es un enlace directo al formulario de
+edicion en Proactivanet:
 
 ```text
 https://soriana.proactivanet.com/proactivanet/servicedesk/incidents/formIncidents/formIncidents.paw?id=<GUID>
 ```
 
-**El bloqueo:** esa URL identifica el ticket por su **GUID interno**, y ese
-dato no existe en nuestra base. El ETL no lee `/api/Incidents`, lee un reporte
+### El problema y como se resolvio
+
+Esa URL identifica el ticket por su **GUID interno**, y ese dato no venia en
+nuestra base: el ETL no lee `/api/Incidents`, lee un reporte
 (`/api/table/data`) que Proactivanet construyo del lado de ellos con columnas
 fijas —fue la salida cuando no nos dieron acceso a su base de datos— y ese
-reporte no incluye el `Id`. Pedirles que lo agreguen no es viable en tiempo
+reporte no incluye el `Id`. Pedirles que lo agreguen no era viable en tiempo
 razonable.
 
-**Lo que si esta disponible:** la API expone el GUID buscando por codigo.
-`GET /api/Incidents` acepta `Code` como parametro y la respuesta trae `Code`
-e `Id` (ver `API.html`). Ademas soporta `$fields`, `$limit` y `$offset`, asi
-que se pueden traer los pares (Code, Id) en bloque y paginados, no de uno en
-uno.
+Lo que si esta disponible es la API: `GET /api/Incidents` devuelve `Code` e
+`Id`, acepta `Code` como filtro y soporta `$fields`, `$limit` y `$offset`
+(ver `API.html`), asi que los pares (Code, Id) se pueden traer en bloque y
+paginados, no de uno en uno.
 
-**Opciones, si se retoma:**
+La solucion es un script, **`sincronizar_ids.py`**, que corre en el **mismo
+equipo que el ETL** y guarda esos pares en una tabla de mapeo. El tablero solo
+lee la tabla. Asi el token sigue viviendo donde ya vivia
+(`PVNET_API_TOKEN`, en el equipo del ETL) y el servidor web no necesita salida
+a `soriana.proactivanet.com`: es la misma disciplina que se ha seguido con el
+resto del proyecto.
 
-1. **Sincronizar los GUID desde el equipo del ETL** (recomendada). Un script
-   que corre despues del ETL, trae los pares (Code, Id) de la API y los
-   guarda en una tabla de mapeo; el tablero solo lee esa tabla. El token
-   sigue viviendo donde ya vive (`PVNET_API_TOKEN` en el equipo del ETL), el
-   servidor web no necesita salida a Proactivanet, y el enlace es instantaneo.
-2. **Resolver el GUID al hacer clic**, con un handler que consulte la API y
-   redirija. No toca base de datos ni ETL, pero **obliga a poner el token en
-   el servidor web** y a abrir salida de ese servidor hacia
-   `soriana.proactivanet.com`, ademas de depender de la API en cada clic.
+### El GUID no cambia — por eso el historico queda cubierto
 
-La 1 evita meter el token en un servidor mas, que es justo la disciplina que
-se ha seguido hasta ahora.
+El GUID es un atributo **fijo** del ticket: `INC 2025-561735` tiene el mismo
+`Id` hoy que hace un año. No es un dato con fecha, como si lo era el snapshot
+diario. Por eso basta resolverlo **una vez por codigo**: en cuanto el codigo
+esta en el mapeo, **todos** los cortes donde aparezca ese ticket —incluidos
+los de enero— muestran el enlace. No hay nada que reconstruir dia por dia, y
+no hay que volver a correr el backfill.
+
+### Objetos (`08_ids_proactivanet.sql`)
+
+| Objeto | Para que |
+|---|---|
+| `dbo.TicketProactivanetId` | La tabla de mapeo: `CodigoTicket` -> `IdProactivanet`. |
+| `usp_TicketIds_PendientesDeResolver` | Que codigos del snapshot todavia no tienen GUID. `@SoloUltimoCorte = 1` (default) para la corrida diaria, `0` para la carga inicial. |
+| `usp_TicketIds_Registrar` | UPSERT de un lote en JSON, desde el script. |
+| `usp_TicketIds_Obtener` | Consulta el GUID de una lista de codigos. Lo usa `backlog_antiguos.ashx`. |
+| `vw_TicketIds_Cobertura` | Cuantos tickets de cada corte ya tienen enlace. |
+
+Se hizo en una tabla aparte, y no como columna nueva de
+`dbo.CorreoBacklogSnapshot`, para no cambiar la estructura del snapshot ni
+tocar `usp_CorreoBacklog_Datos`, que es el que alimenta el **correo diario**.
+**El correo no cambia en nada**: ni el HTML, ni las graficas, ni las columnas
+del Excel adjunto.
+
+### Puesta en marcha
+
+```powershell
+# 1) En SSMS, una vez
+#    (ejecutar 08_ids_proactivanet.sql en Tickets_Proactivanet)
+
+# 2) Carga inicial, desde el equipo del ETL. Recorre todos los cortes
+#    guardados; tarda, pero es una sola vez.
+cd C:\ruta\del\etl
+python sincronizar_ids.py --config config.json --completo
+
+# 3) Revisar cobertura
+#    SELECT TOP (10) * FROM dbo.vw_TicketIds_Cobertura ORDER BY FechaCorte DESC;
+```
+
+Despues, en el Task Scheduler, **agregar el script justo despues del ETL
+diario** (antes o despues del corte del correo, da igual):
+
+```powershell
+python sincronizar_ids.py --config config.json
+```
+
+En la corrida diaria solo quedan pendientes los tickets nuevos, que son pocos:
+el script los resuelve con una peticion por codigo y termina en segundos.
+
+### Como escoge la estrategia
+
+| Modo | Que hace | Cuando |
+|---|---|---|
+| `uno` | Una peticion por codigo (`?Code=INC ...`). | Pocos pendientes (la corrida diaria). |
+| `barrido` | Pagina `/api/Incidents` con `$fields=Code&$limit=1000&$offset=...` y se queda con los codigos que le interesan. | Miles de pendientes (la carga inicial). |
+| `auto` (default) | `uno` si faltan <= 200 codigos, `barrido` si son mas. | Lo normal. |
+
+El barrido se acota ademas con `CreationDate>=` usando la fecha de registro
+mas antigua de lo que falta, para no recorrer todo el historico de incidencias
+de Proactivanet. Si el API rechazara ese filtro, `--sin-filtro-fecha` lo quita.
+
+Opciones utiles: `--simulacion` (consulta el API pero no escribe en SQL),
+`--top N` (limita la corrida), `--url-incidentes` (si la URL del API no se
+puede deducir del config). El log queda en `logs/sincronizar_ids.log`.
+
+### Si un ticket no tiene GUID
+
+No pasa nada: el endpoint devuelve `IdProactivanet = null` y el codigo se
+pinta como texto plano, sin enlace. Lo mismo si `08_ids_proactivanet.sql`
+todavia no se ejecuto en ese ambiente — el handler atrapa el error y sirve la
+tabla sin enlaces. Los codigos que quedaron sin resolver se vuelven a intentar
+en la siguiente corrida, porque siguen sin estar en el mapeo.

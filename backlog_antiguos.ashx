@@ -1,7 +1,9 @@
 <%@ WebHandler Language="C#" Class="BacklogAntiguos" %>
 
+using System;
 using System.Collections.Generic;
 using System.Web;
+using System.Web.Script.Serialization;
 
 // Listado de tickets viejos, igual que el del final del correo: por defecto
 // mas de 120 dias en backlog (donde arranca el bucket '+4 meses'). El filtro
@@ -34,6 +36,7 @@ public class BacklogAntiguos : IHttpHandler
             };
 
             var salida = new List<Dictionary<string, object>>();
+            var codigos = new List<string>();
             foreach (var fila in filas)
             {
                 var reducida = new Dictionary<string, object>();
@@ -43,7 +46,18 @@ public class BacklogAntiguos : IHttpHandler
                     reducida[c] = fila.TryGetValue(c, out valor) ? valor : null;
                 }
                 salida.Add(reducida);
+
+                if (reducida["CodigoTicket"] != null)
+                    codigos.Add(reducida["CodigoTicket"].ToString());
             }
+
+            // GUID interno de Proactivanet, para enlazar cada ticket a su
+            // formulario de edicion. Va en una consulta aparte (y no en el
+            // proc de datos, que lo comparte el correo diario) contra la tabla
+            // que llena sincronizar_ids.py. Si el mapeo aun no tiene el ticket
+            // -o si nunca se ejecuto el script- simplemente no hay enlace: el
+            // codigo se pinta como texto, sin error.
+            AgregarIds(salida, codigos);
 
             return new Dictionary<string, object>
             {
@@ -51,6 +65,44 @@ public class BacklogAntiguos : IHttpHandler
                 { "tickets", salida },
             };
         });
+    }
+
+    private static void AgregarIds(List<Dictionary<string, object>> tickets, List<string> codigos)
+    {
+        foreach (var t in tickets)
+            t["IdProactivanet"] = null;
+
+        if (codigos.Count == 0)
+            return;
+
+        var mapa = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        try
+        {
+            var lista = new Dictionary<string, object>();
+            lista["Codigos"] = new JavaScriptSerializer().Serialize(codigos);
+
+            foreach (var fila in DashboardDb.Ejecutar("dbo.usp_TicketIds_Obtener", lista))
+            {
+                if (fila["CodigoTicket"] == null || fila["IdProactivanet"] == null)
+                    continue;
+                mapa[fila["CodigoTicket"].ToString()] = fila["IdProactivanet"].ToString();
+            }
+        }
+        catch (Exception)
+        {
+            // El enlace es un extra. Si 08_ids_proactivanet.sql todavia no se
+            // ejecuta en este ambiente, la tabla vale mas la pena mostrarla
+            // sin enlaces que no mostrarla.
+            return;
+        }
+
+        foreach (var t in tickets)
+        {
+            if (t["CodigoTicket"] == null) continue;
+            string id;
+            if (mapa.TryGetValue(t["CodigoTicket"].ToString(), out id))
+                t["IdProactivanet"] = id;
+        }
     }
 
     public bool IsReusable { get { return false; } }

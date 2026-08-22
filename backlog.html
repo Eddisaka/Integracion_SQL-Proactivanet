@@ -218,6 +218,11 @@
   /* Señal visual de que la celda tiene tooltip; si no, nadie descubre que
      pasando el raton aparece la descripcion. */
   .con-hint { cursor: help; border-bottom: 1px dotted var(--text-muted); }
+  /* Codigo de ticket que si tiene GUID en el mapeo: abre el formulario de
+     edicion en Proactivanet. Los que no lo tienen se quedan como texto. */
+  .enlace-ticket { color: inherit; text-decoration: none; font-weight: 600; }
+  .enlace-ticket:hover { text-decoration: underline; }
+  .enlace-ticket::after { content: '\2197'; font-size: 0.72em; margin-left: 3px; opacity: 0.55; }
 </style>
 </head>
 <body>
@@ -527,6 +532,23 @@ function limpiarDescripcion(texto) {
     .trim();
 }
 
+// Formulario de edicion de la incidencia en Proactivanet. Pide el Id interno
+// (GUID), no el codigo: ese Id lo resuelve sincronizar_ids.py contra el API y
+// lo guarda en dbo.TicketProactivanetId. Si el ticket todavia no esta en ese
+// mapeo, el endpoint manda IdProactivanet = null y el codigo se pinta como
+// texto plano, sin enlace roto.
+const URL_TICKET_PROACTIVANET =
+  'https://soriana.proactivanet.com/proactivanet/servicedesk/incidents/formIncidents/formIncidents.paw?id=';
+
+function celdaCodigo(t) {
+  const codigo = escapeHtml(t.CodigoTicket);
+  if (!t.IdProactivanet) return codigo;
+  const href = URL_TICKET_PROACTIVANET + encodeURIComponent(t.IdProactivanet);
+  // Sin title= propio a proposito: si el enlace trajera el suyo taparia el de
+  // la celda, que es el que muestra la descripcion del ticket.
+  return `<a class="enlace-ticket" href="${href}" target="_blank" rel="noopener">${codigo}</a>`;
+}
+
 function tooltipDescripcion(texto) {
   const limpio = limpiarDescripcion(texto);
   if (!limpio) return 'Este ticket no tiene descripcion.';
@@ -560,7 +582,7 @@ function renderAntiguos(datos, topPorLider = 10) {
     const orden = lista.slice().sort((a, b) => b.DiasBacklog - a.DiasBacklog).slice(0, topPorLider);
     const sufijo = lista.length > topPorLider ? `mostrando ${topPorLider} de ${lista.length}` : `${lista.length}`;
     const filas = orden.map(t => `<tr>
-        <td class="con-hint" title="${escapeHtml(tooltipDescripcion(t.Descripcion))}">${escapeHtml(t.CodigoTicket)}</td>
+        <td class="con-hint" title="${escapeHtml(tooltipDescripcion(t.Descripcion))}">${celdaCodigo(t)}</td>
         <td class="num"><b>${t.DiasBacklog}</b></td>
         <td>${String(t.FechaRegistro ?? '').slice(0, 10)}</td>
         <td>${escapeHtml(t.Prioridad)}</td>

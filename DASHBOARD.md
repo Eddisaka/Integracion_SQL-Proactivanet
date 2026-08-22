@@ -37,13 +37,14 @@ desde SQL Server. Corre **100% en IIS con ASP.NET; no usa Python**.
   navegador. El correo sigue recibiendo la descripcion completa para el
   Excel: ese parametro por defecto es NULL.
 
-  **Pendiente — enlace al ticket en Proactivanet.** La URL de edicion
-  (`formIncidents.paw?id=<GUID>`) necesita el GUID interno del ticket, que
-  **no esta en la base**: el ETL lee un reporte que Proactivanet expone con
-  columnas fijas y ese reporte no incluye el `Id`. La API si lo da
-  (`GET /api/Incidents?Code=INC 2026-128167` devuelve `Code` e `Id`), pero
-  para usarla habria que decidir de donde se llama; ver la nota al final de
-  `CORREO_BACKLOG.md`.
+  Ese mismo codigo es ademas **enlace al ticket en Proactivanet**
+  (`formIncidents.paw?id=<GUID>`, se abre en otra pestaña). La URL pide el
+  GUID interno, que no viene en el reporte del ETL; lo resuelve contra la API
+  el script **`sincronizar_ids.py`** desde el equipo del ETL y lo deja en
+  `dbo.TicketProactivanetId` (`08_ids_proactivanet.sql`). El servidor web solo
+  lee esa tabla: **no necesita el token ni salida a internet**. Si un ticket
+  aun no esta en el mapeo, el codigo se pinta como texto, sin enlace roto.
+  Detalles y puesta en marcha en la seccion 8 de `CORREO_BACKLOG.md`.
 
 ### Por que son dos paginas y no pestañas con JavaScript
 
@@ -69,7 +70,14 @@ sqlcmd -S AZVMBDCENTRALQA -d Tickets_Proactivanet -i 04_dashboard_sla.sql
 
 # Para la pestaña de Backlog (tambien la usa el correo diario)
 sqlcmd -S AZVMBDCENTRALQA -d Tickets_Proactivanet -i 07_correo_backlog.sql
+
+# Para el enlace de cada ticket a Proactivanet
+sqlcmd -S AZVMBDCENTRALQA -d Tickets_Proactivanet -i 08_ids_proactivanet.sql
 ```
+
+El mapeo de GUID lo llena `sincronizar_ids.py` desde el equipo del ETL, no
+desde el servidor web (seccion 8 de `CORREO_BACKLOG.md`). Sin esa carga el
+tablero funciona igual, nada mas sin los enlaces.
 
 Despues, desplegar en IIS (seccion mas abajo).
 
@@ -156,6 +164,14 @@ GRANT EXECUTE ON dbo.usp_Dash_TendenciaMulti           TO [Principal];
 GRANT EXECUTE ON dbo.usp_Dash_ProductividadTecnicoMulti TO [Principal];
 GRANT EXECUTE ON dbo.usp_Dash_DistribucionMulti        TO [Principal];
 GRANT EXECUTE ON dbo.usp_Dash_DetalleMulti             TO [Principal];
+
+-- Pestaña de Backlog
+GRANT EXECUTE ON dbo.usp_CorreoBacklog_Catalogos       TO [Principal];
+GRANT EXECUTE ON dbo.usp_CorreoBacklog_Principal       TO [Principal];
+GRANT EXECUTE ON dbo.usp_CorreoBacklog_Historico       TO [Principal];
+GRANT EXECUTE ON dbo.usp_CorreoBacklog_HistoricoPorLider TO [Principal];
+GRANT EXECUTE ON dbo.usp_CorreoBacklog_Datos           TO [Principal];
+GRANT EXECUTE ON dbo.usp_TicketIds_Obtener             TO [Principal];
 ```
 
 **No hace falta que el usuario sea `db_owner` ni dueño de los objetos.**
