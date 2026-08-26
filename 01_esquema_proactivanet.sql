@@ -223,7 +223,19 @@ BEGIN
 END
 GO
 
-/* ---- UPSERT (UPDATE+INSERT, sin MERGE) ---- */
+/* ---- UPSERT (UPDATE+INSERT, sin MERGE) ----
+
+   OJO: ESTA VERSION QUEDO SUPERADA POR 10_clave_ticket.sql.
+
+   Esta empareja por CodigoTicket, y eso duplica los tickets que Proactivanet
+   renombra al reclasificarlos ('INC 2026-000001' -> 'REQ 2026-000001' es el
+   mismo ticket). La version vigente empareja por ClaveTicket (año +
+   consecutivo, sin el prefijo).
+
+   En una instalacion nueva: correr este script y luego 10_clave_ticket.sql,
+   que vuelve a crear el procedimiento ya corregido. Si se toca algo aqui,
+   hay que mover el cambio alla tambien.
+   ---- */
 CREATE OR ALTER PROCEDURE dbo.usp_CargarTicketsDesdeStaging
     @LoteCarga UNIQUEIDENTIFIER = NULL
 AS
@@ -416,8 +428,31 @@ BEGIN
 END
 GO
 
-/* ---- Vista para Power BI / HTML ---- */
-CREATE OR ALTER VIEW dbo.vw_Tickets AS
+/* ---- Vista para Power BI / HTML ----
+
+   OJO: solo se crea SI NO EXISTE, y por eso va dentro de un EXEC.
+
+   La vista que esta en produccion ya no es esta: le agregaron Lider,
+   Calendar_Year, Calendar_Month, Calendar_YearMonth y Slot, y le quitaron
+   TiendaNumero, FechaRegistroDia, AnioMes, HorasEnBacklog y EstaAbierto. De
+   esas columnas dependen las vistas de Slots ('Descargar script v2 usando
+   vw_Tickets.sql') y las de por mes (09_slots_por_mes.sql).
+
+   Con un CREATE OR ALTER, volver a correr este script las borraria de un
+   golpe y romperia los dos juegos de vistas. Con el IF, re-ejecutar el
+   script es inofensivo: en una base nueva crea la version base, y en una que
+   ya existe no la toca.
+
+   Si algun dia hay que modificar la vista en produccion, hay que sacarla de
+   SSMS (clic derecho -> Script as -> ALTER) y editar ESA, no esta.
+
+   Nada mas depende de las columnas que aqui se calculan: 04_dashboard_sla.sql
+   y 05_correo_qa_categorias.sql definen sus propias FechaRegistroDia y
+   EstaAbierto en sus vistas, no las toman de aqui.
+   ---- */
+IF OBJECT_ID('dbo.vw_Tickets', 'V') IS NULL
+    EXEC (N'
+CREATE VIEW dbo.vw_Tickets AS
 SELECT
     t.CodigoTicket,
     t.FechaRegistro,
@@ -468,8 +503,8 @@ SELECT
     t.QARe_DescripcionSolucion,
     t.QARe_TipoSolucion,
     t.Tienda,
-    TiendaNumero = CASE WHEN t.Tienda LIKE '[0-9]%'
-        THEN TRY_CONVERT(INT, LEFT(t.Tienda, PATINDEX('%[^0-9]%', t.Tienda + ' ') - 1)) END,
+    TiendaNumero = CASE WHEN t.Tienda LIKE ''[0-9]%''
+        THEN TRY_CONVERT(INT, LEFT(t.Tienda, PATINDEX(''%[^0-9]%'', t.Tienda + '' '') - 1)) END,
     FechaRegistroDia = CONVERT(DATE, t.FechaRegistro),
     AnioMes          = CONVERT(CHAR(7), t.FechaRegistro, 126),
     HorasEnBacklog   = CASE WHEN t.FechaFirmaCierre IS NULL
@@ -478,6 +513,9 @@ SELECT
     EstaAbierto      = CASE WHEN t.FechaFirmaCierre IS NULL THEN 1 ELSE 0 END,
     t.FechaAltaDW, t.FechaUltimaCargaDW, t.VersionFila
 FROM dbo.Tickets t;
+')
+ELSE
+    PRINT N'AVISO: dbo.vw_Tickets ya existia y no se modifico (ver la nota arriba).';
 GO
 
 /* Comprobaciones:

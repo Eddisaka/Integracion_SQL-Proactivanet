@@ -1,0 +1,535 @@
+# Correo automatizado de Backlog ("Inc & Req Backlog") + tablero de Backlog
+
+Automatiza el correo diario "Inc & Req Backlog" y, sobre la misma tabla de
+snapshot, alimenta el tablero de Backlog (volumen, aging, prioridad/
+criticidad, evolucion en el tiempo por C1 o por Grupo).
+
+## De donde viene esto
+
+Daniela construyo por su cuenta el envio del correo (`dbo.CorreoBacklogSnapshot`
++ `dbo.CorreoBacklogEjecucion` + `usp_CorreoBacklog_PrepararCorte/_Principal/
+_Comparativa/_Datos/_FinalizarEjecucion`), tomando `dbo.vw_Backlog` como
+fuente. `07_correo_backlog.sql` conserva ese diseño tal cual -no hay una
+tabla de snapshot paralela para el tablero- y le agrega:
+- Columna `C1` (primer segmento de la `Categoria`) en el snapshot.
+- Un backfill de verdad para fechas pasadas.
+- Los procedimientos que consume el tablero (historico, resumen, catalogos).
+
+Asi el correo y el tablero comparten una sola fuente de datos: lo que ya se
+valido para el correo (KPIs, prioridad por lider/grupo, SLA) es exactamente
+lo que va a ver el tablero tambien.
+
+## 1) Por que hace falta un backfill aparte del corte diario
+
+`dbo.vw_Backlog` (la vista de la que lee `usp_CorreoBacklog_PrepararCorte`)
+solo conoce el **Estado y SLA actuales** de cada ticket -no tiene forma de
+saber como estaba el backlog hace 3 semanas, porque calcula todo contra
+`GETDATE()` y filtra `Estado NOT IN ('Cerrada','Rechazada')` (el estado de
+HOY, no el de esa fecha)-. Por eso `usp_CorreoBacklog_PrepararCorte` sirve
+para preparar el corte de **hoy** (o para reprocesar el mismo dia si algo
+fallo), pero no puede reconstruir fechas pasadas.
+
+`usp_CorreoBacklog_Backfill` resuelve esto leyendo directo de `dbo.Tickets`
++ `dbo.CatLiderGrupo`. La regla de "estaba en backlog en la fecha X" tiene
+que dar **exactamente** lo mismo que el corte del dia cuando X = hoy; si no,
+la serie historica y el corte del dia no empatan:
+
+- Si el ticket **sigue en backlog hoy**
+  (`Estado NOT IN ('Cerrada','Rechazada','Resuelta')`), estaba en backlog en
+  cualquier fecha pasada posterior a su registro.
+- Si **ya salio**, cuenta solo en las fechas **anteriores** a su fecha de
+  salida = `COALESCE(FechaFirmaCierre, FechaFirmaSolucion)`.
+- Si ya salio pero **no tiene ninguna de las dos fechas**, no se puede ubicar
+  en el tiempo y no se cuenta en ninguna fecha.
+
+### Que cuenta como backlog: los estados excluidos
+
+Se excluyen `Cerrada`, `Rechazada` y **`Resuelta`**. Este ultimo se agrego
+despues: un ticket `Resuelta` ya fue resuelto y Proactivanet lo pasa solo a
+`Cerrada` a los ~3 dias por regla, asi que tenerlo en el backlog inflaba
+todos los numeros del correo.
+
+`Resuelta` se agrego al `WHERE` de **`dbo.vw_Backlog`**, para que la
+exclusion aplique a todo lo que lea esa vista -incluido Power BI-, no solo
+al correo. Esa vista **no vive en este repositorio**: solo existe en la base
+de datos, asi que este script no la crea ni la modifica.
+
+La regla queda escrita en dos lugares mas, a proposito:
+
+- `usp_CorreoBacklog_PrepararCorte` repite `Estado <> 'Resuelta'` aunque la
+  vista ya lo excluya. Es redundante hoy; sirve como red de seguridad si
+  alguien revierte la vista, y deja la regla visible junto a la del backfill.
+- `usp_CorreoBacklog_Backfill` **tiene** que repetirla porque no pasa por la
+  vista: lee `dbo.Tickets` directo.
+
+**Si algun dia cambia la lista de estados excluidos, hay que cambiarla en
+los tres lados** (vista, corte y backfill) o vuelve a aparecer un escalon en
+la grafica de tendencia donde el historico se junta con el corte del dia.
+Los dos puntos del script estan comentados haciendose referencia mutua.
+
+Como `dbo.vw_Backlog` no esta versionada, conviene tener a la mano quien mas
+la consume antes de volver a tocarla:
+
+```sql
+SELECT referencing_schema_name, referencing_entity_name
+FROM sys.dm_sql_referencing_entities('dbo.vw_Backlog', 'OBJECT');
+```
+
+(Eso cubre objetos dentro de la base. Power BI, Excel o cualquier consulta
+externa no aparecen ahi y hay que revisarlos aparte.)
+
+**Por que la fecha de salida es un `COALESCE` y no solo `FechaFirmaCierre`:**
+un ticket que hoy esta `Resuelta` todavia no tiene firma de cierre, pero si
+estuvo en backlog hasta el dia que se resolvio. Si se usara solo
+`FechaFirmaCierre`, esos tickets desapareceria de todo el historico y la
+curva se hundiria sin razon. Como efecto lateral tambien rescata a los
+cerrados que quedaron sin `FechaFirmaCierre` pero si tienen
+`FechaFirmaSolucion`, que antes se perdian por completo.
+
+Aging/AgingSort/DiasBacklog se recalculan con esa fecha en vez de
+`GETDATE()`; `EstadoSLA` se copia igual que en `dbo.vw_Backlog` (esa formula
+compara `FechaFirmaSolucion` contra `FechaEstimadaResolucion`/
+`FechaEstimadaOlaUc`, campos fijos del ticket, no depende de `GETDATE()`,
+asi que da el mismo resultado para hoy y para el pasado).
+
+### ⚠️ Si ves un escalon en la grafica de tendencia, es esto
+
+La primera version del backfill usaba solo
+`FechaFirmaCierre IS NULL OR FechaFirmaCierre > X`, sin mirar el `Estado`.
+Con esa regla, **todo ticket cerrado o rechazado que no tenga
+`FechaFirmaCierre` se contaba como abierto en todos los dias del backfill,
+para siempre**. En la practica eso inflaba el historico a ~25,000 tickets
+contra los ~5,850 reales del corte de hoy, y la grafica mostraba una caida
+vertical justo al llegar a la fecha de hoy -que si sale de `dbo.vw_Backlog`
+y si filtra por `Estado`-.
+
+Ya esta corregido. **Cada vez que cambie la regla de que cuenta como
+backlog** -este arreglo, la exclusion de `Resuelta`, o lo que venga- hay que
+**volver a correr el script y luego el backfill**, porque los snapshots ya
+guardados se escribieron con la regla anterior. El backfill reescribe cada
+fecha, no hace falta borrar nada a mano:
+
+```sql
+-- 1) Reinstalar los objetos (idempotente)
+--    ...corre 07_correo_backlog.sql completo...
+
+-- 2) Regenerar el historico ya con la regla corregida
+EXEC dbo.usp_CorreoBacklog_Backfill @FechaInicio = '2026-01-01';
+
+-- 3) Comprobar que ya no hay escalon: el ultimo dia backfilleado y el
+--    corte de hoy deben quedar cerca, no a miles de diferencia
+SELECT TOP (10) FechaCorte, Tickets = COUNT(*)
+FROM dbo.CorreoBacklogSnapshot
+GROUP BY FechaCorte
+ORDER BY FechaCorte DESC;
+```
+
+El corte de **hoy** no lo toca el backfill (por diseño llega hasta ayer); se
+corrige solo en la siguiente corrida del correo, o de inmediato con
+`EXEC dbo.usp_CorreoBacklog_PrepararCorte @Forzar = 1;`.
+
+Para ver el tamaño de las poblaciones involucradas:
+
+```sql
+SELECT
+    FueraSinNingunaFecha = SUM(CASE WHEN Estado IN (N'Cerrada', N'Rechazada', N'Resuelta') AND COALESCE(FechaFirmaCierre, FechaFirmaSolucion) IS NULL THEN 1 ELSE 0 END),
+    FueraConFecha        = SUM(CASE WHEN Estado IN (N'Cerrada', N'Rechazada', N'Resuelta') AND COALESCE(FechaFirmaCierre, FechaFirmaSolucion) IS NOT NULL THEN 1 ELSE 0 END),
+    EnBacklogHoy         = SUM(CASE WHEN Estado NOT IN (N'Cerrada', N'Rechazada', N'Resuelta') THEN 1 ELSE 0 END),
+    Total                  = COUNT(*)
+FROM dbo.Tickets;
+```
+
+**Que se espera ver ya corregido:** la serie historica debe bajar de forma
+gradual hacia el pasado reciente -en enero habia menos tickets acumulados
+que hoy- y **conectar sin salto** con el corte de hoy. Los dias hacia
+adelante los sigue generando `usp_CorreoBacklog_PrepararCorte` desde
+`dbo.vw_Backlog`, que ahora usa la misma definicion de "abierto", asi que no
+va a reaparecer el escalon.
+
+**Un efecto secundario esperado y correcto:** el backfill subestima un poco
+las fechas pasadas, porque los tickets cerrados sin `FechaFirmaCierre` no se
+cuentan en ninguna fecha. Es preferible a contarlos siempre; y solo afecta a
+la parte backfilleada, no a los cortes que se capturan dia a dia.
+
+**Limitacion a tener presente:** el backfill usa el Grupo/Lider/Categoria
+**actuales** de cada ticket, no los que tenia en la fecha pasada -si un
+ticket cambio de grupo o categoria en el camino, en todas las fechas
+backfilleadas aparece bajo su grupo/categoria de **hoy**-. Los cortes que
+se preparen dia a dia hacia adelante (`usp_CorreoBacklog_PrepararCorte`,
+que es lo que ya corre el correo) no tienen este problema: reflejan el
+grupo/categoria real de ese dia porque se toman ese mismo dia. Si mas
+adelante se necesita precision historica exacta, `dbo.TicketsHist` si
+guarda esos cambios -se puede extender el backfill para cruzar contra ahi-.
+
+Por eso `usp_CorreoBacklog_Backfill` **no toca fechas de hoy en adelante**
+por defecto (`@FechaFin` default = ayer): "hoy" siempre lo gobierna
+`usp_CorreoBacklog_PrepararCorte`, con datos en vivo.
+
+**Nota sobre `EstadoSLA` para tickets aun abiertos:** tanto en `dbo.vw_Backlog`
+como en el backfill, un ticket sin `FechaFirmaSolucion` (todavia abierto)
+siempre cae en `Fuera SLA` en la rama final del CASE, sin importar si la
+fecha estimada de resolucion ya paso o no. Es el mismo comportamiento que
+ya tiene el correo hoy -no se cambio aqui sin confirmarlo primero-.
+
+## 2) Instalacion
+
+En SQL Server Management Studio, conectado a `AZAUDITPRECIOS` /
+`Tickets_Proactivanet`, corre `07_correo_backlog.sql` completo. Es
+idempotente (`CREATE OR ALTER` / `IF OBJECT_ID... IS NULL`), se puede
+volver a correr sin romper nada si ya existian los objetos de Daniela —
+y hay que volver a correrlo cada vez que el script cambie: la version
+actual agrega `dbo.usp_CorreoBacklog_HistoricoPorLider`, que necesitan las
+graficas de tendencia de los dos correos.
+
+Permisos para la cuenta que usa PowerShell (al final del script, comentados):
+
+```sql
+GRANT SELECT ON dbo.vw_Backlog TO [PROACTIVANETAD];
+GRANT SELECT ON dbo.CorreoBacklogSnapshot TO [PROACTIVANETAD];
+GRANT EXECUTE ON dbo.usp_CorreoBacklog_PrepararCorte TO [PROACTIVANETAD];
+GRANT EXECUTE ON dbo.usp_CorreoBacklog_Principal TO [PROACTIVANETAD];
+GRANT EXECUTE ON dbo.usp_CorreoBacklog_Comparativa TO [PROACTIVANETAD];
+GRANT EXECUTE ON dbo.usp_CorreoBacklog_Datos TO [PROACTIVANETAD];
+GRANT EXECUTE ON dbo.usp_CorreoBacklog_FinalizarEjecucion TO [PROACTIVANETAD];
+GRANT EXECUTE ON dbo.usp_CorreoBacklog_Backfill TO [PROACTIVANETAD];
+GRANT EXECUTE ON dbo.usp_CorreoBacklog_Historico TO [PROACTIVANETAD];
+GRANT EXECUTE ON dbo.usp_CorreoBacklog_HistoricoPorLider TO [PROACTIVANETAD];
+GRANT EXECUTE ON dbo.usp_CorreoBacklog_ResumenActual TO [PROACTIVANETAD];
+GRANT EXECUTE ON dbo.usp_CorreoBacklog_Catalogos TO [PROACTIVANETAD];
+```
+
+## 3) Primera vez: correr el backfill
+
+```sql
+-- Tarda varios minutos (un INSERT por dia desde el 1 de enero) -normal,
+-- es un proceso de una sola vez-.
+EXEC dbo.usp_CorreoBacklog_Backfill @FechaInicio = '2026-01-01';
+```
+
+## 4) El correo diario
+
+Un solo script: **`Enviar_CorreoBacklog_direccion.ps1`**. Hubo un momento en
+que existieron dos versiones (una de detalle y una de direccion); se
+fusionaron en esta, que conserva el cuerpo ejecutivo de la de direccion y le
+agrega el Excel adjunto que generaba la de detalle.
+
+**Cuerpo del correo (una sola pantalla):**
+- Encabezado con la tendencia del total contra el corte anterior
+  (`Backlog total: 5,853 ↑ 199 vs. el corte anterior`).
+- Tarjetas de KPI: Backlog, Criticos, Altos, +30 dias, Reasignados,
+  Reabiertos y % Fuera SLA.
+- 4 graficas en 2 renglones de 2:
+
+  | | Izquierda | Derecha |
+  |---|---|---|
+  | Renglon 1 | Tendencia del backlog total | Tendencia por lider |
+  | Renglon 2 | Backlog por lider | Backlog por prioridad |
+
+- Abajo, a todo lo ancho: **Antiguedad del backlog por lider** -barras
+  apiladas, cada barra partida en segmentos de color, uno por lider- y
+  debajo su **tabla resumen antiguedad x lider**, con los encabezados
+  pintados del mismo color que el segmento correspondiente. Solo se
+  etiquetan dentro de la barra los segmentos que midan al menos 5% de la
+  barra mas alta; los mas chicos se leen en la tabla, que trae todos los
+  numeros con sus totales por antiguedad y por lider.
+
+  Cuantos lideres salen como segmento propio se controla con
+  `aging_top_lideres` (default 8); el resto se suma en un segmento
+  `Otros`. Todo esto se calcula en PowerShell a partir del result set 3
+  de `usp_CorreoBacklog_Principal`, que ya traia el desglose por lider
+  -antes solo se usaba sumado por bucket-, asi que no hubo que agregar
+  nada en SQL.
+
+- Al final, el **listado de tickets con mas de 4 meses en backlog**: una
+  tabla por lider (Ticket, Dias, Registro, Prioridad, Grupo, Tecnico,
+  Subestado, Titulo), con los mas antiguos primero. Si un lider tiene mas de
+  10, se listan solo los 10 mas antiguos y el encabezado lo dice
+  (`-mostrando 10 de 47-`); el resto esta en la hoja Datos del Excel. Los
+  lideres salen ordenados de mas a menos tickets viejos.
+
+  El umbral es `antiguos_dias_minimo` (default **120 dias**, que es
+  justo donde arranca el bucket `+4 meses` de `dbo.vw_Backlog`) y el tope por
+  lider es `antiguos_top_por_lider` (default 10). El titulo de la seccion se
+  calcula del umbral, asi que si lo cambias el texto se ajusta solo. Sale del
+  result set de `usp_CorreoBacklog_Datos` que ya se consulta para armar el
+  Excel -tampoco hubo que agregar SQL para esto-.
+
+**Sobre el Estado SLA:** se quito esa grafica del cuerpo porque casi todo
+el backlog cae en `Fuera SLA` (ver la nota de la seccion 1 sobre tickets
+abiertos sin `FechaFirmaSolucion`), asi que la barra no aportaba y ocupaba
+espacio. El dato sigue en la tarjeta **% Fuera SLA** y completo en la hoja
+Principal del Excel.
+
+**Excel adjunto:** `Backlog diario - <fecha>.xlsx`, con las hojas
+Principal / Comparativa / Datos. Ahi vive todo el detalle -por lider y
+grupo, reasignaciones, reabiertos, comparativa completa y datos crudos-
+que a proposito ya no se repite en el cuerpo del correo.
+
+### Graficas de tendencia
+
+Las dos responden "¿el backlog va a la baja o al alta?":
+- **Tendencia del backlog total** — una linea con el total por dia.
+- **Tendencia por lider** — una linea por cada uno de los N lideres con mas
+  backlog en el corte mas reciente (`tendencia_top_lideres`, default 6); el
+  resto se suma en una serie `Otros` para que la grafica no quede con 20
+  lineas encimadas. Esta es la que da visibilidad del avance de cada torre.
+
+Ventana configurable con `tendencia_dias` (default 30). Si el archivo de
+configuracion no trae estas llaves, el script usa los defaults -no hace
+falta tocar un archivo de configuracion que ya este en produccion-.
+
+**⚠️ Dependen del historico guardado:** ambas graficas leen los snapshots ya
+existentes en `dbo.CorreoBacklogSnapshot`, asi que solo van a tener tantos
+puntos como cortes existan. Si nunca se corrio
+`usp_CorreoBacklog_Backfill`, al principio solo apareceran los dias que
+lleve corriendo el correo -y con un solo corte los scripts ponen un aviso
+en vez de la grafica, porque una linea necesita al menos dos puntos-. Correr
+el backfill una vez (seccion 3) llena la tendencia de inmediato hacia atras.
+
+### 4.1) Instalacion y operacion del correo
+
+`Enviar_CorreoBacklog_direccion.ps1` hace todo en un solo script: prepara el
+corte de hoy, arma el `.xlsx` (hojas Principal/Comparativa/Datos), genera las
+6 graficas y manda el correo por SMTP con el Excel adjunto. Mismo patron que
+`etl_proactivanet.py` y `Enviar_CorreoQA.ps1` -sin nada que instalar, solo
+clases de .NET Framework-.
+
+**Diferencias con el script original de Daniela:**
+- En vez de un `conexionsql.json` aparte, reusa el bloque `"sql"` de
+  `config.json` (el mismo que ya usa el ETL y `Enviar_CorreoQA.ps1`) para la
+  conexion a SQL Server -una credencial menos que mantener sincronizada-.
+- El cuerpo del correo se rehizo para verse como el reporte manual
+  ("Inc & Req Backlog") que se enviaba antes a mano, con el mismo enfoque
+  ejecutivo que `Enviar_CorreoQA.ps1`: tarjetas de KPI (incluida
+  **% Fuera SLA**, que antes nadie calculaba) y las 6 graficas incrustadas.
+  Las de barras usan el mismo codigo de colores del Excel manual: Critica en
+  rojo, Alta en naranja, Media en amarillo, Baja en verde; Dentro SLA en
+  verde y Fuera SLA en rojo.
+- Todos los totales de las graficas se calculan en PowerShell a partir de
+  los result sets que ya regresan `usp_CorreoBacklog_Principal`,
+  `_Historico` y `_HistoricoPorLider`.
+
+**1) Configuracion** — copia `config_correo_backlog_direccion.ejemplo.json`
+como `config_correo_backlog_direccion.json` (no se sube a git, ya esta en
+`.gitignore`) y llena `destinatarios`/`remitente`/SMTP. `config.json` (el
+bloque `sql`) debe estar en la misma carpeta.
+
+**2) Prueba segura** — mientras `modo_prueba` este en `true`, el script
+ignora `destinatarios`/`cc`/`cco` y solo manda a `destinatario_prueba`.
+
+**3) Ejecutar manualmente:**
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "Enviar_CorreoBacklog_direccion.ps1"
+```
+Para reprocesar una fecha concreta:
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "Enviar_CorreoBacklog_direccion.ps1" -FechaCorte "2026-08-13"
+```
+Si ya existe un envio exitoso para esa fecha el script se detiene a
+proposito, para no mandar el correo dos veces al mismo foro. Para
+reprocesarla, activa temporalmente `"forzar_reproceso": true` en
+`config_correo_backlog_direccion.json` y regresalo a `false` despues.
+
+**4) Validaciones posteriores:**
+```sql
+SELECT TOP (20) * FROM dbo.CorreoBacklogEjecucion ORDER BY IdEjecucion DESC;
+SELECT FechaCorte, COUNT(*) AS Tickets FROM dbo.CorreoBacklogSnapshot GROUP BY FechaCorte ORDER BY FechaCorte DESC;
+```
+Compara contra el reporte manual: backlog total, Critica/Alta/Media/Baja,
++30 dias, reasignaciones >1, intentos de solucion >1, totales por lider y
+grupo, estado SLA.
+
+**5) Paso a produccion:** llena `destinatarios`/`cc`/`cco`, cambia
+`modo_prueba` a `false`, manten `forzar_reproceso` en `false`, y haz una
+ultima prueba manual controlada.
+
+**6) Programador de tareas:**
+- Programa: `powershell.exe`
+- Argumentos: `-NoProfile -ExecutionPolicy Bypass -File "C:\ruta\Enviar_CorreoBacklog_direccion.ps1"`
+- Iniciar en: la carpeta donde estan `Enviar_CorreoBacklog_direccion.ps1`,
+  `config.json` y `config_correo_backlog_direccion.json`.
+- Cuenta con acceso a SQL Server, permiso de escritura en la carpeta y
+  acceso al relay SMTP.
+
+**Codigos de salida:** `0` exitoso, `5` error (revisar `Logs\`).
+
+## 5) Que expone cada procedimiento nuevo para el tablero
+
+| Elemento del tablero | Procedimiento |
+|---|---|
+| Grafica de historico (eje tiempo dia/semana/mes x cantidad de tickets), filtrable por C1 y/o Grupo | `dbo.usp_CorreoBacklog_Historico @FechaInicio, @FechaFin, @Granularidad = 'Dia'\|'Semana'\|'Mes', @C1, @Grupo` |
+| Serie de tiempo abierta por lider (la que grafican los correos) | `dbo.usp_CorreoBacklog_HistoricoPorLider @FechaInicio, @FechaFin, @TopLideres` |
+| Volumen actual por C1 / Grupo / Prioridad / Aging | `dbo.usp_CorreoBacklog_ResumenActual` → 4 result sets |
+| Catalogos para los filtros (C1, Grupo, Lider) | `dbo.usp_CorreoBacklog_Catalogos` |
+
+`usp_CorreoBacklog_ResumenActual` sin parametro usa automaticamente el
+snapshot mas reciente (`MAX(FechaCorte)`); pasa `@FechaCorte` para ver el
+backlog tal como estaba en cualquier dia pasado.
+
+Estos procedimientos leen de la misma `dbo.CorreoBacklogSnapshot` que llena
+el correo -no hace falta correr nada aparte cada vez que
+`usp_CorreoBacklog_PrepararCorte` agrega el corte del dia-.
+
+## 6) Seguridad
+
+- Cambiar la contraseña SQL que fue compartida durante el desarrollo.
+- No almacenar `config.json` ni `config_correo_backlog_direccion.json` en
+  Git -ambos ya estan cubiertos por `.gitignore`-.
+- Limitar permisos NTFS de la carpeta.
+- Preferir una cuenta tecnica de minimo privilegio.
+- No imprimir contraseñas ni tokens en los logs.
+
+## 7) Siguientes pasos
+
+1. Correr `07_correo_backlog.sql` y el backfill inicial (secciones 2-3).
+2. Probar `Enviar_CorreoBacklog_direccion.ps1` en modo de prueba y pasar a
+   produccion (seccion 4.1).
+3. Correr `08_ids_proactivanet.sql` y la carga inicial de
+   `sincronizar_ids.py --completo` para que el tablero enlace cada ticket a
+   Proactivanet (seccion 8), y agregar el script al Task Scheduler despues
+   del ETL diario.
+
+## 8) Enlace de cada ticket a Proactivanet (GUID)
+
+En el tablero web (`backlog.html`), el codigo de los tickets de la tabla
+"Tickets con mas de N meses en backlog" es un enlace directo al formulario de
+edicion en Proactivanet:
+
+```text
+https://soriana.proactivanet.com/proactivanet/servicedesk/incidents/formIncidents/formIncidents.paw?id=<GUID>
+```
+
+### El problema y como se resolvio
+
+Esa URL identifica el ticket por su **GUID interno**, y ese dato no venia en
+nuestra base: el ETL no lee `/api/Incidents`, lee un reporte
+(`/api/table/data`) que Proactivanet construyo del lado de ellos con columnas
+fijas —fue la salida cuando no nos dieron acceso a su base de datos— y ese
+reporte no incluye el `Id`. Pedirles que lo agreguen no era viable en tiempo
+razonable.
+
+Lo que si esta disponible es la API: `GET /api/Incidents` devuelve `Code` e
+`Id`, acepta `Code` como filtro y soporta `$fields`, `$limit` y `$offset`
+(ver `API.html`), asi que los pares (Code, Id) se pueden traer en bloque y
+paginados, no de uno en uno.
+
+La solucion es **`sincronizar_ids.py`**, que guarda esos pares en una tabla de
+mapeo y corre como **ultimo paso de `etl_proactivanet.py`**, en el mismo
+equipo y con la misma conexion. El tablero solo lee la tabla. Asi el token
+sigue viviendo donde ya vivia (`PVNET_API_TOKEN`, en el equipo del ETL) y el
+servidor web no necesita salida a `soriana.proactivanet.com`: es la misma
+disciplina que se ha seguido con el resto del proyecto.
+
+El archivo tambien se puede ejecutar solo —es lo que se hace para la carga
+inicial—, pero para la operacion diaria no hay que programar nada aparte.
+
+### El GUID no cambia — por eso el historico queda cubierto
+
+El GUID es un atributo **fijo** del ticket: `INC 2025-561735` tiene el mismo
+`Id` hoy que hace un año. No es un dato con fecha, como si lo era el snapshot
+diario. Por eso basta resolverlo **una vez por codigo**: en cuanto el codigo
+esta en el mapeo, **todos** los cortes donde aparezca ese ticket —incluidos
+los de enero— muestran el enlace. No hay nada que reconstruir dia por dia, y
+no hay que volver a correr el backfill.
+
+### Objetos (`08_ids_proactivanet.sql`)
+
+| Objeto | Para que |
+|---|---|
+| `dbo.TicketProactivanetId` | La tabla de mapeo: `CodigoTicket` -> `IdProactivanet`. |
+| `usp_TicketIds_PendientesDeResolver` | Que codigos del snapshot todavia no tienen GUID. `@SoloUltimoCorte = 1` (default) para la corrida diaria, `0` para la carga inicial. |
+| `usp_TicketIds_Registrar` | UPSERT de un lote en JSON, desde el script. |
+| `usp_TicketIds_Obtener` | Consulta el GUID de una lista de codigos. Lo usa `backlog_antiguos.ashx`. |
+| `vw_TicketIds_Cobertura` | Cuantos tickets de cada corte ya tienen enlace. |
+
+Se hizo en una tabla aparte, y no como columna nueva de
+`dbo.CorreoBacklogSnapshot`, para no cambiar la estructura del snapshot ni
+tocar `usp_CorreoBacklog_Datos`, que es el que alimenta el **correo diario**.
+**El correo no cambia en nada**: ni el HTML, ni las graficas, ni las columnas
+del Excel adjunto.
+
+### Puesta en marcha
+
+```powershell
+# 1) En SSMS, una vez
+#    (ejecutar 08_ids_proactivanet.sql en Tickets_Proactivanet)
+
+# 2) Carga inicial, desde el equipo del ETL. Recorre todos los cortes
+#    guardados; tarda, pero es una sola vez.
+cd C:\ruta\del\etl
+python sincronizar_ids.py --config config.json --completo
+
+# 3) Revisar cobertura
+#    SELECT TOP (10) * FROM dbo.vw_TicketIds_Cobertura ORDER BY FechaCorte DESC;
+```
+
+**La corrida diaria no se programa aparte.** `etl_proactivanet.py` llama a
+`sincronizar_ids.sincronizar()` como ultimo paso, despues de cargar tickets y
+categorias, reusando su misma conexion. En el Task Scheduler sigue habiendo
+una sola tarea:
+
+```powershell
+python etl_proactivanet.py --config config.json
+```
+
+Cada dia solo quedan pendientes los tickets nuevos, que son pocos: se
+resuelven con una peticion por codigo y el paso termina en segundos. El
+resultado sale en el resumen del ETL:
+
+```text
+===== RESUMEN =====
+  tickets: 1043 de la API | +37 nuevos, ~112 actualizados
+  categorias: 812 de la API | +0 nuevos, ~3 actualizados
+  guid: 37 de 37 codigos resueltos, 37 guardados
+```
+
+**Este paso nunca tumba el ETL.** Si el API no responde, si el token expiro o
+si falta `08_ids_proactivanet.sql` en la base, los tickets ya quedaron bien
+cargados; lo unico que se pierde son los enlaces del tablero, y se reintenta
+solo en la corrida siguiente porque esos codigos siguen sin estar en el mapeo.
+El detalle queda en `logs/etl_proactivanet.log` y en la linea `guid:` del
+resumen.
+
+Banderas utiles del ETL:
+
+| Bandera | Para que |
+|---|---|
+| `--sin-ids` | Cargar tickets y categorias sin tocar los GUID. |
+| `--solo-ids` | Solo el paso de GUID, sin volver a bajar tickets. |
+| `--completa` | Ademas del reporte 'Total', hace la carga de GUID sobre **todos** los cortes, no solo el mas reciente. |
+
+Tambien se puede desactivar de forma permanente con
+`"ids_proactivanet": { "habilitado": false }` en el `config.json`; ese bloque
+es opcional y ahi mismo se ajustan `umbral`, `limite` y demas (ver
+`config.ejemplo.json`).
+
+**Un detalle de sincronia:** el paso pregunta por los codigos que estan en el
+**ultimo corte guardado** del snapshot, y ese corte lo genera el proceso del
+correo, no el ETL. Si el ETL corre antes que el corte del dia, los tickets
+nuevos de hoy se resuelven hasta la corrida de manana. Para el tablero da
+igual —muestra el ultimo corte, que ya trae sus GUID—, pero conviene saberlo
+si algun ticket recien creado aparece sin enlace.
+
+### Como escoge la estrategia
+
+| Modo | Que hace | Cuando |
+|---|---|---|
+| `uno` | Una peticion por codigo (`?Code=INC ...`). | Pocos pendientes (la corrida diaria). |
+| `barrido` | Pagina `/api/Incidents` con `$fields=Code&$limit=1000&$offset=...` y se queda con los codigos que le interesan. | Miles de pendientes (la carga inicial). |
+| `auto` (default) | `uno` si faltan <= 200 codigos, `barrido` si son mas. | Lo normal. |
+
+El barrido se acota ademas con `CreationDate>=` usando la fecha de registro
+mas antigua de lo que falta, para no recorrer todo el historico de incidencias
+de Proactivanet. Si el API rechazara ese filtro, `--sin-filtro-fecha` lo quita.
+
+Opciones utiles: `--simulacion` (consulta el API pero no escribe en SQL),
+`--top N` (limita la corrida), `--url-incidentes` (si la URL del API no se
+puede deducir del config). El log queda en `logs/sincronizar_ids.log`.
+
+### Si un ticket no tiene GUID
+
+No pasa nada: el endpoint devuelve `IdProactivanet = null` y el codigo se
+pinta como texto plano, sin enlace. Lo mismo si `08_ids_proactivanet.sql`
+todavia no se ejecuto en ese ambiente — el handler atrapa el error y sirve la
+tabla sin enlaces. Los codigos que quedaron sin resolver se vuelven a intentar
+en la siguiente corrida, porque siguen sin estar en el mapeo.
