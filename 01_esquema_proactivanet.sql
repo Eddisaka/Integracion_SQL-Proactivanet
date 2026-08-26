@@ -223,7 +223,19 @@ BEGIN
 END
 GO
 
-/* ---- UPSERT (UPDATE+INSERT, sin MERGE) ---- */
+/* ---- UPSERT (UPDATE+INSERT, sin MERGE) ----
+
+   OJO: ESTA VERSION QUEDO SUPERADA POR 10_clave_ticket.sql.
+
+   Esta empareja por CodigoTicket, y eso duplica los tickets que Proactivanet
+   renombra al reclasificarlos ('INC 2026-000001' -> 'REQ 2026-000001' es el
+   mismo ticket). La version vigente empareja por ClaveTicket (año +
+   consecutivo, sin el prefijo).
+
+   En una instalacion nueva: correr este script y luego 10_clave_ticket.sql,
+   que vuelve a crear el procedimiento ya corregido. Si se toca algo aqui,
+   hay que mover el cambio alla tambien.
+   ---- */
 CREATE OR ALTER PROCEDURE dbo.usp_CargarTicketsDesdeStaging
     @LoteCarga UNIQUEIDENTIFIER = NULL
 AS
