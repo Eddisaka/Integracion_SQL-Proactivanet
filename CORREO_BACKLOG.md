@@ -413,12 +413,15 @@ Lo que si esta disponible es la API: `GET /api/Incidents` devuelve `Code` e
 (ver `API.html`), asi que los pares (Code, Id) se pueden traer en bloque y
 paginados, no de uno en uno.
 
-La solucion es un script, **`sincronizar_ids.py`**, que corre en el **mismo
-equipo que el ETL** y guarda esos pares en una tabla de mapeo. El tablero solo
-lee la tabla. Asi el token sigue viviendo donde ya vivia
-(`PVNET_API_TOKEN`, en el equipo del ETL) y el servidor web no necesita salida
-a `soriana.proactivanet.com`: es la misma disciplina que se ha seguido con el
-resto del proyecto.
+La solucion es **`sincronizar_ids.py`**, que guarda esos pares en una tabla de
+mapeo y corre como **ultimo paso de `etl_proactivanet.py`**, en el mismo
+equipo y con la misma conexion. El tablero solo lee la tabla. Asi el token
+sigue viviendo donde ya vivia (`PVNET_API_TOKEN`, en el equipo del ETL) y el
+servidor web no necesita salida a `soriana.proactivanet.com`: es la misma
+disciplina que se ha seguido con el resto del proyecto.
+
+El archivo tambien se puede ejecutar solo —es lo que se hace para la carga
+inicial—, pero para la operacion diaria no hay que programar nada aparte.
 
 ### El GUID no cambia — por eso el historico queda cubierto
 
@@ -460,15 +463,52 @@ python sincronizar_ids.py --config config.json --completo
 #    SELECT TOP (10) * FROM dbo.vw_TicketIds_Cobertura ORDER BY FechaCorte DESC;
 ```
 
-Despues, en el Task Scheduler, **agregar el script justo despues del ETL
-diario** (antes o despues del corte del correo, da igual):
+**La corrida diaria no se programa aparte.** `etl_proactivanet.py` llama a
+`sincronizar_ids.sincronizar()` como ultimo paso, despues de cargar tickets y
+categorias, reusando su misma conexion. En el Task Scheduler sigue habiendo
+una sola tarea:
 
 ```powershell
-python sincronizar_ids.py --config config.json
+python etl_proactivanet.py --config config.json
 ```
 
-En la corrida diaria solo quedan pendientes los tickets nuevos, que son pocos:
-el script los resuelve con una peticion por codigo y termina en segundos.
+Cada dia solo quedan pendientes los tickets nuevos, que son pocos: se
+resuelven con una peticion por codigo y el paso termina en segundos. El
+resultado sale en el resumen del ETL:
+
+```text
+===== RESUMEN =====
+  tickets: 1043 de la API | +37 nuevos, ~112 actualizados
+  categorias: 812 de la API | +0 nuevos, ~3 actualizados
+  guid: 37 de 37 codigos resueltos, 37 guardados
+```
+
+**Este paso nunca tumba el ETL.** Si el API no responde, si el token expiro o
+si falta `08_ids_proactivanet.sql` en la base, los tickets ya quedaron bien
+cargados; lo unico que se pierde son los enlaces del tablero, y se reintenta
+solo en la corrida siguiente porque esos codigos siguen sin estar en el mapeo.
+El detalle queda en `logs/etl_proactivanet.log` y en la linea `guid:` del
+resumen.
+
+Banderas utiles del ETL:
+
+| Bandera | Para que |
+|---|---|
+| `--sin-ids` | Cargar tickets y categorias sin tocar los GUID. |
+| `--solo-ids` | Solo el paso de GUID, sin volver a bajar tickets. |
+| `--completa` | Ademas del reporte 'Total', hace la carga de GUID sobre **todos** los cortes, no solo el mas reciente. |
+
+Tambien se puede desactivar de forma permanente con
+`"ids_proactivanet": { "habilitado": false }` en el `config.json`; ese bloque
+es opcional y ahi mismo se ajustan `umbral`, `limite` y demas (ver
+`config.ejemplo.json`).
+
+**Un detalle de sincronia:** el paso pregunta por los codigos que estan en el
+**ultimo corte guardado** del snapshot, y ese corte lo genera el proceso del
+correo, no el ETL. Si el ETL corre antes que el corte del dia, los tickets
+nuevos de hoy se resuelven hasta la corrida de manana. Para el tablero da
+igual —muestra el ultimo corte, que ya trae sus GUID—, pero conviene saberlo
+si algun ticket recien creado aparece sin enlace.
 
 ### Como escoge la estrategia
 

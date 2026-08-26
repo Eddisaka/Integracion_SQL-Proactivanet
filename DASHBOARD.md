@@ -40,7 +40,8 @@ desde SQL Server. Corre **100% en IIS con ASP.NET; no usa Python**.
   Ese mismo codigo es ademas **enlace al ticket en Proactivanet**
   (`formIncidents.paw?id=<GUID>`, se abre en otra pestaña). La URL pide el
   GUID interno, que no viene en el reporte del ETL; lo resuelve contra la API
-  el script **`sincronizar_ids.py`** desde el equipo del ETL y lo deja en
+  `sincronizar_ids.py`, que corre como ultimo paso de `etl_proactivanet.py`
+  en el equipo del ETL, y lo deja en
   `dbo.TicketProactivanetId` (`08_ids_proactivanet.sql`). El servidor web solo
   lee esa tabla: **no necesita el token ni salida a internet**. Si un ticket
   aun no esta en el mapeo, el codigo se pinta como texto, sin enlace roto.
@@ -75,9 +76,11 @@ sqlcmd -S AZVMBDCENTRALQA -d Tickets_Proactivanet -i 07_correo_backlog.sql
 sqlcmd -S AZVMBDCENTRALQA -d Tickets_Proactivanet -i 08_ids_proactivanet.sql
 ```
 
-El mapeo de GUID lo llena `sincronizar_ids.py` desde el equipo del ETL, no
-desde el servidor web (seccion 8 de `CORREO_BACKLOG.md`). Sin esa carga el
-tablero funciona igual, nada mas sin los enlaces.
+El mapeo de GUID lo llena el ETL (`etl_proactivanet.py` lo hace al final de
+cada corrida) desde el equipo del ETL, no desde el servidor web; la carga
+inicial se hace a mano con `sincronizar_ids.py --completo`. Ver la seccion 8
+de `CORREO_BACKLOG.md`. Sin esa carga el tablero funciona igual, nada mas sin
+los enlaces.
 
 Despues, desplegar en IIS (seccion mas abajo).
 

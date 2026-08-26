@@ -704,6 +704,63 @@ def procesar_entidad(nombre: str, ent: dict, cfg: dict, args, cn_ref: dict) -> t
         return 1, f"{nombre}: ERROR - {str(e)[:80]}"
 
 
+def sincronizar_guid(cfg: dict, cn: pyodbc.Connection, completo: bool = False) -> str:
+    """Resuelve el Id interno (GUID) de Proactivanet de los tickets del backlog.
+
+    Es el ultimo paso de la corrida: va DESPUES de cargar tickets y
+    categorias, para que los codigos nuevos ya esten en la base cuando se
+    pregunte cuales no tienen GUID todavia.
+
+    La logica vive en sincronizar_ids.py y se importa aqui adentro, no arriba,
+    por dos razones: ese modulo importa de este (crear_sesion, conectar) y
+    arriba seria un import circular; y asi el ETL sigue corriendo aunque el
+    archivo no este en algun ambiente.
+
+    Nunca tumba el ETL. Si el API no responde o falta 08_ids_proactivanet.sql,
+    los tickets ya quedaron bien cargados y lo unico que se pierde es el
+    enlace a Proactivanet en el tablero, que se reintenta en la corrida
+    siguiente. El resultado igual sale en el resumen y en el log.
+    """
+    op = cfg.get("ids_proactivanet") or {}
+    if not op.get("habilitado", True):
+        return "guid: desactivado en el config"
+
+    try:
+        import sincronizar_ids
+    except ImportError:
+        LOG.warning("No se encontro sincronizar_ids.py: se omite el paso de GUID.")
+        return "guid: omitido (falta sincronizar_ids.py)"
+
+    LOG.info("=== [guid] Sincronizando los Id de Proactivanet ===")
+    try:
+        r = sincronizar_ids.sincronizar(
+            cfg, cn,
+            completo=completo,
+            modo=op.get("modo", "auto"),
+            umbral=op.get("umbral", 200),
+            limite=op.get("limite", 1000),
+            max_paginas=op.get("max_paginas", 2000),
+            tam_lote=op.get("tam_lote", 500),
+            sin_filtro_fecha=op.get("sin_filtro_fecha", False),
+            url_forzada=op.get("url_incidentes") or None,
+        )
+    except pyodbc.Error as e:
+        if "usp_TicketIds" in str(e) or "Could not find stored procedure" in str(e):
+            LOG.warning("Falta ejecutar 08_ids_proactivanet.sql en esta base: "
+                        "se omite el paso de GUID.")
+            return "guid: omitido (falta 08_ids_proactivanet.sql)"
+        LOG.exception("Error al sincronizar los GUID: %s", e)
+        return f"guid: ERROR - {str(e)[:80]}"
+    except Exception as e:  # noqa: BLE001
+        LOG.exception("Error al sincronizar los GUID: %s", e)
+        return f"guid: ERROR - {str(e)[:80]}"
+
+    if r["pendientes"] == 0:
+        return "guid: al dia, nada pendiente"
+    return (f"guid: {r['resueltos']} de {r['pendientes']} codigos resueltos, "
+            f"{r['guardados']} guardados")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="ETL de Proactivanet hacia SQL Server")
     ap.add_argument("--config", default=str(RAIZ / "config.json"))
@@ -714,19 +771,25 @@ def main() -> int:
     ap.add_argument("--desde", help="Fecha de inicio explícita (YYYY-MM-DD)")
     ap.add_argument("--muestra", help="Lee de un archivo JSON local en lugar de la API")
     ap.add_argument("--solo-extraer", action="store_true", help="Sólo baja de la API y guarda a disco")
+    ap.add_argument("--sin-ids", action="store_true",
+                    help="Omite el paso final que resuelve los GUID de Proactivanet.")
+    ap.add_argument("--solo-ids", action="store_true",
+                    help="Sólo corre el paso de GUID, sin cargar tickets ni categorías.")
     ap.add_argument("--nivel-log", default="INFO")
     args = ap.parse_args()
 
     configurar_log(args.nivel_log)
     cfg = cargar_config(Path(args.config))
 
-    try:
-        entidades = resolver_entidades(cfg, args.entidad)
-    except Exception as e:
-        LOG.error("%s", e)
-        return 1
+    entidades: dict = {}
+    if not args.solo_ids:
+        try:
+            entidades = resolver_entidades(cfg, args.entidad)
+        except Exception as e:
+            LOG.error("%s", e)
+            return 1
+        LOG.info("Entidades a procesar: %s", ", ".join(entidades))
 
-    LOG.info("Entidades a procesar: %s", ", ".join(entidades))
     cn_ref: dict = {"cn": None}
     rc_final = 0
     resumen: list[str] = []
@@ -735,6 +798,19 @@ def main() -> int:
             rc, msg = procesar_entidad(nombre, ent, cfg, args, cn_ref)
             resumen.append(msg)
             rc_final = rc_final or rc
+
+        # Los GUID al final, ya con los tickets del dia en la base. Se omite
+        # con --solo-extraer porque en ese modo no se toca SQL, y cuando se
+        # pidio una entidad suelta que no sea tickets, porque no habria
+        # codigos nuevos que resolver.
+        hacer_ids = not args.sin_ids and not args.solo_extraer
+        if hacer_ids and entidades and "tickets" not in entidades:
+            hacer_ids = False
+
+        if hacer_ids:
+            if cn_ref.get("cn") is None:
+                cn_ref["cn"] = conectar(cfg["sql"])
+            resumen.append(sincronizar_guid(cfg, cn_ref["cn"], completo=args.completa))
     finally:
         if cn_ref.get("cn") is not None:
             cn_ref["cn"].close()

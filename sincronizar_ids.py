@@ -26,10 +26,17 @@ aparezca ese ticket. No hay nada que reconstruir dia con dia.
 
 USO
 ---
+La corrida DIARIA ya no se programa aparte: `etl_proactivanet.py` llama a la
+funcion `sincronizar()` de este modulo al terminar de cargar tickets y
+categorias, reusando su misma conexion. En el Task Scheduler basta con el ETL.
+
+Este archivo se sigue ejecutando a mano para la carga inicial y para casos
+sueltos:
+
     # Primera carga: todos los cortes guardados (tarda, es una sola vez)
     python sincronizar_ids.py --config config.json --completo
 
-    # Corrida diaria, despues del ETL: solo el corte mas reciente
+    # Solo el corte mas reciente (lo mismo que hace el ETL)
     python sincronizar_ids.py --config config.json
 
     # Ver que haria, sin escribir en SQL
@@ -312,6 +319,78 @@ def resolver_por_barrido(sesion, url, cfg_api, codigos: list[str],
     return encontrados
 
 
+# --------------------------------------------------------------------------- sincronizacion
+def sincronizar(cfg: dict, cn: pyodbc.Connection, *,
+                completo: bool = False,
+                top: int | None = None,
+                modo: str = "auto",
+                umbral: int = 200,
+                limite: int = 1000,
+                max_paginas: int = 2000,
+                tam_lote: int = 500,
+                sin_filtro_fecha: bool = False,
+                url_forzada: str | None = None,
+                simulacion: bool = False) -> dict:
+    """Resuelve los GUID pendientes y los guarda. Devuelve el conteo de lo hecho.
+
+    Recibe la conexion ya abierta —no la abre ni la cierra— para que
+    `etl_proactivanet.py` pueda encadenar este paso reusando la suya al
+    terminar de cargar tickets y categorias. `main()` de aqui abajo es
+    solamente la version de linea de comandos de esta misma funcion.
+    """
+    cfg_api = cfg["api"]
+    url = url_incidentes(cfg_api, url_forzada)
+    LOG.info("API de incidencias: %s", url)
+
+    faltantes = pendientes(cn, solo_ultimo=not completo, top=top)
+    if not faltantes:
+        LOG.info("No hay codigos pendientes: el mapeo esta al dia.")
+        return {"pendientes": 0, "resueltos": 0, "guardados": 0}
+
+    codigos = [c for c, _ in faltantes]
+    LOG.info("Codigos sin GUID: %d (%s).", len(codigos),
+             "todos los cortes" if completo else "corte mas reciente")
+
+    # El barrido se acota con la fecha de registro mas vieja de lo que falta,
+    # menos un dia de holgura por diferencias de huso/hora. Sin esto habria
+    # que recorrer todo el historico de incidencias.
+    desde = None
+    if not sin_filtro_fecha:
+        fechas = [f for _, f in faltantes if f]
+        if fechas:
+            desde = (min(fechas) - timedelta(days=1)).strftime("%Y-%m-%d")
+            LOG.info("El barrido se limita a incidencias creadas desde %s.", desde)
+
+    if modo == "auto":
+        modo = "uno" if len(codigos) <= umbral else "barrido"
+        LOG.info("Modo automatico: %s.", modo)
+
+    sesion = crear_sesion(cfg_api)
+    if modo == "uno":
+        encontrados = resolver_uno_por_uno(sesion, url, cfg_api, codigos)
+    else:
+        encontrados = resolver_por_barrido(sesion, url, cfg_api, codigos,
+                                           desde, limite, max_paginas)
+
+    no_hallados = len(codigos) - len(encontrados)
+    LOG.info("Resueltos %d de %d codigos.", len(encontrados), len(codigos))
+    if no_hallados:
+        # Es normal que sobren algunos: tickets archivados, o que el tecnico
+        # del token no alcanza a ver. Se vuelven a intentar en la siguiente
+        # corrida porque siguen sin estar en el mapeo.
+        ejemplos = [c for c in codigos if c not in encontrados][:5]
+        LOG.warning("Quedaron %d sin GUID. Ejemplos: %s", no_hallados,
+                    ", ".join(ejemplos))
+
+    guardados = 0
+    if encontrados:
+        guardados = registrar(cn, sorted(encontrados.items()), tam_lote, simulacion)
+
+    return {"pendientes": len(codigos),
+            "resueltos": len(encontrados),
+            "guardados": guardados}
+
+
 # --------------------------------------------------------------------------- main
 def main() -> int:
     ap = argparse.ArgumentParser(
@@ -352,57 +431,20 @@ def main() -> int:
     if not ruta.is_absolute():
         ruta = RAIZ / ruta
     cfg = cargar_config(ruta)
-    cfg_api = cfg["api"]
-    url = url_incidentes(cfg_api, args.url_incidentes)
-    LOG.info("API de incidencias: %s", url)
 
     cn = conectar(cfg["sql"])
     try:
-        faltantes = pendientes(cn, solo_ultimo=not args.completo, top=args.top)
-        if not faltantes:
-            LOG.info("No hay codigos pendientes: el mapeo esta al dia.")
-            cobertura(cn)
-            return 0
-
-        codigos = [c for c, _ in faltantes]
-        LOG.info("Codigos sin GUID: %d (%s).", len(codigos),
-                 "todos los cortes" if args.completo else "corte mas reciente")
-
-        # El barrido se acota con la fecha de registro mas vieja de lo que
-        # falta, menos un dia de holgura por diferencias de huso/hora. Sin
-        # esto habria que recorrer todo el historico de incidencias.
-        desde = None
-        if not args.sin_filtro_fecha:
-            fechas = [f for _, f in faltantes if f]
-            if fechas:
-                desde = (min(fechas) - timedelta(days=1)).strftime("%Y-%m-%d")
-                LOG.info("El barrido se limita a incidencias creadas desde %s.", desde)
-
-        modo = args.modo
-        if modo == "auto":
-            modo = "uno" if len(codigos) <= args.umbral else "barrido"
-            LOG.info("Modo automatico: %s.", modo)
-
-        sesion = crear_sesion(cfg_api)
-        if modo == "uno":
-            encontrados = resolver_uno_por_uno(sesion, url, cfg_api, codigos)
-        else:
-            encontrados = resolver_por_barrido(sesion, url, cfg_api, codigos,
-                                               desde, args.limite, args.max_paginas)
-
-        no_hallados = len(codigos) - len(encontrados)
-        LOG.info("Resueltos %d de %d codigos.", len(encontrados), len(codigos))
-        if no_hallados:
-            # Es normal que sobren algunos: tickets archivados, o que el
-            # tecnico del token no alcanza a ver. Se vuelven a intentar en la
-            # siguiente corrida porque siguen sin estar en el mapeo.
-            ejemplos = [c for c in codigos if c not in encontrados][:5]
-            LOG.warning("Quedaron %d sin GUID. Ejemplos: %s", no_hallados,
-                        ", ".join(ejemplos))
-
-        if encontrados:
-            registrar(cn, sorted(encontrados.items()), args.tam_lote, args.simulacion)
-
+        sincronizar(cfg, cn,
+                    completo=args.completo,
+                    top=args.top,
+                    modo=args.modo,
+                    umbral=args.umbral,
+                    limite=args.limite,
+                    max_paginas=args.max_paginas,
+                    tam_lote=args.tam_lote,
+                    sin_filtro_fecha=args.sin_filtro_fecha,
+                    url_forzada=args.url_incidentes,
+                    simulacion=args.simulacion)
         if not args.simulacion:
             cobertura(cn)
         return 0

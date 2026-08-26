@@ -57,6 +57,17 @@
     "dias_solape": 3,
     "tam_lote": 1000
   },
+  "_ids_proactivanet": "Ultimo paso del ETL: resuelve contra /api/Incidents el Id interno (GUID) de los tickets del backlog y lo guarda en dbo.TicketProactivanetId, para que el tablero pueda enlazar cada ticket a su formulario en Proactivanet. Todo el bloque es OPCIONAL: si no viene, se usan estos mismos valores. Requiere 08_ids_proactivanet.sql en la base; si falta, el paso se omite con un aviso y el ETL sigue.",
+  "ids_proactivanet": {
+    "habilitado": true,
+    "modo": "auto",
+    "umbral": 200,
+    "limite": 1000,
+    "max_paginas": 2000,
+    "tam_lote": 500,
+    "sin_filtro_fecha": false,
+    "url_incidentes": ""
+  },
   "_mapeo": "Izquierda = columna de stg.Tickets. Derecha = nombre EXACTO del campo en el JSON de la API. Si un campo no existe en tu consulta, déjalo con cadena vacía y quedará NULL.",
   "mapeo": {
     "CodigoTicket": "Código",
