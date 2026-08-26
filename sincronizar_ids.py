@@ -127,11 +127,19 @@ def url_incidentes(cfg_api: dict, forzada: str | None) -> str:
     # Ultimo recurso: sacar la raiz del API de la URL del reporte. En Soriana
     # el reporte es .../proactivanet/api/table/data?url=... , de donde sale
     # .../proactivanet/api  ->  .../proactivanet/api/Incidents
+    #
+    # url_cruda_completa puede venir como LISTA (un reporte por trimestre,
+    # por ejemplo), igual que la maneja etl_proactivanet.extraer(); todas
+    # apuntan al mismo host, asi que sirve cualquiera.
     for clave in ("url_cruda_incremental", "url_cruda_completa"):
-        cruda = cfg_api.get(clave) or ""
-        m = re.match(r"^(https?://[^?]*?/api)/", cruda)
-        if m:
-            return m.group(1) + "/Incidents"
+        valor = cfg_api.get(clave)
+        candidatas = valor if isinstance(valor, list) else [valor]
+        for cruda in candidatas:
+            if not isinstance(cruda, str):
+                continue
+            m = re.match(r"^(https?://[^?]*?/api)/", cruda)
+            if m:
+                return m.group(1) + "/Incidents"
 
     raise RuntimeError(
         "No se pudo determinar la URL del API de incidencias. Agrega "
