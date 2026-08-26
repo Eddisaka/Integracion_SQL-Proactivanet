@@ -4,6 +4,7 @@ config*.json
 !config_correo_qa.ejemplo.json
 !config_correo_backlog.ejemplo.json
 !config_correo_backlog_direccion.ejemplo.json
+!config_correo_servicio.ejemplo.json
 *.log
 logs/
 extraccion_*.json
