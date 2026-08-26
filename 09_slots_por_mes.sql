@@ -21,7 +21,9 @@
    El Excel muestra nada mas el numero de mes (6, 7, 8) porque el origen ya
    venia filtrado a un solo año. Una vista sobre la base acumula años, y
    agrupar solo por numero de mes juntaria junio de 2025 con junio de 2026.
-   Por eso las vistas agrupan por Anio + Mes y exponen las tres columnas:
+   Por eso las vistas agrupan por Anio + Mes y exponen las tres columnas,
+   todas tomadas de dbo.vw_Tickets (Calendar_Year, Calendar_Month y
+   Calendar_YearMonth) y no recalculadas aparte:
 
        Anio                2026
        Mes                 6     <- la columna del Excel
@@ -40,9 +42,10 @@
    C1&C2 y Categoria V2 tiene que ser la misma en las vistas por Slot y en las
    de por mes, o los totales no van a cuadrar entre unas y otras.
 
-   dbo.vw_Tickets tiene que exponer la columna Calendar_YearMonth (el año-mes
-   ya armado). Es la que se usa aqui; si en algun ambiente se llama distinto,
-   se cambia en la vista base y en los tres GROUP BY.
+   dbo.vw_Tickets tiene que exponer Calendar_Year, Calendar_Month y
+   Calendar_YearMonth. Son las que se usan aqui; si en algun ambiente se
+   llaman distinto, se cambian en la vista base (seccion 2) y, en el caso de
+   Calendar_YearMonth, tambien en los tres GROUP BY.
 
    DIFERENCIA CON LAS VISTAS POR SLOT
    ----------------------------------
@@ -120,10 +123,14 @@ AS
 SELECT
     t.CodigoTicket,
     t.FechaRegistro,
-    Anio    = YEAR(t.FechaRegistro),
-    Mes     = MONTH(t.FechaRegistro),
-    -- dbo.vw_Tickets ya trae el año-mes armado; se reusa en vez de volver a
-    -- calcularlo, para que el formato sea el mismo en todo el modelo.
+    -- El año, el mes y el año-mes ya vienen armados en dbo.vw_Tickets: se
+    -- reusan en vez de recalcularlos con YEAR()/MONTH(), para que estas
+    -- vistas corten el calendario igual que el resto del modelo.
+    -- El CONVERT(INT) es por si Calendar_Year/Calendar_Month fueran texto:
+    -- asi 'Mes' siempre ordena 6, 7, 8, 9, 10 y no 10, 6, 7 como lo haria
+    -- una cadena. Si ya son INT no cuesta nada.
+    Anio    = CONVERT(INT, t.Calendar_Year),
+    Mes     = CONVERT(INT, t.Calendar_Month),
     t.Calendar_YearMonth,
     CategoriaV2 = dbo.fn_NormalizaCategoria(t.Categoria),
     C1          = dbo.fn_CategoriaC1(t.Categoria),
