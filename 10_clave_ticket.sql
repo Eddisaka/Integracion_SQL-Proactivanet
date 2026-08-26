@@ -553,14 +553,24 @@ GO
          tickets baja alrededor de 500.
 
       4. Opcional: exponer ClaveTicket en dbo.vw_Tickets, para poder agrupar
-         por ticket sin importar el prefijo. NO se hace aqui a proposito: la
-         vista que esta en la base ya no coincide con la de
-         01_esquema_proactivanet.sql —tiene al menos Slot y
-         Calendar_YearMonth, que el script del repo no trae—, asi que
-         recrearla desde el repo borraria esas columnas y romperia las vistas
-         de Slots y las de por mes. Si se quiere agregar, hay que scriptear
-         la vista REAL desde SSMS (clic derecho -> Script as -> ALTER),
-         meterle 't.ClaveTicket,' y ejecutar eso.
+         por ticket sin importar el prefijo.
+
+         NO se hace desde aqui a proposito. La vista que esta en la base ya
+         no es la de 01_esquema_proactivanet.sql: le agregaron Lider,
+         Calendar_Year, Calendar_Month, Calendar_YearMonth y Slot, y le
+         quitaron TiendaNumero, FechaRegistroDia, AnioMes, HorasEnBacklog y
+         EstaAbierto. De Slot y Calendar_YearMonth dependen las vistas de
+         Slots y las de por mes, asi que recrear la vista desde el repo las
+         romperia.
+
+         La forma segura: en SSMS, clic derecho sobre dbo.vw_Tickets ->
+         Script View as -> ALTER To -> New Query Window, agregarle
+         't.ClaveTicket,' a la lista y ejecutar ESO. Asi se conserva lo que
+         la vista ya tiene.
+
+         (En el repo, 01_esquema_proactivanet.sql ya dejo de recrear la
+         vista: ahora solo la crea si no existe, para que volver a correrlo
+         no borre esas columnas.)
    ===================================================================================== */
 
 /* =====================================================================================
