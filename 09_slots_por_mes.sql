@@ -23,9 +23,10 @@
    agrupar solo por numero de mes juntaria junio de 2025 con junio de 2026.
    Por eso las vistas agrupan por Anio + Mes y exponen las tres columnas:
 
-       Anio    2026
-       Mes     6            <- la columna del Excel
-       AnioMes '2026-06'    <- practica para ordenar y para el eje de una grafica
+       Anio                2026
+       Mes                 6     <- la columna del Excel
+       Calendar_YearMonth        <- el año-mes tal como lo trae dbo.vw_Tickets;
+                                    practico para ordenar y para el eje de una grafica
 
    Para obtener exactamente la hoja del Excel:
        SELECT Mes, C1, Aplica, [Tipo relación], ... FROM dbo.vw_TBMesC1
@@ -34,11 +35,14 @@
    REQUISITO PREVIO
    ----------------
    Ejecutar antes 'Descargar script v2 usando vw_Tickets.sql', que crea las
-   funciones de categoria (fn_NormalizaCategoria, fn_CategoriaC1,
-   fn_CategoriaC1C2) y la tabla dbo.CategoriaServiceOwner. Este script las
-   reutiliza tal cual: la definicion de C1, C1&C2 y Categoria V2 tiene que
-   ser la misma en las vistas por Slot y en las de por mes, o los totales no
-   van a cuadrar entre unas y otras.
+   funciones de categoria: fn_NormalizaCategoria, fn_CategoriaC1 y
+   fn_CategoriaC1C2. Este script las reutiliza tal cual: la definicion de C1,
+   C1&C2 y Categoria V2 tiene que ser la misma en las vistas por Slot y en las
+   de por mes, o los totales no van a cuadrar entre unas y otras.
+
+   dbo.vw_Tickets tiene que exponer la columna Calendar_YearMonth (el año-mes
+   ya armado). Es la que se usa aqui; si en algun ambiente se llama distinto,
+   se cambia en la vista base y en los tres GROUP BY.
 
    DIFERENCIA CON LAS VISTAS POR SLOT
    ----------------------------------
@@ -118,9 +122,9 @@ SELECT
     t.FechaRegistro,
     Anio    = YEAR(t.FechaRegistro),
     Mes     = MONTH(t.FechaRegistro),
-    -- dbo.vw_Tickets ya trae AnioMes ('yyyy-MM'); se reusa para que el
-    -- formato sea el mismo en todo el modelo.
-    t.AnioMes,
+    -- dbo.vw_Tickets ya trae el año-mes armado; se reusa en vez de volver a
+    -- calcularlo, para que el formato sea el mismo en todo el modelo.
+    t.Calendar_YearMonth,
     CategoriaV2 = dbo.fn_NormalizaCategoria(t.Categoria),
     C1          = dbo.fn_CategoriaC1(t.Categoria),
     C1C2        = dbo.fn_CategoriaC1C2(t.Categoria),
@@ -144,7 +148,7 @@ AS
 SELECT
     b.Anio,
     b.Mes,
-    b.AnioMes,
+    b.Calendar_YearMonth,
     [Categoria V2] = b.CategoriaV2,
     b.Aplica,
     [Tipo relación] = b.TipoRelacion,
@@ -156,22 +160,24 @@ SELECT
     [SorIA Incidentes] = NULLIF(SUM(CASE WHEN b.TipoTicket = N'SorIA Incidentes' THEN 1 ELSE 0 END), 0),
     [Total general] = COUNT_BIG(*)
 FROM dbo.vw_TicketsMesBase AS b
-GROUP BY b.Anio, b.Mes, b.AnioMes, b.CategoriaV2, b.Aplica, b.TipoRelacion;
+GROUP BY b.Anio, b.Mes, b.Calendar_YearMonth, b.CategoriaV2, b.Aplica, b.TipoRelacion;
 GO
 
 /* =====================================================================================
    4) Hoja "TablaTickets (c2)": Mes + C1&C2 + Aplica + Tipo relacion.
 
-      Lleva ademas ServiceOwner, igual que vw_TBSlotC2. La hoja del Excel no
-      lo trae, pero sale del mismo catalogo y no estorba: si no se quiere,
-      basta no seleccionar la columna.
+      A diferencia de vw_TBSlotC2, esta NO trae ServiceOwner: la hoja del
+      Excel tampoco lo trae. Si algun dia se quiere, se agrega
+          ServiceOwner = MAX(so.ServiceOwner)
+      con un LEFT JOIN dbo.CategoriaServiceOwner AS so ON so.C1C2 = b.C1C2,
+      pero entonces esa tabla tiene que existir en el ambiente.
    ===================================================================================== */
 CREATE OR ALTER VIEW dbo.vw_TBMesC2
 AS
 SELECT
     b.Anio,
     b.Mes,
-    b.AnioMes,
+    b.Calendar_YearMonth,
     [C1&C2] = b.C1C2,
     b.Aplica,
     [Tipo relación] = b.TipoRelacion,
@@ -179,12 +185,9 @@ SELECT
     [Petición de Servicio] = NULLIF(SUM(CASE WHEN b.TipoTicket IN (N'Petición de Servicio', N'Peticion de Servicio') THEN 1 ELSE 0 END), 0),
     [SorIA Peticiones] = NULLIF(SUM(CASE WHEN b.TipoTicket = N'SorIA Peticiones' THEN 1 ELSE 0 END), 0),
     [SorIA Incidentes] = NULLIF(SUM(CASE WHEN b.TipoTicket = N'SorIA Incidentes' THEN 1 ELSE 0 END), 0),
-    [Total general] = COUNT_BIG(*),
-    ServiceOwner = MAX(so.ServiceOwner)
+    [Total general] = COUNT_BIG(*)
 FROM dbo.vw_TicketsMesBase AS b
-LEFT JOIN dbo.CategoriaServiceOwner AS so
-       ON so.C1C2 = b.C1C2
-GROUP BY b.Anio, b.Mes, b.AnioMes, b.C1C2, b.Aplica, b.TipoRelacion;
+GROUP BY b.Anio, b.Mes, b.Calendar_YearMonth, b.C1C2, b.Aplica, b.TipoRelacion;
 GO
 
 /* =====================================================================================
@@ -195,7 +198,7 @@ AS
 SELECT
     b.Anio,
     b.Mes,
-    b.AnioMes,
+    b.Calendar_YearMonth,
     b.C1,
     b.Aplica,
     [Tipo relación] = b.TipoRelacion,
@@ -205,7 +208,7 @@ SELECT
     [SorIA Incidentes] = NULLIF(SUM(CASE WHEN b.TipoTicket = N'SorIA Incidentes' THEN 1 ELSE 0 END), 0),
     [Total general] = COUNT_BIG(*)
 FROM dbo.vw_TicketsMesBase AS b
-GROUP BY b.Anio, b.Mes, b.AnioMes, b.C1, b.Aplica, b.TipoRelacion;
+GROUP BY b.Anio, b.Mes, b.Calendar_YearMonth, b.C1, b.Aplica, b.TipoRelacion;
 GO
 
 /* =====================================================================================
