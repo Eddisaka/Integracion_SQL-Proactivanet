@@ -5,17 +5,34 @@
 
    QUE ES UN "SERVICIO"
    --------------------
-   El correo de Fenix WMS cubre todos los tickets cuya categoria empieza con
-   '/S-Logistica/'. Lo verifique contra el Excel del 26 de agosto: los 394
-   creados y los 43 en backlog son 100% de esa rama, repartidos entre ocho
-   grupos distintos (Soporte Fenix_WMS, WMS Nivel 2.5, End User, Service
-   Desk...). O sea que el recorte NO es por grupo: es por el PRIMER NIVEL de
-   la categoria, lo que en este proyecto ya llamamos C1.
+   El correo de Fenix WMS cubre todos los tickets de una rama de categorias.
+   Lo verifique contra el Excel del 26 de agosto: los 394 creados y los 43 en
+   backlog cuelgan todos de la misma rama, repartidos entre ocho grupos
+   distintos (Soporte Fenix_WMS, WMS Nivel 2.5, End User, Service Desk...).
+   O sea que el recorte NO es por grupo, es por categoria.
 
-   Por eso el parametro del correo es el servicio, y cada servicio es un C1.
-   Se apoya en dbo.fn_CategoriaC1, la misma funcion que usan las vistas de
-   Slots y las de por mes, para que "S-Logistica" signifique lo mismo en
-   todos lados.
+   UN SERVICIO, VARIAS RAMAS
+   Y no es una sola rama. Proactivanet reestructura su catalogo cada tanto:
+   'S-FENIX WMS' se inactivo el 20 de agosto y sus tickets se movieron a
+   'S-Logistica'. Los tickets viejos conservan la ruta vieja para siempre,
+   asi que el servicio WMS necesita las DOS para ver su historia completa; si
+   solo se mirara la nueva, el correo perderia todo lo anterior al 20 y las
+   tendencias saldrian truncadas.
+
+   Por eso las categorias de un servicio viven en su propia tabla,
+   dbo.CatServicioCategoria, con una fila por rama. Dar de alta la
+   reestructuracion del mes que entra es un INSERT, no un cambio de diseno.
+
+   NO SE GUARDA VIGENCIA POR FECHAS
+   A proposito. Un ticket trae UNA sola categoria, y esa ruta ya dice a que
+   epoca pertenece: no hace falta decir ademas desde cuando conto cada rama.
+   Guardar fechas duplicaria ese dato y abriria la puerta a huecos si alguien
+   se equivoca al capturarlas.
+
+   SE GUARDA UN PREFIJO, NO UN NIVEL FIJO
+   'S-Logistica' toma toda la rama. Si algun dia un servicio necesitara solo
+   una parte, se pone 'S-Logistica/FENIX WMS' y funciona igual, sin rehacer
+   nada.
 
    QUE TRAE ESTE SCRIPT
    --------------------
@@ -25,6 +42,8 @@
    se consulta a diario.
 
    - dbo.CatServicioCorreo        que servicios existen y a quien se les manda
+   - dbo.CatServicioCategoria     que ramas de categorias cubre cada servicio
+   - dbo.fn_RutaServicio          normaliza la ruta para poder comparar
    - dbo.CatCedis                 Sucursal (numero) -> nombre del CEDIS
    - dbo.CatCausaRaizAgrupador    causa raiz de Fenix -> agrupador
    - dbo.fn_CategoriaNivel        saca el nivel N de una ruta de categoria
@@ -105,8 +124,8 @@ SELECT dbo.fn_CategoriaNivel(N'/S-Logistica/RECIBO PROVEEDORES/CITA NO REPLICA',
    2) Catalogo de servicios
 
       Una fila por correo que se quiera mandar. El script de envio recibe el
-      nombre del servicio y de aqui saca TODO lo demas: que categoria mirar,
-      como titular el correo y a quien mandarselo.
+      nombre del servicio y de aqui saca como titular el correo y a quien
+      mandarselo; QUE categorias mirar sale de la tabla de la seccion 2.1.
 
       Asi cambiar la lista de distribucion es un UPDATE, sin tocar archivos ni
       pedir un deploy.
@@ -118,7 +137,6 @@ BEGIN
     CREATE TABLE dbo.CatServicioCorreo
     (
         Servicio      NVARCHAR(100)  NOT NULL,   -- 'WMS', el nombre corto que se pasa por parametro
-        C1            NVARCHAR(255)  NOT NULL,   -- 'S-Logistica', el primer nivel de la categoria
         Descripcion   NVARCHAR(255)  NULL,       -- 'Fenix WMS / Logistica', para los titulos
         AsuntoPlantilla NVARCHAR(255) NULL,      -- 'Tickets WMS al {fecha}'
         Para          NVARCHAR(MAX)  NULL,
@@ -133,27 +151,110 @@ GO
 
 /* Alta del primer servicio. Las listas se dejan VACIAS a proposito: este
    repositorio es publico y los correos del personal no se suben. Se llenan
-   con un UPDATE directo en la base.
-
-   Ojo con C1: tiene que coincidir EXACTO con lo que devuelve
-   dbo.fn_CategoriaC1 sobre las categorias reales. Antes de darlo por bueno:
-
-     SELECT C1 = dbo.fn_CategoriaC1(Categoria), Tickets = COUNT(*)
-     FROM dbo.Tickets
-     WHERE Categoria LIKE '%ogistic%'
-     GROUP BY dbo.fn_CategoriaC1(Categoria);
-*/
+   con un UPDATE directo en la base. */
 IF NOT EXISTS (SELECT 1 FROM dbo.CatServicioCorreo WHERE Servicio = N'WMS')
-    INSERT INTO dbo.CatServicioCorreo (Servicio, C1, Descripcion, AsuntoPlantilla, DiasVentana)
-    VALUES (N'WMS', N'S-Logistica', N'Fenix WMS / Logistica', N'Tickets WMS al {fecha}', 15);
+    INSERT INTO dbo.CatServicioCorreo (Servicio, Descripcion, AsuntoPlantilla, DiasVentana)
+    VALUES (N'WMS', N'Fenix WMS / Logistica', N'Tickets WMS al {fecha}', 15);
 GO
 
-/*  Llenar la distribucion (correr en la base, NO subir con datos reales):
+/* =====================================================================================
+   2.1) Que categorias cubre cada servicio
 
-UPDATE dbo.CatServicioCorreo
-   SET Para    = N'alguien@soriana.com;otro@soriana.com',
-       CopiaCc = N'tercero@soriana.com'
- WHERE Servicio = N'WMS';
+      Una fila por RAMA. El servicio WMS necesita dos:
+
+          WMS -> S-Logistica     (la vigente)
+          WMS -> S-FENIX WMS     (inactivada el 20 de agosto)
+
+      Se guarda un PREFIJO de ruta, sin la diagonal inicial. 'S-Logistica'
+      toma toda la rama; si algun dia hiciera falta acotar, 'S-Logistica/FENIX
+      WMS' funciona igual sin cambiar nada mas.
+
+      El indice unico sobre PrefijoCategoria impide que una misma rama quede
+      en dos servicios: si eso pasara, un ticket se contaria en dos correos y
+      la suma de los servicios dejaria de ser el total.
+   ===================================================================================== */
+IF OBJECT_ID('dbo.CatServicioCategoria', 'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.CatServicioCategoria
+    (
+        Servicio         NVARCHAR(100) NOT NULL,
+        PrefijoCategoria NVARCHAR(400) NOT NULL,
+        Nota             NVARCHAR(255) NULL,   -- 'inactivada el 20/08/2026'
+        FechaAltaDW      DATETIME2(0)  NOT NULL CONSTRAINT DF_CSCat_Alta DEFAULT (SYSDATETIME()),
+        CONSTRAINT PK_CatServicioCategoria PRIMARY KEY CLUSTERED (Servicio, PrefijoCategoria),
+        CONSTRAINT FK_CatServicioCategoria_Servicio
+            FOREIGN KEY (Servicio) REFERENCES dbo.CatServicioCorreo (Servicio)
+    );
+    CREATE UNIQUE INDEX UQ_CatServicioCategoria_Prefijo
+        ON dbo.CatServicioCategoria (PrefijoCategoria);
+END;
+GO
+
+/* Migracion desde la version anterior, cuando el C1 era una columna de
+   CatServicioCorreo. Se conserva lo que ya se haya capturado. */
+IF COL_LENGTH('dbo.CatServicioCorreo', 'C1') IS NOT NULL
+BEGIN
+    EXEC sp_executesql N'
+        INSERT INTO dbo.CatServicioCategoria (Servicio, PrefijoCategoria, Nota)
+        SELECT s.Servicio, LTRIM(RTRIM(s.C1)), N''Migrado de CatServicioCorreo.C1''
+        FROM dbo.CatServicioCorreo AS s
+        WHERE NULLIF(LTRIM(RTRIM(s.C1)), N'''') IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM dbo.CatServicioCategoria AS c
+                          WHERE c.PrefijoCategoria = LTRIM(RTRIM(s.C1)));';
+
+    ALTER TABLE dbo.CatServicioCorreo DROP COLUMN C1;
+    PRINT N'CatServicioCorreo.C1 migrado a CatServicioCategoria y eliminado.';
+END;
+GO
+
+/*  Dar de alta la rama vieja de WMS (la que ya no acepta la PK anterior):
+
+INSERT INTO dbo.CatServicioCategoria (Servicio, PrefijoCategoria, Nota)
+VALUES (N'WMS', N'S-FENIX WMS', N'Inactivada el 20/08/2026, se movio a S-Logistica');
+
+    Para ver que ramas existen realmente y con cuantos tickets, antes de
+    capturarlas -aqui se ven los nombres exactos, con sus guiones y espacios-:
+
+SELECT C1 = dbo.fn_CategoriaC1(Categoria), Tickets = COUNT(*),
+       Desde = MIN(FechaRegistro), Hasta = MAX(FechaRegistro)
+FROM dbo.Tickets
+GROUP BY dbo.fn_CategoriaC1(Categoria)
+ORDER BY 2 DESC;
+*/
+
+/* =====================================================================================
+   2.2) Normalizar la ruta para poder compararla
+
+      Quita la diagonal inicial y la final, para que la categoria del ticket y
+      el prefijo capturado se puedan comparar sin depender de como venga cada
+      uno:
+
+          '/S-Logistica/EMBARQUE/'  ->  'S-Logistica/EMBARQUE'
+
+      La comparacion se hace con LEFT y no con LIKE a proposito: hay
+      categorias con guion bajo ('S-FENIX_WMS'), y en LIKE el guion bajo es
+      comodin de un caracter. Con LIKE, 'FENIX_WMS' tambien casaria con
+      'FENIXAWMS'.
+   ===================================================================================== */
+CREATE OR ALTER FUNCTION dbo.fn_RutaServicio (@Categoria NVARCHAR(1000))
+RETURNS NVARCHAR(1000)
+WITH SCHEMABINDING
+AS
+BEGIN
+    DECLARE @s NVARCHAR(1000) = LTRIM(RTRIM(REPLACE(ISNULL(@Categoria, N''), NCHAR(160), N' ')));
+    IF @s = N'' RETURN N'';
+    IF LEFT(@s, 1)  = N'/' SET @s = SUBSTRING(@s, 2, LEN(@s + N'|') - 2);
+    IF @s <> N'' AND RIGHT(@s, 1) = N'/' SET @s = LEFT(@s, LEN(@s + N'|') - 2);
+    RETURN @s;
+END;
+GO
+
+/* Comprobacion: las cuatro deben dar 'S-Logistica/EMBARQUE'.
+
+SELECT dbo.fn_RutaServicio(N'/S-Logistica/EMBARQUE/'),
+       dbo.fn_RutaServicio(N'S-Logistica/EMBARQUE'),
+       dbo.fn_RutaServicio(N'/S-Logistica/EMBARQUE'),
+       dbo.fn_RutaServicio(N'S-Logistica/EMBARQUE/');
 */
 
 /* =====================================================================================
@@ -322,6 +423,20 @@ GO
       No filtra por servicio: eso lo hace quien la consulta, con
       Servicio = @Servicio. Asi la vista sirve para cualquier servicio del
       catalogo sin duplicarla.
+
+      El JOIN empareja la ruta del ticket contra los prefijos del catalogo:
+      coincide si la ruta ES el prefijo, o si CUELGA de el. No usa LIKE por lo
+      del guion bajo (ver 2.2), y por eso no puede resolverse con un seek.
+
+      Con pocos prefijos en el catalogo y una corrida al dia no se nota. Si
+      algun dia pesara, la salida es la misma que se uso para ClaveTicket:
+
+          ALTER TABLE dbo.Tickets
+              ADD RutaServicio AS dbo.fn_RutaServicio(Categoria) PERSISTED;
+          CREATE INDEX IX_Tickets_RutaServicio ON dbo.Tickets (RutaServicio);
+
+      No se hace aqui porque seria agregar una columna a una tabla de un
+      millon de filas sin haber medido que haga falta.
    ===================================================================================== */
 CREATE OR ALTER VIEW dbo.vw_ServicioTickets
 AS
@@ -329,6 +444,9 @@ SELECT
     t.CodigoTicket,
     s.Servicio,
     C1 = dbo.fn_CategoriaC1(t.Categoria),
+    -- Que rama del catalogo lo trajo. Sirve para ver, en el Excel, cuanto
+    -- viene de la categoria vieja y cuanto de la nueva.
+    RamaServicio = sc.PrefijoCategoria,
     N2 = dbo.fn_CategoriaNivel(t.Categoria, 2),
     N3 = dbo.fn_CategoriaNivel(t.Categoria, 3),
     t.Categoria,
@@ -373,8 +491,12 @@ SELECT
     EnBacklog = CASE WHEN t.Estado NOT IN (N'Cerrada', N'Rechazada', N'Resuelta')
                      THEN 1 ELSE 0 END
 FROM dbo.Tickets AS t
+INNER JOIN dbo.CatServicioCategoria AS sc
+        ON  dbo.fn_RutaServicio(t.Categoria) = sc.PrefijoCategoria
+         OR LEFT(dbo.fn_RutaServicio(t.Categoria), LEN(sc.PrefijoCategoria + N'|')) 
+            = sc.PrefijoCategoria + N'/'
 INNER JOIN dbo.CatServicioCorreo AS s
-        ON s.C1 = dbo.fn_CategoriaC1(t.Categoria)
+        ON s.Servicio = sc.Servicio
        AND s.Habilitado = 1
 LEFT JOIN dbo.CatCedis AS c
        ON c.Sucursal = t.Sucursal
@@ -387,15 +509,20 @@ GO
    6) Comprobaciones
    =====================================================================================
 
--- a) LO PRIMERO. Si esto devuelve 0 filas, los tickets de S-Logistica no
---    llegaron a dbo.Tickets y hay que resolver eso antes de seguir: el
---    reporte que alimenta el ETL no los estaria viendo.
-SELECT C1 = dbo.fn_CategoriaC1(Categoria), Tickets = COUNT(*),
+-- a) Que ramas cubre hoy cada servicio
+SELECT s.Servicio, s.Descripcion, c.PrefijoCategoria, c.Nota
+FROM dbo.CatServicioCorreo AS s
+LEFT JOIN dbo.CatServicioCategoria AS c ON c.Servicio = s.Servicio
+ORDER BY s.Servicio, c.PrefijoCategoria;
+
+-- a.2) Cuantos tickets aporta cada rama. Si una sale en cero, el prefijo esta
+--      mal escrito: se captura EXACTO como aparece en la consulta de la
+--      seccion 2.1, con sus guiones y espacios.
+SELECT Servicio, RamaServicio, Tickets = COUNT(*),
        Desde = MIN(FechaRegistro), Hasta = MAX(FechaRegistro)
-FROM dbo.Tickets
-WHERE Categoria LIKE N'%ogistic%'
-GROUP BY dbo.fn_CategoriaC1(Categoria)
-ORDER BY 2 DESC;
+FROM dbo.vw_ServicioTickets
+GROUP BY Servicio, RamaServicio
+ORDER BY Servicio, 3 DESC;
 
 -- b) Contra el Excel del 26 de agosto: creados del 11 al 26 deben dar 394,
 --    y el backlog 43.
@@ -432,6 +559,7 @@ WHERE Servicio = N'WMS';
    =====================================================================================
 GRANT SELECT  ON dbo.vw_ServicioTickets            TO [PROACTIVANETAD];
 GRANT SELECT  ON dbo.CatServicioCorreo             TO [PROACTIVANETAD];
+GRANT SELECT  ON dbo.CatServicioCategoria          TO [PROACTIVANETAD];
 GRANT EXECUTE ON dbo.usp_CargarCatCedis            TO [PROACTIVANETAD];
 GRANT EXECUTE ON dbo.usp_CargarCatCausaRaizAgrupador TO [PROACTIVANETAD];
 */

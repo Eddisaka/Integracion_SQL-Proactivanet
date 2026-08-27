@@ -7,14 +7,17 @@
     Automatiza el correo que hoy se arma a mano ("Tickets WMS al ...").
 
     QUE ES UN SERVICIO
-    Un servicio es una rama de categorias: todo lo que cuelga de un mismo
-    primer nivel. En el correo de WMS son los tickets de '/S-Logistica/...',
-    que reparten ocho grupos resolutores distintos. Por eso el recorte va por
-    categoria y no por grupo.
+    Un servicio son una o mas ramas de categorias. En WMS son los tickets de
+    '/S-Logistica/...' y tambien los de '/S-FENIX WMS/...', la rama que
+    Proactivanet inactivo el 20 de agosto: los tickets viejos conservan su
+    ruta para siempre, asi que sin las dos el correo perderia toda la
+    historia anterior a esa fecha. Entre ambas reparten ocho grupos
+    resolutores distintos, por eso el recorte va por categoria y no por grupo.
 
-    Los servicios viven en dbo.CatServicioCorreo, con su C1, su asunto y su
-    lista de distribucion. Cambiar a quien se le manda es un UPDATE en esa
-    tabla: no hay que tocar este archivo ni pedir un deploy.
+    Los servicios viven en dbo.CatServicioCorreo (asunto y distribucion) y
+    sus ramas en dbo.CatServicioCategoria. Cambiar a quien se le manda, o
+    darle de alta la rama de la proxima reestructuracion, son un UPDATE y un
+    INSERT: no hay que tocar este archivo ni pedir un deploy.
 
         .\Enviar_CorreoServicio.ps1 -Listar
         .\Enviar_CorreoServicio.ps1 -Servicio WMS
