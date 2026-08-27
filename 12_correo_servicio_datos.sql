@@ -20,6 +20,16 @@
    misma ventana corrida un dia: no es el dato de un solo dia, es la misma
    medida calculada al corte anterior, que es como se compara en el Excel.
 
+   VARIAS CATEGORIAS POR SERVICIO
+   ------------------------------
+   Un servicio cubre las ramas que tenga dadas de alta en
+   dbo.CatServicioCategoria, no una sola. WMS lleva 'S-Logistica' y tambien
+   'S-FENIX WMS', la que se inactivo el 20 de agosto: sin las dos, el correo
+   perderia toda la historia anterior a esa fecha.
+
+   Cada ticket sale con la rama que lo trajo (RamaServicio), asi que en el
+   Excel se puede ver cuanto viene de cada una.
+
    Objetos:
    - dbo.fn_ServicioAging          los buckets de antiguedad del backlog
    - dbo.usp_CorreoServicio_Principal   los 8 bloques del correo, de un jalon
@@ -92,11 +102,21 @@ CREATE OR ALTER PROCEDURE dbo.usp_CorreoServicio_Catalogo
 AS
 BEGIN
     SET NOCOUNT ON;
-    SELECT Servicio, C1, Descripcion, DiasVentana, Habilitado,
-           TienePara = CASE WHEN NULLIF(LTRIM(RTRIM(ISNULL(Para, N''))), N'') IS NULL
-                            THEN 0 ELSE 1 END
-    FROM dbo.CatServicioCorreo
-    ORDER BY Servicio;
+    SELECT s.Servicio, s.Descripcion, s.DiasVentana, s.Habilitado,
+           TienePara = CASE WHEN NULLIF(LTRIM(RTRIM(ISNULL(s.Para, N''))), N'') IS NULL
+                            THEN 0 ELSE 1 END,
+           Ramas = (SELECT COUNT(*) FROM dbo.CatServicioCategoria AS c
+                    WHERE c.Servicio = s.Servicio),
+           -- Las ramas en una sola celda: un servicio suele tener dos o tres
+           -- y asi se ve de un vistazo si le falta la vieja tras una
+           -- reestructuracion del catalogo.
+           Categorias = STUFF((SELECT N', ' + c.PrefijoCategoria
+                               FROM dbo.CatServicioCategoria AS c
+                               WHERE c.Servicio = s.Servicio
+                               ORDER BY c.PrefijoCategoria
+                               FOR XML PATH(''), TYPE).value('.', 'NVARCHAR(MAX)'), 1, 2, N'')
+    FROM dbo.CatServicioCorreo AS s
+    ORDER BY s.Servicio;
 END;
 GO
 
@@ -126,17 +146,32 @@ AS
 BEGIN
     SET NOCOUNT ON;
 
-    DECLARE @C1 NVARCHAR(255), @Desc NVARCHAR(255), @Asunto NVARCHAR(255),
-            @Para NVARCHAR(MAX), @Cc NVARCHAR(MAX), @Dias INT;
+    DECLARE @Desc NVARCHAR(255), @Asunto NVARCHAR(255),
+            @Para NVARCHAR(MAX), @Cc NVARCHAR(MAX), @Dias INT, @Existe BIT = 0;
 
-    SELECT @C1 = C1, @Desc = Descripcion, @Asunto = AsuntoPlantilla,
+    SELECT @Existe = 1, @Desc = Descripcion, @Asunto = AsuntoPlantilla,
            @Para = Para, @Cc = CopiaCc, @Dias = DiasVentana
     FROM dbo.CatServicioCorreo
     WHERE Servicio = @Servicio AND Habilitado = 1;
 
-    IF @C1 IS NULL
+    IF @Existe = 0
     BEGIN
         RAISERROR (N'El servicio "%s" no existe en dbo.CatServicioCorreo o esta deshabilitado.', 16, 1, @Servicio);
+        RETURN;
+    END;
+
+    -- Sin ramas capturadas el correo saldria vacio sin decir por que. Vale
+    -- mas tronar aqui, con el mensaje que dice exactamente que hacer.
+    DECLARE @Ramas NVARCHAR(MAX) = STUFF((
+        SELECT N', ' + c.PrefijoCategoria
+        FROM dbo.CatServicioCategoria AS c
+        WHERE c.Servicio = @Servicio
+        ORDER BY c.PrefijoCategoria
+        FOR XML PATH(''), TYPE).value('.', 'NVARCHAR(MAX)'), 1, 2, N'');
+
+    IF @Ramas IS NULL
+    BEGIN
+        RAISERROR (N'El servicio "%s" no tiene ninguna categoria en dbo.CatServicioCategoria. Agrega al menos una: INSERT INTO dbo.CatServicioCategoria (Servicio, PrefijoCategoria) VALUES (N''%s'', N''S-Logistica'');', 16, 1, @Servicio, @Servicio);
         RETURN;
     END;
 
@@ -151,7 +186,7 @@ BEGIN
        y de aqui salen los ocho bloques. */
     IF OBJECT_ID('tempdb..#V') IS NOT NULL DROP TABLE #V;
     SELECT
-        v.CodigoTicket, v.N2, v.N3, v.Grupo, v.Subestado, v.Estado, v.Prioridad,
+        v.CodigoTicket, v.RamaServicio, v.N2, v.N3, v.Grupo, v.Subestado, v.Estado, v.Prioridad,
         v.Cedis, v.Agrupador, v.CausaRaizFenix, v.HorasSolucion, v.Reabierto,
         v.FechaRegistro, v.FechaRegistroDia, v.FechaCierreDia, v.EnBacklog,
         DiasAging = DATEDIFF(DAY, v.FechaRegistro, @FechaCorte)
@@ -163,7 +198,7 @@ BEGIN
            OR v.EnBacklog = 1);
 
     /* ---------- 1) Encabezado ---------- */
-    SELECT Servicio = @Servicio, Descripcion = @Desc, C1 = @C1,
+    SELECT Servicio = @Servicio, Descripcion = @Desc, Categorias = @Ramas,
            FechaCorte = @FechaCorte, Desde = @Desde, DiasVentana = @DiasVentana,
            AsuntoPlantilla = @Asunto, Para = @Para, CopiaCc = @Cc;
 
@@ -303,7 +338,7 @@ BEGIN
     SELECT
         v.CodigoTicket, v.FechaRegistro, v.Prioridad, v.SLA, v.Grupo,
         v.TecnicoSegundaLinea, v.Estado, v.Subestado, v.Tipo,
-        v.Categoria, v.N2, v.N3,
+        v.Categoria, v.RamaServicio, v.N2, v.N3,
         v.Sucursal, v.Cedis, v.TipoCedis,
         v.CausaRaizFenix, v.CausaC1, v.CausaC2, v.CausaC3, v.Agrupador,
         v.IntentosSolucion, v.Reabierto,
@@ -325,6 +360,14 @@ GO
    =====================================================================================
 
 EXEC dbo.usp_CorreoServicio_Catalogo;
+
+-- Cuanto aporta cada rama. Si alguna sale en cero, el prefijo esta mal
+-- escrito; se captura EXACTO como aparece en dbo.Tickets.
+SELECT Servicio, RamaServicio, Tickets = COUNT(*),
+       Desde = MIN(FechaRegistro), Hasta = MAX(FechaRegistro)
+FROM dbo.vw_ServicioTickets
+GROUP BY Servicio, RamaServicio
+ORDER BY Servicio, 3 DESC;
 
 -- El correo completo. Con corte 2026-08-26 y ventana 15, el bloque 2 debe dar
 -- Creados 394, Backlog 43 (ayer 51), VolumenPromedioDiario 24.6 y
