@@ -427,12 +427,15 @@ function New-GraficaBarrasAgrupadas {
     $area.AxisX.LabelStyle.Angle = -45
     $area.AxisX.MajorGrid.Enabled = $false
     $area.AxisY.MajorGrid.LineColor = [System.Drawing.ColorTranslator]::FromHtml('#e5e7eb')
-    $area.AxisX.LineColor = [System.Drawing.ColorTranslator]::FromHtml('#9ca3af')
-    $area.AxisY.LineColor = [System.Drawing.ColorTranslator]::FromHtml('#9ca3af')
     $chart.ChartAreas.Add($area)
 
-    $titulo = $chart.Titles.Add($Titulo)
-    $titulo.ForeColor = [System.Drawing.ColorTranslator]::FromHtml('#374151')
+    # Titles.Add(string) NO devuelve el Title: en PS 5.1 resuelve a la
+    # sobrecarga heredada de CollectionBase y regresa el indice (un int), asi
+    # que cualquier propiedad que se le ponga encima truena con "la propiedad
+    # 'ForeColor' no se encuentra en este objeto". Es la misma leccion que ya
+    # estaba anotada para .Font sobre Title y Series. Por eso las otras
+    # graficas del proyecto lo agregan y ya: [void] y sin tocarle nada.
+    [void]$chart.Titles.Add($Titulo)
 
     $leyenda = New-Object System.Windows.Forms.DataVisualization.Charting.Legend
     $leyenda.Docking = [System.Windows.Forms.DataVisualization.Charting.Docking]::Bottom
