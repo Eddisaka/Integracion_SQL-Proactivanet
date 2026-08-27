@@ -14,6 +14,26 @@
    Eso tambien cuadra el KPI de volumen: 394 creados / 16 dias = 24.6, que es
    el "25 tickets" del dashboard.
 
+   CUANDO SE CUENTA UN TICKET COMO CERRADO
+   ---------------------------------------
+   Por la FIRMA DE SOLUCION, no por el cierre formal. Lo confirme leyendo la
+   definicion de las tablas dinamicas dentro del .xlsx del Excel manual: la
+   de cerrados y la de reabiertos agrupan las dos por 'Fecha firma solucion'.
+   El cierre formal llega tres dias despues por una regla automatica de
+   Proactivanet, asi que medir por el correria las barras tres dias.
+
+   REABIERTOS
+   ----------
+   Un ticket cuenta como reabierto si 'Intentos de solucion' es mayor que 1,
+   y se cuenta el dia de su firma de solucion. Tambien salio de la dinamica
+   del Excel: agrupa por ese campo, y sus renglones son 2, 3 y 4.
+
+   Ojo: se cuentan los reabiertos de los tickets CERRADOS en la ventana, sin
+   importar cuando se crearon. La dinamica del Excel sale de la hoja Creados,
+   asi que ahi solo entran los creados en esos mismos 15 dias; un ticket
+   viejo que se reabrio esta semana no aparece. Aqui si, que es lo que
+   interesa saber.
+
    COMPARATIVO CON AYER
    --------------------
    Los KPIs traen su valor de ayer para poder pintar la flecha. "Ayer" es la

@@ -477,14 +477,32 @@ SELECT
     FechaRegistroDia = CONVERT(DATE, t.FechaRegistro),
     t.FechaFirmaSolucion,
     t.FechaFirmaCierre,
-    -- Cierre efectivo: misma regla que el correo de Backlog, para que los dos
-    -- cuenten "cerrado" el mismo dia.
-    FechaCierreEfectiva = COALESCE(t.FechaFirmaCierre, t.FechaFirmaSolucion),
-    FechaCierreDia      = CONVERT(DATE, COALESCE(t.FechaFirmaCierre, t.FechaFirmaSolucion)),
+    /* CUANDO SE CUENTA COMO CERRADO: por la FIRMA DE SOLUCION.
+
+       Es lo que mide el Excel manual. Lo confirme leyendo la definicion de
+       sus tablas dinamicas dentro del .xlsx: la de cerrados y la de
+       reabiertos agrupan las dos por 'Fecha firma solucion'.
+
+       Y tiene sentido: la firma de solucion es cuando el equipo realmente
+       resolvio. El cierre formal llega tres dias despues por una regla
+       automatica de Proactivanet, asi que medir por el correria las barras
+       tres dias y haria ver los ultimos dias del correo con menos cerrados
+       de los que de verdad ya se atendieron.
+
+       Se deja FechaFirmaCierre como respaldo para los que se cerraron sin
+       pasar por solucion -rechazados, por ejemplo-, que si no quedarian
+       fuera de la cuenta.
+
+       OJO: el correo de Backlog usa el orden CONTRARIO
+       (COALESCE(FechaFirmaCierre, FechaFirmaSolucion)) y esta bien asi: alla
+       la pregunta es cuando el ticket dejo de pesar en el backlog, y eso
+       ocurre al cerrarse. */
+    FechaCierreEfectiva = COALESCE(t.FechaFirmaSolucion, t.FechaFirmaCierre),
+    FechaCierreDia      = CONVERT(DATE, COALESCE(t.FechaFirmaSolucion, t.FechaFirmaCierre)),
     HorasSolucion = CASE
-        WHEN COALESCE(t.FechaFirmaCierre, t.FechaFirmaSolucion) IS NULL THEN NULL
+        WHEN COALESCE(t.FechaFirmaSolucion, t.FechaFirmaCierre) IS NULL THEN NULL
         ELSE DATEDIFF(MINUTE, t.FechaRegistro,
-                      COALESCE(t.FechaFirmaCierre, t.FechaFirmaSolucion)) / 60.0
+                      COALESCE(t.FechaFirmaSolucion, t.FechaFirmaCierre)) / 60.0
     END,
 
     DiasBacklog = DATEDIFF(DAY, t.FechaRegistro, CONVERT(DATE, SYSDATETIME())),
