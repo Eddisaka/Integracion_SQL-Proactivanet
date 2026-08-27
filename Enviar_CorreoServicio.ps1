@@ -230,7 +230,7 @@ try {
     $hayCat = $porCatTop.Rows.Count -gt 0
     if ($hayCat) {
         $series = ConvertTo-SeriesTendencia -Tabla $porCatTop -ColumnaFecha 'Dia' -ColumnaSerie 'Categoria' -ColumnaValor 'Tickets'
-        New-GraficaLineas -Series $series -Titulo "Tickets creados por categoria - ultimos $($enc['DiasVentana']) dias" -RutaArchivo $gCategorias -ConLeyenda -Ancho 900 -Alto 380
+        New-GraficaLineas -Series $series -Titulo "Tickets creados por categoria - ultimos $($enc['DiasVentana']) dias" -RutaArchivo $gCategorias -ConLeyenda -MostrarValores -Ancho 1000 -Alto 420
     }
 
     # 2) Flujo diario. Un renglon por dia lo garantiza SQL, incluso los dias
@@ -289,7 +289,7 @@ try {
     $tablaGrupo = ConvertTo-TablaHtml -Tabla $porGrupo -Columnas @('Grupo','Tickets','Horas') -Alineacion @('left','right','right')
     $tablaSub   = ConvertTo-TablaHtml -Tabla $subestados -Columnas @('Subestado','Tickets') -Alineacion @('left','right')
 
-    $imgCat   = if ($hayCat)   { "<img src='cid:gCategorias' style='max-width:900px'>" } else { '' }
+    $imgCat   = if ($hayCat)   { "<img src='cid:gCategorias' style='max-width:1000px'>" } else { '' }
     $imgFlujo = if ($hayFlujo) { "<img src='cid:gFlujo' style='max-width:900px'>" } else { '' }
     $imgAging = if ($hayAging) { "<img src='cid:gAging' style='max-width:640px'>" } else { '' }
     $imgCausa = if ($hayCausa) { "<img src='cid:gCausa' style='max-width:640px'>" } else { '' }

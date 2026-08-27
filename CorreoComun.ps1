@@ -192,6 +192,7 @@ function New-GraficaLineas {
         [Parameter(Mandatory)]$Series,
         [Parameter(Mandatory)][string]$Titulo,
         [Parameter(Mandatory)][string]$RutaArchivo,
+        # Escribe el numero sobre cada punto, saltandose los ceros.
         [switch]$MostrarValores,
         # Etiqueta solo el primer y ultimo punto de cada linea -el "antes y
         # despues"-. Con 30 fechas y 7 series, etiquetar todos los puntos
@@ -232,12 +233,26 @@ function New-GraficaLineas {
         $serie.Color = [System.Drawing.ColorTranslator]::FromHtml($paleta[$indiceSerie % $paleta.Count])
         $serie.MarkerStyle = [System.Windows.Forms.DataVisualization.Charting.MarkerStyle]::Circle
         $serie.MarkerSize = 6
-        if ($MostrarValores) { $serie.IsValueShownAsLabel = $true }
         if ($ConLeyenda) { $serie.Legend = 'Legend1' }
 
         foreach ($p in $s.Puntos) {
             $idx = $serie.Points.AddY([double]$p.Valor)
             $serie.Points[$idx].AxisLabel = [string]$p.Etiqueta
+            # Se etiqueta punto por punto y solo cuando hay valor, en vez de
+            # usar IsValueShownAsLabel, que pinta TODOS los puntos: con varias
+            # series, los dias en cero llenarian el eje de ceros encimados.
+            # Es lo mismo que hace el Excel manual, que tampoco los muestra.
+            if ($MostrarValores -and [double]$p.Valor -gt 0) {
+                $serie.Points[$idx].Label = [string][int]$p.Valor
+            }
+        }
+
+        if ($MostrarValores) {
+            # La etiqueta toma el color de su linea, para saber cual es cual
+            # cuando dos series quedan a alturas parecidas; y SmartLabelStyle
+            # reacomoda las que se encimarian.
+            $serie.LabelForeColor = $serie.Color
+            $serie.SmartLabelStyle.Enabled = $true
         }
 
         if ($ValoresExtremos -and $serie.Points.Count -gt 0) {
