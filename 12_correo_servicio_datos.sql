@@ -128,7 +128,7 @@ CREATE OR ALTER PROCEDURE dbo.usp_CorreoServicio_Catalogo
 AS
 BEGIN
     SET NOCOUNT ON;
-    SELECT s.Servicio, s.Descripcion, s.DiasVentana, s.Habilitado,
+    SELECT s.Servicio, s.Descripcion, s.DiasVentana, s.Habilitado, s.UsaCausaRaiz,
            TienePara = CASE WHEN NULLIF(LTRIM(RTRIM(ISNULL(s.Para, N''))), N'') IS NULL
                             THEN 0 ELSE 1 END,
            Ramas = (SELECT COUNT(*) FROM dbo.CatServicioCategoria AS c
@@ -173,10 +173,12 @@ BEGIN
     SET NOCOUNT ON;
 
     DECLARE @Desc NVARCHAR(255), @Asunto NVARCHAR(255),
-            @Para NVARCHAR(MAX), @Cc NVARCHAR(MAX), @Dias INT, @Existe BIT = 0;
+            @Para NVARCHAR(MAX), @Cc NVARCHAR(MAX), @Dias INT, @Existe BIT = 0,
+            @UsaCausaRaiz BIT = 0;
 
     SELECT @Existe = 1, @Desc = Descripcion, @Asunto = AsuntoPlantilla,
-           @Para = Para, @Cc = CopiaCc, @Dias = DiasVentana
+           @Para = Para, @Cc = CopiaCc, @Dias = DiasVentana,
+           @UsaCausaRaiz = UsaCausaRaiz
     FROM dbo.CatServicioCorreo
     WHERE Servicio = @Servicio AND Habilitado = 1;
 
@@ -226,7 +228,10 @@ BEGIN
     /* ---------- 1) Encabezado ---------- */
     SELECT Servicio = @Servicio, Descripcion = @Desc, Categorias = @Ramas,
            FechaCorte = @FechaCorte, Desde = @Desde, DiasVentana = @DiasVentana,
-           AsuntoPlantilla = @Asunto, Para = @Para, CopiaCc = @Cc;
+           AsuntoPlantilla = @Asunto, Para = @Para, CopiaCc = @Cc,
+           -- El script quita las cinco columnas de causa raiz de las hojas de
+           -- detalle cuando esto viene en 0 (ver 2.0 de 11_correo_servicio.sql).
+           UsaCausaRaiz = @UsaCausaRaiz;
 
     /* ---------- 2) KPIs, con el mismo calculo al corte anterior ----------
        El backlog "de ayer" se reconstruye: tickets creados antes de ayer que
