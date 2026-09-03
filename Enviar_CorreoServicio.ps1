@@ -191,7 +191,19 @@ try {
     # el y la grafica de causa raiz. Es una bandera del catalogo y no una
     # deteccion automatica: asi el correo no cambia de forma solo porque un
     # dia entro un ticket suelto con el campo lleno.
-    $usaCausaRaiz = [bool](Num $enc['UsaCausaRaiz'])
+    #
+    # Se comprueba que la columna venga en el encabezado antes de leerla: si
+    # el procedimiento en la base es de antes de este cambio, no la trae, y
+    # sin esta guarda el script tronaria con un ArgumentException que no dice
+    # que hacer. El valor leido queda en el log para no tener que adivinar por
+    # que salio o no salio la causa raiz.
+    $usaCausaRaiz = $false
+    if ($enc.Table.Columns.Contains('UsaCausaRaiz')) {
+        $usaCausaRaiz = ($enc['UsaCausaRaiz'] -isnot [DBNull]) -and [bool]$enc['UsaCausaRaiz']
+        Write-Log "UsaCausaRaiz del catalogo: $usaCausaRaiz"
+    } else {
+        Write-Log 'El encabezado no trae UsaCausaRaiz: dbo.usp_CorreoServicio_Principal esta desactualizado en la base. Corre 12_correo_servicio_datos.sql. Por ahora se asume 0.' 'WARN'
+    }
 
     $cultura = [Globalization.CultureInfo]::GetCultureInfo('es-MX')
     $fechaTexto = $FechaCorte.ToString('dd MMMM yyyy', $cultura)
