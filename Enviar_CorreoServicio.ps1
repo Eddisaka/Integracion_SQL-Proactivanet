@@ -27,8 +27,9 @@
     Un cuerpo de una sola pantalla -tarjetas de KPI con su comparativo contra
     el corte anterior, la tendencia de creados por categoria, el flujo diario
     de creados/cerrados/reabiertos, el backlog por antiguedad y la causa raiz
-    agrupada- y un Excel adjunto con el detalle: Backlog, Creados, Cerrados y
-    una hoja de resumen.
+    agrupada- y un Excel adjunto con cinco hojas: Resumen, creados_dash
+    -creados por categoria y dia, la matriz que hoy se arma con una tabla
+    dinamica- y el detalle de Backlog, Creados y Cerrados.
 
     DE DONDE SALEN LOS DATOS
     De dbo.usp_CorreoServicio_Principal y dbo.usp_CorreoServicio_Datos
@@ -194,6 +195,14 @@ try {
     $tCreados  = (Invoke-SpDataSet 'dbo.usp_CorreoServicio_Datos' @{ '@Servicio'=$Servicio; '@Conjunto'='Creados';  '@FechaCorte'=$FechaCorte }).Tables[0]
     $tCerrados = (Invoke-SpDataSet 'dbo.usp_CorreoServicio_Datos' @{ '@Servicio'=$Servicio; '@Conjunto'='Cerrados'; '@FechaCorte'=$FechaCorte }).Tables[0]
 
+    # La hoja 'creados_dash': la matriz de creados por categoria y dia que hoy
+    # se arma a mano con una tabla dinamica. SQL la devuelve en formato largo
+    # -una fila por C1/C2/dia- y aqui se abre en columnas.
+    $tDash = (Invoke-SpDataSet 'dbo.usp_CorreoServicio_CreadosDash' @{ '@Servicio'=$Servicio; '@FechaCorte'=$FechaCorte }).Tables[0]
+    $mDash = ConvertTo-TablaPivote -Tabla $tDash -ColumnasFijas @('Servicio','C1','C2') `
+                                   -ColumnaPivote 'Dia' -ColumnaValor 'Tickets'
+    $diasVentana = ($FechaCorte.Date - $desde.Date).Days
+
     # La hoja Resumen lleva los mismos numeros que las tablas dinamicas del
     # Excel manual, pero como celdas: el generador escribe XML plano y no
     # sabe hacer pivotes. A cambio, el archivo abre sin recalcular nada.
@@ -206,6 +215,10 @@ try {
             @{Titulo='Flujo diario';                    Tabla=$flujo},
             @{Titulo='Backlog por antiguedad';          Tabla=$aging},
             @{Titulo='Causa raiz agrupada';             Tabla=$causaRaiz}
+        )},
+        @{Nombre='creados_dash'; Filtro=$false; Secciones=@(
+            @{Titulo=("Tickets creados en los ultimos {0} dias por categoria - {1} al {2}" -f $diasVentana, $Servicio, $fechaTexto)
+              Tabla=$mDash}
         )},
         @{Nombre='Backlog';  Filtro=$true; Secciones=@(@{Titulo=$null; Tabla=$tBacklog})},
         @{Nombre='Creados';  Filtro=$true; Secciones=@(@{Titulo=$null; Tabla=$tCreados})},
