@@ -54,6 +54,7 @@
    - dbo.fn_ServicioAging          los buckets de antiguedad del backlog
    - dbo.usp_CorreoServicio_Principal   los 8 bloques del correo, de un jalon
    - dbo.usp_CorreoServicio_Datos       una hoja del Excel adjunto
+   - dbo.usp_CorreoServicio_CreadosDash creados por categoria y dia
    - dbo.usp_CorreoServicio_Catalogo    que servicios hay (para --listar)
 
    Script idempotente. Compatible con SQL Server 2016+.
@@ -66,6 +67,11 @@ GO
 
 IF OBJECT_ID('dbo.vw_ServicioTickets', 'V') IS NULL
     RAISERROR (N'Falta dbo.vw_ServicioTickets. Ejecuta primero 11_correo_servicio.sql.', 16, 1);
+GO
+
+-- La columna EnlaceTicket de las hojas de detalle sale de este mapeo.
+IF OBJECT_ID('dbo.TicketProactivanetId', 'U') IS NULL
+    RAISERROR (N'Falta dbo.TicketProactivanetId. Ejecuta primero 08_ids_proactivanet.sql: de ahi sale el enlace al ticket en el Excel.', 16, 1);
 GO
 
 /* =====================================================================================
@@ -335,10 +341,22 @@ GO
       @Conjunto: 'Backlog' | 'Creados' | 'Cerrados'
 
       Se devuelven las columnas que el equipo usa para filtrar, con lo
-      derivado ya resuelto (N2, N3, Cedis, causa raiz partida, agrupador,
-      horas). @MaxTexto recorta Titulo y Descripcion: sin tope, una sola
-      descripcion pegada desde Outlook puede traer decenas de miles de
-      caracteres e inflar el .xlsx de mas.
+      derivado ya resuelto (C1, C2, N2, N3, Cedis, causa raiz partida,
+      agrupador, horas). @MaxTexto recorta Titulo, Descripcion y la solucion:
+      sin tope, una sola descripcion pegada desde Outlook puede traer decenas
+      de miles de caracteres e inflar el .xlsx de mas -Excel ademas no admite
+      mas de 32,767 caracteres por celda-.
+
+      LAS COLUMNAS SALEN EN EL ORDEN DEL EXCEL MANUAL
+      La lista replica la de sus hojas Backlog / Creados / Cerrados, para que
+      quien hoy revisa el archivo a mano encuentre cada cosa donde la busca.
+      Es la MISMA lista para los tres conjuntos: el manual las tiene distintas
+      solo por columnas auxiliares de Excel, y no vale la pena arrastrar esa
+      diferencia.
+
+      LO QUE NO SE EXPORTA
+      'contador' del manual: es un 1 fijo que sirve de contador a sus tablas
+      dinamicas. Aqui las cuentas ya vienen hechas de SQL.
    ===================================================================================== */
 CREATE OR ALTER PROCEDURE dbo.usp_CorreoServicio_Datos
     @Servicio    NVARCHAR(100),
@@ -356,22 +374,145 @@ BEGIN
     DECLARE @Desde DATE = DATEADD(DAY, -@DiasVentana, @FechaCorte);
 
     SELECT
-        v.CodigoTicket, v.FechaRegistro, v.Prioridad, v.SLA, v.Grupo,
-        v.TecnicoSegundaLinea, v.Estado, v.Subestado, v.Tipo,
-        v.Categoria, v.RamaServicio, v.N2, v.N3,
-        v.Sucursal, v.Cedis, v.TipoCedis,
-        v.CausaRaizFenix, v.CausaC1, v.CausaC2, v.CausaC3, v.Agrupador,
-        v.IntentosSolucion, v.Reabierto,
-        v.FechaCierreEfectiva, v.HorasSolucion,
-        DiasAging = DATEDIFF(DAY, v.FechaRegistro, @FechaCorte),
-        Aging     = dbo.fn_ServicioAging(DATEDIFF(DAY, v.FechaRegistro, @FechaCorte)),
-        Titulo      = LEFT(v.Titulo, @MaxTexto)
+        /* Enlace al formulario de Proactivanet: el 'Ver registro' del manual.
+           Es la misma URL que usa el tablero (backlog.html). Pide el Id
+           interno, no el codigo, y ese Id lo resuelve sincronizar_ids.py
+           dentro del ETL. Si el ticket todavia no esta en el mapeo la celda
+           queda vacia, que es mejor que un enlace roto. */
+        EnlaceTicket = CASE WHEN p.IdProactivanet IS NULL THEN NULL
+            ELSE N'https://soriana.proactivanet.com/proactivanet/servicedesk/incidents/formIncidents/formIncidents.paw?id='
+                 + CONVERT(NVARCHAR(36), p.IdProactivanet) END,
+        v.CodigoTicket,
+
+        v.FechaRegistro,
+        v.FechaEstimadaResolucion,
+        v.FechaEstimadaOlaUc,
+        v.Prioridad,
+        v.SLA,
+
+        /* El 'sla1' del manual, que ahi esta roto: su formula arrastra #REF!
+           y compara la fecha de descarga contra la columna equivocada. Se
+           implementa la intencion, no la formula: un ticket cerrado se juzga
+           contra su fecha de cierre, y uno abierto contra la fecha de corte,
+           que es hasta donde ha corrido el reloj. */
+        EstadoSLA = CASE
+            WHEN v.FechaEstimadaResolucion IS NULL THEN N'Sin SLA'
+            WHEN COALESCE(v.FechaCierreEfectiva, CONVERT(DATETIME2(0), @FechaCorte))
+                 <= v.FechaEstimadaResolucion THEN N'Dentro SLA'
+            ELSE N'Fuera SLA' END,
+
+        v.Grupo,
+        v.TecnicoSegundaLinea,
+        v.Estado,
+        v.Subestado,
+        v.Tipo,
+
+        Titulo      = LEFT(v.Titulo, @MaxTexto),
+        Descripcion = LEFT(v.Descripcion, @MaxTexto),
+        v.Cliente,
+        v.Sucursal,
+        v.Cedis,
+        v.TipoCedis,
+
+        v.Categoria,
+        v.RamaServicio,
+        v.C1,
+        v.C2,
+        v.N2,
+        v.N3,
+
+        SolucionUsuario = LEFT(v.SolucionUsuario, @MaxTexto),
+        v.FechaFirmaSolucion,
+        v.FechaFirmaCierre,
+        v.FechaCierreEfectiva,
+        v.FirmaSolucion,
+        v.FirmaCierreRevocacion,
+        v.FechaUltimaModificacion,
+        v.ResponsableUltimaModificacion,
+        v.NotificadoPor,
+        v.RegistradoPor,
+        v.TipoRelacion,
+
+        -- En Proactivanet es Si/No y asi lo trae el Excel manual; en la base
+        -- es un BIT. Se devuelve como texto para que las dos vistas cuadren.
+        Caducada = CASE WHEN v.Caducada = 1 THEN N'Si'
+                        WHEN v.Caducada = 0 THEN N'No' END,
+        v.IntentosSolucion,
+        v.Reabierto,
+        v.ReasignacionesGrupo,
+
+        v.TiempoResolucion,
+        v.TiempoAtencion,
+        v.TiempoAtencionHorasMin,
+        v.TiempoPrimeraRespuesta,
+        v.TiempoPrimeraRespuestaHorasMin,
+        v.HorasSolucion,
+
+        v.CausaRaizGrupos,
+        v.CausaRaizFenix,
+        v.CausaC1, v.CausaC2, v.CausaC3, v.Agrupador,
+
+        -- Las auxiliares del manual: su 'Fecha de Descarga', 'dias de
+        -- antiguedad', 'Again', 'Mes' y 'DIA-Mes-Ano'.
+        FechaCorte = @FechaCorte,
+        DiasAging  = DATEDIFF(DAY, v.FechaRegistro, @FechaCorte),
+        Aging      = dbo.fn_ServicioAging(DATEDIFF(DAY, v.FechaRegistro, @FechaCorte)),
+        MesRegistro = FORMAT(v.FechaRegistro, N'MM/yyyy'),
+        DiaRegistro = v.FechaRegistroDia
     FROM dbo.vw_ServicioTickets AS v
+    LEFT JOIN dbo.TicketProactivanetId AS p
+           ON p.CodigoTicket = v.CodigoTicket
     WHERE v.Servicio = @Servicio
       AND (   (@Conjunto = N'Backlog'  AND v.EnBacklog = 1)
            OR (@Conjunto = N'Creados'  AND v.FechaRegistroDia BETWEEN @Desde AND @FechaCorte)
            OR (@Conjunto = N'Cerrados' AND v.FechaCierreDia   BETWEEN @Desde AND @FechaCorte))
     ORDER BY v.FechaRegistro DESC;
+END;
+GO
+
+/* =====================================================================================
+   4.1) La hoja 'creados_dash': creados por categoria y dia
+
+      Replica la tabla dinamica del centro de esa hoja del Excel manual: los
+      tickets creados en la ventana, abiertos por los dos niveles de categoria
+      que cuelgan del servicio, con una columna por dia.
+
+      SALE EN FORMATO LARGO, NO PIVOTEADO
+      Una fila por C1 / C2 / dia. El pivoteo lo hace PowerShell
+      (ConvertTo-TablaPivote en CorreoComun.ps1) por dos razones: evita un
+      PIVOT dinamico con sp_executesql, y deja los encabezados -'11-ago'- en
+      la capa que los dibuja. El mismo procedimiento sirve tal cual para el
+      tablero web sin tener que deshacer un pivote.
+
+      POR QUE C1/C2 Y NO N2/N3
+      Ver 2.3 de 11_correo_servicio.sql. El manual usa niveles posicionales y
+      por eso parte los tickets de WMS en dos bloques; C1/C2 se cuentan desde
+      la rama del servicio y los junta.
+   ===================================================================================== */
+CREATE OR ALTER PROCEDURE dbo.usp_CorreoServicio_CreadosDash
+    @Servicio    NVARCHAR(100),
+    @FechaCorte  DATE = NULL,
+    @DiasVentana INT  = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DECLARE @Dias INT = (SELECT DiasVentana FROM dbo.CatServicioCorreo WHERE Servicio = @Servicio);
+    SET @FechaCorte  = ISNULL(@FechaCorte, CONVERT(DATE, SYSDATETIME()));
+    SET @DiasVentana = ISNULL(@DiasVentana, ISNULL(@Dias, 15));
+    DECLARE @Desde DATE = DATEADD(DAY, -@DiasVentana, @FechaCorte);
+
+    SELECT
+        v.Servicio,
+        v.C1,
+        v.C2,
+        Dia     = v.FechaRegistroDia,
+        Tickets = COUNT(*)
+    FROM dbo.vw_ServicioTickets AS v
+    WHERE v.Servicio = @Servicio
+      AND v.FechaRegistroDia BETWEEN @Desde AND @FechaCorte
+    GROUP BY v.Servicio, v.C1, v.C2, v.FechaRegistroDia
+    ORDER BY v.C1, v.C2, v.FechaRegistroDia;
 END;
 GO
 
@@ -399,6 +540,39 @@ EXEC dbo.usp_CorreoServicio_Datos @Servicio = N'WMS', @Conjunto = N'Backlog',  @
 EXEC dbo.usp_CorreoServicio_Datos @Servicio = N'WMS', @Conjunto = N'Creados',  @FechaCorte = '2026-08-26';
 EXEC dbo.usp_CorreoServicio_Datos @Servicio = N'WMS', @Conjunto = N'Cerrados', @FechaCorte = '2026-08-26';
 
+-- La hoja creados_dash, en formato largo. La suma de Tickets debe dar 394,
+-- igual que el KPI de creados y que el 'Total general' del Excel manual.
+EXEC dbo.usp_CorreoServicio_CreadosDash @Servicio = N'WMS', @FechaCorte = '2026-08-26';
+
+-- Los totales por dia deben coincidir uno a uno con la fila de totales de la
+-- hoja creados_dash del Excel del 26 de agosto:
+-- 39, 21, 37, 29, 20, 6, 42, 40, 35, 18, 29, 21, 3, 27, 22, 5.
+SELECT Dia = v.FechaRegistroDia, Tickets = COUNT(*)
+FROM dbo.vw_ServicioTickets AS v
+WHERE v.Servicio = N'WMS'
+  AND v.FechaRegistroDia BETWEEN '2026-08-11' AND '2026-08-26'
+GROUP BY v.FechaRegistroDia
+ORDER BY 1;
+
+-- Los renglones SI deben diferir del manual, y ese es el punto: el Excel parte
+-- los tickets de WMS en dos porque cuenta niveles desde la raiz. Aqui
+-- 'RECIBO PROVEEDORES / CITA NO REPLICA' debe salir con 65 (los 48 de su
+-- renglon mas los 17 que el manual manda al bloque 'FENIX WMS').
+SELECT v.C1, v.C2, Tickets = COUNT(*)
+FROM dbo.vw_ServicioTickets AS v
+WHERE v.Servicio = N'WMS'
+  AND v.FechaRegistroDia BETWEEN '2026-08-11' AND '2026-08-26'
+GROUP BY v.C1, v.C2
+ORDER BY 3 DESC;
+
+-- No deberia haber 'Sin clasificar': significaria que la ruta del ticket no
+-- cuelga de ninguna rama del catalogo, y la vista une justo por eso.
+SELECT v.Servicio, v.RamaServicio, v.Categoria, Tickets = COUNT(*)
+FROM dbo.vw_ServicioTickets AS v
+WHERE v.C1 = N'Sin clasificar'
+GROUP BY v.Servicio, v.RamaServicio, v.Categoria
+ORDER BY 4 DESC;
+
 */
 
 /* =====================================================================================
@@ -406,5 +580,6 @@ EXEC dbo.usp_CorreoServicio_Datos @Servicio = N'WMS', @Conjunto = N'Cerrados', @
    =====================================================================================
 GRANT EXECUTE ON dbo.usp_CorreoServicio_Principal TO [PROACTIVANETAD];
 GRANT EXECUTE ON dbo.usp_CorreoServicio_Datos     TO [PROACTIVANETAD];
+GRANT EXECUTE ON dbo.usp_CorreoServicio_CreadosDash TO [PROACTIVANETAD];
 GRANT EXECUTE ON dbo.usp_CorreoServicio_Catalogo  TO [PROACTIVANETAD];
 */

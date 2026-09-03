@@ -414,6 +414,127 @@ function Group-SumaPorColumna {
     if ($ColumnaOrden) { $resultado | Sort-Object Orden } else { $resultado | Sort-Object Valor -Descending }
 }
 
+# Convierte un resultado en formato largo -una fila por combinacion- en la
+# matriz que espera una hoja de Excel: las columnas fijas a la izquierda, una
+# columna por cada valor distinto del pivote, el Total y un renglon final de
+# totales.
+#
+# Lo usa la hoja 'creados_dash': dbo.usp_CorreoServicio_CreadosDash devuelve
+# Servicio / C1 / C2 / Dia / Tickets, y aqui los dias se abren en columnas.
+# El pivoteo se hace de este lado y no en SQL para no tener que armar un PIVOT
+# dinamico con sp_executesql; el procedimiento queda util tal cual para el
+# tablero web, que prefiere el formato largo.
+#
+# Devuelve un DataTable porque es justo lo que New-SheetXml sabe pintar.
+#
+# Ojo con el encabezado: los meses se arman con una tabla fija de tres letras
+# y no con ToString('MMM'), porque la cultura del servidor meteria acentos y
+# este archivo tiene que quedarse en ASCII (ver la nota de codificacion de
+# Enviar_CorreoServicio.ps1).
+$script:MesesCortos = @('ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic')
+
+function ConvertTo-TablaPivote {
+    param(
+        [Parameter(Mandatory)][System.Data.DataTable]$Tabla,
+        [Parameter(Mandatory)][string[]]$ColumnasFijas,
+        [Parameter(Mandatory)][string]$ColumnaPivote,
+        [Parameter(Mandatory)][string]$ColumnaValor,
+        [string]$TotalColumna = 'Total',
+        [string]$TotalFila    = 'Total general'
+    )
+
+    # 1) Recolectar las columnas del pivote y las filas, sin perder el orden.
+    $pivotes = New-Object System.Collections.Generic.List[object]
+    $vistos  = @{}
+    $filas   = [ordered]@{}
+
+    foreach ($fila in $Tabla.Rows) {
+        $p = $fila[$ColumnaPivote]
+        if ($null -eq $p -or $p -is [DBNull]) { continue }
+        $clavePivote = if ($p -is [datetime]) { $p.ToString('yyyyMMdd') } else { [string]$p }
+        if (-not $vistos.ContainsKey($clavePivote)) {
+            $vistos[$clavePivote] = $true
+            [void]$pivotes.Add($p)
+        }
+
+        $partes = foreach ($c in $ColumnasFijas) {
+            if ($fila[$c] -is [DBNull]) { '' } else { [string]$fila[$c] }
+        }
+        # Separador que no puede aparecer en un nombre de categoria. Se escribe
+        # como [char]1 y no como "`u{1}": esa sintaxis es de PowerShell 6+ y
+        # aqui corre 5.1.
+        $claveFila = (@($partes) -join [string][char]1)
+        if (-not $filas.Contains($claveFila)) {
+            $filas[$claveFila] = @{ Fijas = @($partes); Valores = @{}; Total = 0.0 }
+        }
+
+        $v = $fila[$ColumnaValor]
+        $n = if ($null -eq $v -or $v -is [DBNull]) { 0.0 } else { [double]$v }
+        $celda = $filas[$claveFila]
+        if ($celda.Valores.ContainsKey($clavePivote)) { $celda.Valores[$clavePivote] += $n }
+        else { $celda.Valores[$clavePivote] = $n }
+        $celda.Total += $n
+    }
+
+    $pivotesOrdenados = $pivotes | Sort-Object
+
+    # 2) Armar el DataTable. Las columnas de dato van como int: la hoja cuenta
+    #    tickets, y un double pintaria '5' como '5.0' en el XML.
+    $dt = New-Object System.Data.DataTable
+    foreach ($c in $ColumnasFijas) { [void]$dt.Columns.Add($c, [string]) }
+    $encabezados = @{}
+    foreach ($p in $pivotesOrdenados) {
+        $clavePivote = if ($p -is [datetime]) { $p.ToString('yyyyMMdd') } else { [string]$p }
+        $titulo = if ($p -is [datetime]) {
+            '{0:00}-{1}' -f $p.Day, $script:MesesCortos[$p.Month - 1]
+        } else { [string]$p }
+        # Dos dias distintos no pueden dar el mismo encabezado, pero un pivote
+        # de texto si; se desempata para que Columns.Add no truene.
+        $base = $titulo; $n = 2
+        while ($dt.Columns.Contains($titulo)) { $titulo = "$base ($n)"; $n++ }
+        $encabezados[$clavePivote] = $titulo
+        [void]$dt.Columns.Add($titulo, [int])
+    }
+    [void]$dt.Columns.Add($TotalColumna, [int])
+
+    # 3) Las filas, ordenadas por total descendente: arriba lo que mas pesa.
+    $ordenadas = $filas.Keys | Sort-Object { -1 * $filas[$_].Total }, { $_ }
+    $totalesColumna = @{}
+    $granTotal = 0.0
+
+    foreach ($clave in $ordenadas) {
+        $celda = $filas[$clave]
+        $dr = $dt.NewRow()
+        for ($i = 0; $i -lt $ColumnasFijas.Count; $i++) { $dr[$ColumnasFijas[$i]] = $celda.Fijas[$i] }
+        foreach ($p in $pivotesOrdenados) {
+            $clavePivote = if ($p -is [datetime]) { $p.ToString('yyyyMMdd') } else { [string]$p }
+            $valor = if ($celda.Valores.ContainsKey($clavePivote)) { $celda.Valores[$clavePivote] } else { 0.0 }
+            $dr[$encabezados[$clavePivote]] = [int]$valor
+            if ($totalesColumna.ContainsKey($clavePivote)) { $totalesColumna[$clavePivote] += $valor }
+            else { $totalesColumna[$clavePivote] = $valor }
+        }
+        $dr[$TotalColumna] = [int]$celda.Total
+        $granTotal += $celda.Total
+        $dt.Rows.Add($dr)
+    }
+
+    # 4) El renglon de totales, para poder cuadrar de un vistazo contra el KPI
+    #    de creados del cuerpo del correo.
+    if ($dt.Rows.Count -gt 0) {
+        $dr = $dt.NewRow()
+        $dr[$ColumnasFijas[0]] = $TotalFila
+        for ($i = 1; $i -lt $ColumnasFijas.Count; $i++) { $dr[$ColumnasFijas[$i]] = '' }
+        foreach ($p in $pivotesOrdenados) {
+            $clavePivote = if ($p -is [datetime]) { $p.ToString('yyyyMMdd') } else { [string]$p }
+            $dr[$encabezados[$clavePivote]] = [int]$totalesColumna[$clavePivote]
+        }
+        $dr[$TotalColumna] = [int]$granTotal
+        $dt.Rows.Add($dr)
+    }
+
+    ,$dt
+}
+
 # Barras agrupadas: una barra por serie dentro de cada categoria del eje X.
 # Es lo que pide el bloque "Creados vs Cerrados vs Reabiertos": las tres
 # series comparten el dia y hay que verlas lado a lado, no encimadas -si se
