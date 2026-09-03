@@ -265,7 +265,27 @@ ORDER BY 2 DESC;
       categorias con guion bajo ('S-FENIX_WMS'), y en LIKE el guion bajo es
       comodin de un caracter. Con LIKE, 'FENIX_WMS' tambien casaria con
       'FENIXAWMS'.
+
+      OJO CON EL DROP DE ABAJO
+      fn_CategoriaRelativa (2.3) llama a esta funcion y esta declarada WITH
+      SCHEMABINDING, que es justo lo que hace el schemabinding: amarra a la
+      referenciada para que nadie la cambie por debajo. El efecto secundario
+      es que a la segunda corrida del script el CREATE OR ALTER de aqui truena
+      con "Cannot ALTER 'dbo.fn_RutaServicio' because it is being referenced
+      by object 'fn_CategoriaRelativa'".
+
+      Por eso se suelta el amarre antes de recrearla. fn_CategoriaRelativa se
+      vuelve a crear unas lineas mas abajo, en el mismo script, asi que la
+      unica ventana en que no existe es la de esta corrida.
+
+      La alternativa -quitarle el SCHEMABINDING a fn_CategoriaRelativa- se
+      descarto: el schemabinding es lo que permite marcarla determinista, y
+      esta funcion se llama dos veces por fila en vw_ServicioTickets.
    ===================================================================================== */
+IF OBJECT_ID('dbo.fn_CategoriaRelativa', 'FN') IS NOT NULL
+    DROP FUNCTION dbo.fn_CategoriaRelativa;
+GO
+
 CREATE OR ALTER FUNCTION dbo.fn_RutaServicio (@Categoria NVARCHAR(1000))
 RETURNS NVARCHAR(1000)
 WITH SCHEMABINDING
