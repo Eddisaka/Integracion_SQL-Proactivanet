@@ -1,0 +1,24 @@
+{
+  "_comentario": "Copia este archivo como config_correo_servicio.json y ajustalo. NO subas config_correo_servicio.json a git -ya lo cubre .gitignore-. Ojo: los DESTINATARIOS no van aqui, van en dbo.CatServicioCorreo (Para y CopiaCc), para poder cambiarlos sin tocar archivos ni pedir deploy. Este archivo solo trae lo que es igual para todos los servicios. La conexion a SQL Server tampoco va aqui: se reusa el bloque \"sql\" de config.json.",
+
+  "remitente": "performanceTI@soriana.com",
+
+  "_smtp": "Relay SMTP interno, sin SSL ni autenticacion desde IPs de la red corporativa -deja smtp_usuario vacio en ese caso-.",
+  "smtp_servidor": "corpex10.soriana.com",
+  "smtp_puerto": 25,
+  "smtp_usa_ssl": false,
+  "smtp_usuario": "",
+  "smtp_password": "",
+
+  "_modo_prueba": "Mientras este en true, el correo solo se manda a destinatario_prueba y se ignora la distribucion del catalogo.",
+  "modo_prueba": true,
+  "destinatario_prueba": "TU_CORREO@soriana.com",
+
+  "_top_categorias": "Cuantas categorias (N2) se dibujan como linea propia en la grafica de tendencia. El Excel manual pinta once y queda ilegible. Default si no existe la llave: 6.",
+  "top_categorias": 6,
+
+  "_enviar_sin_datos": "Si el servicio no tiene ni un ticket en la ventana, con false el script aborta en vez de mandar un correo vacio. Sirve de alarma cuando el C1 del catalogo no coincide con las categorias reales.",
+  "enviar_sin_datos": false,
+
+  "conservar_archivos_dias": 15
+}
