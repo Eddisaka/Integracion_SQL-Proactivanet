@@ -339,6 +339,15 @@ try {
     $imgAging = if ($hayAging) { "<img src='cid:gAging' style='max-width:640px'>" } else { '' }
     $imgCausa = if ($hayCausa) { "<img src='cid:gCausa' style='max-width:640px'>" } else { '' }
 
+    # Antiguedad y causa raiz van lado a lado. Cuando el servicio no captura
+    # causa raiz se arma la fila con una sola celda: un <td> vacio dejaria a la
+    # de antiguedad con su margen derecho y descuadrada respecto al resto.
+    $filaGraficas = if ($hayCausa) {
+        "<td style='vertical-align:top;padding-right:18px'>$imgAging</td><td style='vertical-align:top'>$imgCausa</td>"
+    } else {
+        "<td style='vertical-align:top'>$imgAging</td>"
+    }
+
     $body = @"
 <html><body style='font-family:Segoe UI,Arial;font-size:13px;color:#111827'>
 <h2 style='color:#1f4e78;margin-bottom:2px'>Tickets $(Html $enc['Descripcion']) al $fechaTexto</h2>
@@ -346,10 +355,7 @@ try {
 $tarjetas
 <div style='margin-top:18px'>$imgCat</div>
 <div style='margin-top:18px'>$imgFlujo</div>
-<table style='margin-top:18px'><tr>
-  <td style='vertical-align:top;padding-right:18px'>$imgAging</td>
-  <td style='vertical-align:top'>$imgCausa</td>
-</tr></table>
+<table style='margin-top:18px'><tr>$filaGraficas</tr></table>
 <table style='margin-top:22px'><tr>
   <td style='vertical-align:top;padding-right:28px'>
     <h3 style='color:#1f4e78;margin-bottom:6px'>Tiempo de solucion por grupo</h3>
