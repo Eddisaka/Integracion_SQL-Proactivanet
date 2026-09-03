@@ -144,6 +144,8 @@ BEGIN
         CopiaCc       NVARCHAR(MAX)  NULL,
         DiasVentana   INT            NOT NULL CONSTRAINT DF_CSC_Dias DEFAULT (15),
         Habilitado    BIT            NOT NULL CONSTRAINT DF_CSC_Hab  DEFAULT (1),
+        -- Ver la nota de la seccion 2.0.
+        UsaCausaRaiz  BIT            NOT NULL CONSTRAINT DF_CSC_Causa DEFAULT (0),
         FechaAltaDW   DATETIME2(0)   NOT NULL CONSTRAINT DF_CSC_Alta DEFAULT (SYSDATETIME()),
         CONSTRAINT PK_CatServicioCorreo PRIMARY KEY CLUSTERED (Servicio)
     );
@@ -188,6 +190,33 @@ BEGIN
     );
     CREATE UNIQUE INDEX UQ_CatServicioCategoria_Prefijo
         ON dbo.CatServicioCategoria (PrefijoCategoria);
+END;
+GO
+
+/* =====================================================================================
+   2.0) La bandera UsaCausaRaiz
+
+      'Causa y raiz Fenix' es un campo que solo captura el equipo de WMS. Para
+      cualquier otro servicio llega siempre vacio, y con el vienen sin
+      contenido las cinco columnas que salen de el: CausaRaizFenix, CausaC1,
+      CausaC2, CausaC3 y Agrupador.
+
+      Cinco columnas vacias en una hoja de casi cincuenta estorban mas de lo
+      que ayudan, asi que el Excel solo las incluye para los servicios que
+      tengan esta bandera en 1.
+
+      Es una bandera del catalogo y no una deteccion automatica a proposito:
+      un servicio que hoy no captura causa raiz pero manana empiece a hacerlo
+      -o al reves- se resuelve con un UPDATE, y el correo no cambia de forma
+      solo porque un dia entro un ticket suelto con el campo lleno.
+
+          UPDATE dbo.CatServicioCorreo SET UsaCausaRaiz = 1 WHERE Servicio = N'WMS';
+   ===================================================================================== */
+IF COL_LENGTH('dbo.CatServicioCorreo', 'UsaCausaRaiz') IS NULL
+BEGIN
+    ALTER TABLE dbo.CatServicioCorreo
+        ADD UsaCausaRaiz BIT NOT NULL CONSTRAINT DF_CSC_Causa DEFAULT (0);
+    PRINT N'CatServicioCorreo.UsaCausaRaiz agregada en 0. Ponla en 1 para los servicios que capturen "Causa y raiz Fenix".';
 END;
 GO
 
