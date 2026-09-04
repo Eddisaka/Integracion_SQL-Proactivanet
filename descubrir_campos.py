@@ -5,10 +5,21 @@ Valida tu config.json contra lo que la API de Proactivanet devuelve de verdad.
 Trae una muestra (1 pagina) y te dice:
   - que labels devuelve la consulta,
   - que campos del mapeo NO estan llegando (posible typo o campo que no viene),
+  - CUANTAS filas traen valor en cada campo del mapeo,
   - que labels llegan pero NO estas guardando (candidatos a agregar al esquema).
+
+El conteo de llenado importa tanto como el de nombres: un campo puede llegar
+con el nombre correcto y venir vacio en todas las filas, y entonces el ETL lo
+guarda como NULL sin que nada avise. Paso con los siete campos QARe, que son
+los que el resolutor contesta al cerrar: en el reporte incremental casi todos
+los tickets siguen abiertos y esas respuestas todavia no existen.
+
+Por eso conviene mirar tambien el reporte Total, donde si hay tickets ya
+resueltos:
 
 Uso:
     python descubrir_campos.py --config config.soriana.json
+    python descubrir_campos.py --config config.soriana.json --completa
     python descubrir_campos.py --muestra extraccion.json --config config.soriana.json
 """
 from __future__ import annotations
@@ -42,6 +53,10 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default=str(m.RAIZ / "config.json"))
     ap.add_argument("--muestra")
+    ap.add_argument("--completa", action="store_true",
+                    help="Muestrea del reporte Total en vez del incremental. "
+                         "Es donde hay tickets ya resueltos, y por tanto donde se "
+                         "puede ver si los campos de la fase de resolucion llegan llenos.")
     args = ap.parse_args()
 
     cfg = m.cargar_config(Path(args.config))
@@ -53,7 +68,7 @@ def main() -> None:
     else:
         cfg_muestra = json.loads(json.dumps({k: v for k, v in cfg.items() if k != "sql"}))
         cfg_muestra["api"].setdefault("paginacion", {})["max_paginas"] = 1
-        filas = m.extraer(cfg_muestra, None)
+        filas = m.extraer(cfg_muestra, None, completa=args.completa)
         datos = filas
 
     if not filas:
@@ -91,6 +106,48 @@ def main() -> None:
         print()
     else:
         print("OK: todos los campos del mapeo llegan con el nombre exacto.\n")
+
+    # --- Llenado ---
+    # Que el label exista no significa que traiga dato. Este bloque es el que
+    # descubre los campos que se estan guardando como NULL en silencio.
+    def con_valor(f, label):
+        v = f.get(label)
+        if v is None:
+            v = m.por_ruta(f, label)
+        if v is None:
+            return False
+        if isinstance(v, str):
+            return v.strip() != ""
+        if isinstance(v, (list, dict)):
+            return len(v) > 0
+        return True
+
+    llenado = []
+    for col, label in mapeo.items():
+        if not label:
+            continue
+        n = sum(1 for f in filas if con_valor(f, label))
+        llenado.append((n, col, label))
+
+    vacios = [x for x in llenado if x[0] == 0]
+    if vacios:
+        print("--- Campos del mapeo que llegan SIEMPRE VACIOS en esta muestra ---")
+        print("    (el nombre esta bien; lo que no viene es el valor, y el ETL los")
+        print("     guarda como NULL sin avisar)")
+        for _, col, label in sorted(vacios, key=lambda x: x[1]):
+            print(f"  {col:30} {label!r}")
+        if not args.completa:
+            print("\n  Si son campos que el resolutor contesta al cerrar el ticket, vuelve")
+            print("  a correrlo con --completa: en el reporte incremental casi todos los")
+            print("  tickets siguen abiertos y esas respuestas todavia no existen.")
+        print()
+
+    parciales = [x for x in llenado if 0 < x[0] < len(filas)]
+    if parciales:
+        print(f"--- Llenado parcial (de {len(filas)} filas de muestra) ---")
+        for n, col, _ in sorted(parciales):
+            print(f"  {col:30} {n:6} filas con valor")
+        print()
 
     sin_guardar = [x for x in labels_api
                    if x not in mapeados and norm(x) not in {norm(y) for y in mapeados}]
