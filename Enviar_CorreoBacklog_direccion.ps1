@@ -93,7 +93,19 @@ function Write-Log([string]$Mensaje,[string]$Nivel='INFO') {
 function Html([object]$Valor) { [System.Net.WebUtility]::HtmlEncode([string]$Valor) }
 function Xml([object]$Valor) {
     $s=[string]$Valor
-    $s=[regex]::Replace($s,'[\x00-\x08\x0B\x0C\x0E-\x1F]','')
+    # XML 1.0 no admite caracteres de control ni los dos no-caracteres del
+    # final del plano basico. Los textos que vienen de Proactivanet los traen:
+    # los usuarios pegan las descripciones desde Outlook y Word.
+    $s=[regex]::Replace($s,'[\x00-\x08\x0B\x0C\x0E-\x1F\uFFFE\uFFFF]','')
+    # Y tampoco admite medio par surrogate. Aparecen cuando un texto con
+    # emoji se corta por numero de caracteres -el LEFT(Descripcion, @MaxTexto)
+    # de usp_CorreoServicio_Datos, por ejemplo-: NVARCHAR cuenta unidades
+    # UTF-16, asi que el corte puede caer justo en medio del par y dejar la
+    # mitad suelta. SecurityElement::Escape no la filtra, el .xlsx sale con
+    # XML mal formado y Excel lo rechaza entero con "el formato o la extension
+    # no son validos", sin decir en que celda.
+    $s=[regex]::Replace($s,'[\uD800-\uDBFF](?![\uDC00-\uDFFF])','')
+    $s=[regex]::Replace($s,'(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]','')
     [System.Security.SecurityElement]::Escape($s)
 }
 function Get-ConnectionString($c) {
