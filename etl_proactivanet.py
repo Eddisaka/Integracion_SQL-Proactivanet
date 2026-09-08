@@ -185,6 +185,40 @@ def _extraer_lote(datos, ruta_items):
     return _a_lista(datos)
 
 
+def _pista_url_rota(u: str) -> str:
+    """Busca senales de que la URL se corrompio al copiarla.
+
+    La URL de un reporte de Proactivanet lleva el titulo dentro, codificado
+    varias veces (%2525...). Si al pegarla se pierden unos caracteres, el
+    titulo deja de coincidir con ningun reporte y el servidor contesta 204
+    vacio DE INMEDIATO, sin ningun mensaje que lo explique.
+
+    Paso de verdad: en 'Backlog Soriana Ultimos 3 dias' los dos bytes de la
+    'i' acentuada quedaron con distinto nivel de codificacion -%25252c3 y
+    %25252525ad-, el titulo se volvio 'Ultimos 3 d,3\xadas' y el reporte
+    dejo de existir para el servidor.
+
+    Se detecta decodificando de mas: una URL sana da texto legible; una rota
+    saca bytes que no forman UTF-8.
+    """
+    import urllib.parse as _up
+    actual = u
+    for vuelta in range(1, 7):
+        siguiente = _up.unquote(actual, errors="replace")
+        if siguiente == actual:
+            break
+        actual = siguiente
+        if "\ufffd" in actual:
+            pos = actual.index("\ufffd")
+            trozo = actual[max(0, pos - 40):pos + 10]
+            return ("La URL parece MAL COPIADA: al decodificarla salen bytes que no "
+                    f"son texto valido, cerca de ...{trozo!r}... Es lo que pasa cuando "
+                    "se pierden caracteres al pegarla (los titulos con acentos van "
+                    "codificados varias veces y se rompen facil). Vuelve a copiarla "
+                    "desde Proactivanet sin editarla a mano.")
+    return ""
+
+
 def _url_sin_secretos(u: str) -> str:
     """La URL del reporte puede llevar el token pegado como parametro, y los
     logs se comparten para diagnosticar. Se enmascara antes de escribirla."""
@@ -311,7 +345,8 @@ def _paginar_reporte(sesion, url_cruda: str, cfg_api: dict, etiqueta: str) -> li
                     f"permiso de verlo; 3) que su filtro de fechas no esté dejando fuera todo. "
                     f"Ábrela en el navegador con la sesión iniciada: si ahí tampoco da filas, el "
                     f"problema está en el reporte, no en el ETL. "
-                    f"URL: {_url_sin_secretos(url)}")
+                    f"URL: {_url_sin_secretos(url)}"
+                    + (f"\n\n>>> {_pista_url_rota(url)}" if _pista_url_rota(url) else ""))
 
             # 3) HTML = problema de autenticación
             if cuerpo.lstrip()[:1] == "<":
