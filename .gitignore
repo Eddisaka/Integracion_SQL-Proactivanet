@@ -18,3 +18,10 @@ obj/
 correo_qa_temp/
 correo_backlog_temp/
 correo_backlog_direccion_temp/
+
+# Exports con datos de personal. Este repositorio es publico: los nombres de
+# los agentes del Call Center y los de Experiencia al Usuario no se suben.
+# Los catalogos se llenan con UPDATE directo en la base.
+CONCENTRADO_LLAMADAS*.xls*
+hiperpbx*.xls*
+Bases_de_Datos*Experiencia*.xls*
