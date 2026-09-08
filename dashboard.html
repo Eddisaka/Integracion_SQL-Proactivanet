@@ -294,11 +294,7 @@
        el mismo rango de fechas arriba, se puede ver de un vistazo si el dia
        que se dispararon los tickets tambien se dispararon las llamadas. -->
   <h2 class="titulo-bloque">Call Center de Servicios TI</h2>
-<<<<<<< HEAD
-  <div class="nota" id="nota-llamadas">Llamadas recibidas en el rango filtrado. Los filtros de grupo y tecnico no aplican: una llamada no tiene grupo resolutor.</div>
-=======
   <div class="nota" id="nota-llamadas">Llamadas recibidas en el rango filtrado. Los filtros de grupo y tecnico no aplican: una llamada no tiene grupo resolutor. Una llamada cuenta como abandono solo si espero mas de un minuto antes de colgar.</div>
->>>>>>> 8be4438d2a0ebb0ca1397f7f90ff7258226386c9
 
   <section class="kpis" id="kpis-llamadas"></section>
 
@@ -596,15 +592,11 @@ function renderKpisLlamadas(k) {
   const tarjetas = [
     { valor: k.Llamadas ?? 0, etiqueta: 'Llamadas recibidas' },
     { valor: k.Contestadas ?? 0, etiqueta: 'Contestadas' },
-<<<<<<< HEAD
-    { valor: k.Abandonadas ?? 0, etiqueta: 'Abandonadas' },
-=======
     { valor: k.Abandonadas ?? 0, etiqueta: 'Abandonadas (&gt; 1 min)' },
     // No son abandono -quien cuelga dentro del minuto se arrepintio-, pero se
     // muestran para poder cuadrar contra el reporte del conmutador, que las
     // cuenta todas juntas.
     { valor: k.ColgadasRapido ?? 0, etiqueta: 'Colgaron antes del minuto' },
->>>>>>> 8be4438d2a0ebb0ca1397f7f90ff7258226386c9
     { valor: aband !== null ? `${aband}%` : 'N/D', etiqueta: '% de abandono', clase: claseAbandono(aband) },
     // El menor-que va escapado: la etiqueta se inyecta con innerHTML y un '<'
     // suelto abre una etiqueta que se come el resto del texto.

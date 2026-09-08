@@ -186,8 +186,6 @@ IF COL_LENGTH('dbo.Llamadas', 'EsAbandonada') IS NULL
         ADD EsAbandonada AS (CASE WHEN Evento = N'Abandonada' THEN 1 ELSE 0 END) PERSISTED;
 GO
 
-<<<<<<< HEAD
-=======
 /* EL ABANDONO QUE SE REPORTA NO ES EL EVENTO CRUDO
    -----------------------------------------------
    Regla del area: una llamada cuenta como abandono solo si la persona espero
@@ -223,7 +221,6 @@ IF COL_LENGTH('dbo.Llamadas', 'EsColgadoRapido') IS NULL
                   THEN 1 ELSE 0 END) PERSISTED;
 GO
 
->>>>>>> 8be4438d2a0ebb0ca1397f7f90ff7258226386c9
 IF NOT EXISTS (SELECT 1 FROM sys.indexes
                WHERE name = 'UQ_Llamadas_Clave' AND object_id = OBJECT_ID('dbo.Llamadas'))
     CREATE UNIQUE INDEX UQ_Llamadas_Clave ON dbo.Llamadas (ClaveLlamada);
@@ -369,13 +366,9 @@ SELECT
     l.TipoLlamada,
     l.Evento,
     l.EsContestada,
-<<<<<<< HEAD
-    l.EsAbandonada
-=======
     l.EsAbandonada,
     l.EsAbandonoContable,
     l.EsColgadoRapido
->>>>>>> 8be4438d2a0ebb0ca1397f7f90ff7258226386c9
 FROM dbo.Llamadas AS l
 LEFT JOIN dbo.CatCampanaLlamadas AS c ON c.NumeroCola = l.NumeroCola;
 GO
@@ -395,13 +388,6 @@ SELECT
     CampanaNombre = ISNULL(c.Nombre, l.Campana),
     Llamadas    = COUNT(*),
     Contestadas = SUM(CONVERT(INT, l.EsContestada)),
-<<<<<<< HEAD
-    Abandonadas = SUM(CONVERT(INT, l.EsAbandonada)),
-    PorcAbandono = CONVERT(DECIMAL(5,2),
-                   100.0 * SUM(CONVERT(INT, l.EsAbandonada)) / NULLIF(COUNT(*), 0)),
-    EsperaPromSeg      = CONVERT(INT, AVG(CONVERT(FLOAT, l.EsperaSeg))),
-    EsperaPromAbanSeg  = CONVERT(INT, AVG(CASE WHEN l.EsAbandonada = 1
-=======
     -- 'Abandonadas' publica el indicador, no el evento crudo (ver la nota del
     -- umbral en la seccion 3). El evento se conserva aparte para poder
     -- reconciliar contra el reporte del conmutador.
@@ -412,7 +398,6 @@ SELECT
                    100.0 * SUM(CONVERT(INT, l.EsAbandonoContable)) / NULLIF(COUNT(*), 0)),
     EsperaPromSeg      = CONVERT(INT, AVG(CONVERT(FLOAT, l.EsperaSeg))),
     EsperaPromAbanSeg  = CONVERT(INT, AVG(CASE WHEN l.EsAbandonoContable = 1
->>>>>>> 8be4438d2a0ebb0ca1397f7f90ff7258226386c9
                                                THEN CONVERT(FLOAT, l.EsperaSeg) END)),
     DuracionPromSeg    = CONVERT(INT, AVG(CASE WHEN l.EsContestada = 1
                                                THEN CONVERT(FLOAT, l.DuracionSeg) END)),
@@ -431,16 +416,6 @@ GO
 SELECT Llamadas = COUNT(*), Desde = MIN(FechaLlamada), Hasta = MAX(FechaLlamada)
 FROM dbo.Llamadas;
 
-<<<<<<< HEAD
--- b) El corte por mes. Debe dar ~23% de abandono en el total, con noviembre de
---    2025 disparado (42.5%) y enero de 2026 en el minimo (13.1%).
-SELECT AnioMes, Llamadas = COUNT(*),
-       Abandonadas = SUM(CONVERT(INT, EsAbandonada)),
-       PorcAbandono = CONVERT(DECIMAL(5,2), 100.0 * SUM(CONVERT(INT, EsAbandonada)) / COUNT(*))
-FROM dbo.vw_Llamadas
-GROUP BY AnioMes ORDER BY AnioMes;
-
-=======
 -- b) El corte por mes, con la regla del minuto aplicada: 16.5% en el total,
 --    noviembre de 2025 en 31.2% y enero de 2026 en 6.8%. Sin la regla darian
 --    23.3%, 42.5% y 13.1%.
@@ -459,7 +434,6 @@ SELECT Evento = COUNT(*),
        DentroDelMinuto = SUM(CONVERT(INT, EsColgadoRapido))
 FROM dbo.vw_Llamadas WHERE EsAbandonada = 1;
 
->>>>>>> 8be4438d2a0ebb0ca1397f7f90ff7258226386c9
 -- c) Por campana.
 SELECT CampanaNombre, Llamadas = COUNT(*),
        Abandonadas = SUM(CONVERT(INT, EsAbandonada)),
