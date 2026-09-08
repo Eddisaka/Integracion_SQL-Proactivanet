@@ -116,7 +116,7 @@ BEGIN
         Campana      NVARCHAR(300) NOT NULL,   -- como lo exporta HiperPBX
         Nombre       NVARCHAR(300) NULL,       -- como se quiere ver en el tablero
         Servicio     NVARCHAR(100) NULL,       -- para cruzar con CatServicioCorreo
-        Habilitada   BIT           NOT NULL CONSTRAINT DF_CCL_Hab DEFAULT (1),
+        Habilitada   BIT           NOT NULL CONSTRAINT DF_CatCampanaLlamadas_Hab DEFAULT (1),
         CONSTRAINT PK_CatCampanaLlamadas PRIMARY KEY CLUSTERED (NumeroCola)
     );
 END;
@@ -162,7 +162,7 @@ BEGIN
         TipoLlamada   NVARCHAR(20)  NULL,     -- 'entrante' / 'saliente'
         Evento        NVARCHAR(50)  NULL,     -- 'Contestada' / 'Abandonada'
         ArchivoOrigen NVARCHAR(400) NULL,
-        FechaAltaDW   DATETIME2(0)  NOT NULL CONSTRAINT DF_Llam_Alta DEFAULT (SYSDATETIME()),
+        FechaAltaDW   DATETIME2(0)  NOT NULL CONSTRAINT DF_Llamadas_Alta DEFAULT (SYSDATETIME()),
         CONSTRAINT PK_Llamadas PRIMARY KEY CLUSTERED (IdLlamada)
     );
 END;

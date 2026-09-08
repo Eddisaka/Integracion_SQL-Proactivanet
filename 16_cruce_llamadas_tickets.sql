@@ -119,10 +119,14 @@ BEGIN
         NombreAgente NVARCHAR(200) NULL,      -- como lo escribe el conmutador
         Tecnico      NVARCHAR(255) NULL,      -- EXACTO como en dbo.Tickets
         Grupo        NVARCHAR(255) NULL,      -- el grupo donde mas tickets tiene
-        Origen       NVARCHAR(20)  NOT NULL CONSTRAINT DF_CAT_Origen DEFAULT (N'manual'),
-        Habilitado   BIT           NOT NULL CONSTRAINT DF_CAT_Hab    DEFAULT (1),
+        -- Los nombres de constraint son GLOBALES en la base, no por tabla. Con
+        -- abreviaturas como DF_CAT_Alta se choca con lo que ya existe -paso
+        -- aqui-, y el CREATE TABLE entero falla, no solo esa linea. Se nombran
+        -- con la tabla completa.
+        Origen       NVARCHAR(20)  NOT NULL CONSTRAINT DF_CatAgenteTecnico_Origen DEFAULT (N'manual'),
+        Habilitado   BIT           NOT NULL CONSTRAINT DF_CatAgenteTecnico_Hab    DEFAULT (1),
         Nota         NVARCHAR(400) NULL,
-        FechaAltaDW  DATETIME2(0)  NOT NULL CONSTRAINT DF_CAT_Alta   DEFAULT (SYSDATETIME()),
+        FechaAltaDW  DATETIME2(0)  NOT NULL CONSTRAINT DF_CatAgenteTecnico_Alta   DEFAULT (SYSDATETIME()),
         CONSTRAINT PK_CatAgenteTecnico PRIMARY KEY CLUSTERED (NumeroAgente)
     );
 END;
