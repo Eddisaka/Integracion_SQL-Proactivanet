@@ -165,6 +165,15 @@
   }
   .tabla-wrap h2 { font-size: 0.95rem; margin: 0 0 4px; }
   .tabla-wrap .nota { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 10px; }
+  /* Separador de bloque dentro de la misma pestana: el Call Center empieza
+     aqui, pero comparte los filtros de arriba. */
+  .titulo-bloque {
+    font-size: 1.05rem;
+    margin: 28px 0 2px;
+    padding-top: 20px;
+    border-top: 2px solid var(--border);
+  }
+  .nota { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 10px; }
   table { border-collapse: collapse; width: 100%; font-size: 0.8rem; white-space: nowrap; }
   th, td { padding: 6px 10px; border-bottom: 1px solid var(--border); text-align: left; }
   th { position: sticky; top: 0; background: var(--panel); font-weight: 600; color: var(--text-muted); }
@@ -239,6 +248,10 @@
       <label for="f-tecnicos">Tecnicos (Ctrl/Cmd + clic para varios)</label>
       <select id="f-tecnicos" multiple></select>
     </div>
+    <div class="campo">
+      <label for="f-campanas">Campanas del Call Center (Ctrl/Cmd + clic para varias)</label>
+      <select id="f-campanas" multiple></select>
+    </div>
     <div class="campo acciones">
       <button class="btn-primario" id="btn-aplicar">Aplicar filtros</button>
       <button class="btn-secundario" id="btn-limpiar">Limpiar</button>
@@ -274,6 +287,34 @@
     <h2>Detalle de tickets</h2>
     <div class="nota">Se muestran hasta 500 tickets del rango filtrado, ordenados por fecha de registro descendente.</div>
     <div id="tabla-detalle"></div>
+  </section>
+
+  <!-- Call Center. Va en esta misma pestana y no en una aparte porque las
+       llamadas y los tickets son la misma atencion vista por dos lados: con
+       el mismo rango de fechas arriba, se puede ver de un vistazo si el dia
+       que se dispararon los tickets tambien se dispararon las llamadas. -->
+  <h2 class="titulo-bloque">Call Center de Servicios TI</h2>
+  <div class="nota" id="nota-llamadas">Llamadas recibidas en el rango filtrado. Los filtros de grupo y tecnico no aplican: una llamada no tiene grupo resolutor.</div>
+
+  <section class="kpis" id="kpis-llamadas"></section>
+
+  <section class="graficos">
+    <div class="panel ancho">
+      <h2>Llamadas por dia: recibidas vs contestadas vs abandonadas</h2>
+      <div class="lienzo"><canvas id="chart-llamadas-dia"></canvas></div>
+    </div>
+    <div class="panel">
+      <h2>Abandono por campana</h2>
+      <div class="lienzo"><canvas id="chart-llamadas-campana"></canvas></div>
+    </div>
+    <div class="panel">
+      <h2>Llamadas por hora del dia</h2>
+      <div class="lienzo"><canvas id="chart-llamadas-hora"></canvas></div>
+    </div>
+    <div class="panel ancho">
+      <h2>Atencion por agente (top 15 por volumen)</h2>
+      <div class="lienzo"><canvas id="chart-llamadas-agente"></canvas></div>
+    </div>
   </section>
 </main>
 
@@ -326,6 +367,9 @@ function paramsFiltros() {
   if (ff) p.set('fecha_fin', ff);
   if (grupos.length) p.set('grupos', grupos.join(','));
   if (tecnicos.length) p.set('tecnicos', tecnicos.join(','));
+  // Solo la consume llamadas.ashx; los demas handlers la ignoran.
+  const campanas = valoresSeleccionados('f-campanas');
+  if (campanas.length) p.set('campanas', campanas.join(','));
   return p;
 }
 
@@ -523,17 +567,165 @@ function renderTablaDetalle(filas) {
     </table>`;
 }
 
+// mm:ss. Los segundos crudos ('194') no dicen nada de un vistazo; en un Call
+// Center todo el mundo lee 3:14.
+function mmss(segundos) {
+  if (segundos === null || segundos === undefined) return 'N/D';
+  const s = Math.round(Number(segundos));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+
+// El abandono es el KPI que se mira primero, y aqui menos es mejor: se colorea
+// al reves que el cumplimiento de SLA.
+function claseAbandono(pct) {
+  if (pct === null || pct === undefined) return '';
+  if (pct <= 10) return 'ok';
+  if (pct <= 20) return 'warn';
+  return 'bad';
+}
+
+function renderKpisLlamadas(k) {
+  const cont = document.getElementById('kpis-llamadas');
+  const aband = k.AbandonoPct ?? null;
+  const nivel = k.NivelServicioPct ?? null;
+  const umbral = k.UmbralNivelServicioSeg ?? 20;
+  const tarjetas = [
+    { valor: k.Llamadas ?? 0, etiqueta: 'Llamadas recibidas' },
+    { valor: k.Contestadas ?? 0, etiqueta: 'Contestadas' },
+    { valor: k.Abandonadas ?? 0, etiqueta: 'Abandonadas' },
+    { valor: aband !== null ? `${aband}%` : 'N/D', etiqueta: '% de abandono', clase: claseAbandono(aband) },
+    // El menor-que va escapado: la etiqueta se inyecta con innerHTML y un '<'
+    // suelto abre una etiqueta que se come el resto del texto.
+    { valor: nivel !== null ? `${nivel}%` : 'N/D', etiqueta: `Nivel de servicio (&lt; ${umbral}s)`, clase: claseKpiSla(nivel) },
+    { valor: mmss(k.EsperaPromSeg), etiqueta: 'Espera promedio' },
+    { valor: mmss(k.EsperaPromAbanSeg), etiqueta: 'Espera antes de colgar' },
+    { valor: mmss(k.DuracionPromSeg), etiqueta: 'Duracion promedio' },
+    { valor: k.PromedioDiario ?? 0, etiqueta: 'Llamadas por dia' },
+    { valor: k.AgentesActivos ?? 0, etiqueta: 'Agentes activos' },
+  ];
+  cont.innerHTML = tarjetas.map(t => `
+    <div class="kpi-card ${t.clase ?? ''}">
+      <div class="valor">${t.valor}</div>
+      <div class="etiqueta">${t.etiqueta}</div>
+    </div>
+  `).join('');
+}
+
+function renderLlamadasDia(filas) {
+  destruirGrafico('llamadasDia');
+  graficos.llamadasDia = new Chart(document.getElementById('chart-llamadas-dia'), {
+    type: 'line',
+    data: {
+      labels: filas.map(f => f.Fecha),
+      datasets: [
+        { label: 'Recibidas', data: filas.map(f => f.Llamadas), borderColor: PALETA.azul, backgroundColor: PALETA.azul, tension: 0.25 },
+        { label: 'Contestadas', data: filas.map(f => f.Contestadas), borderColor: PALETA.verde, backgroundColor: PALETA.verde, tension: 0.25 },
+        { label: 'Abandonadas', data: filas.map(f => f.Abandonadas), borderColor: PALETA.rojo, backgroundColor: PALETA.rojo, tension: 0.25 },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+    }
+  });
+}
+
+// Volumen en barras y % de abandono en linea sobre un segundo eje: una campana
+// chica con 60% de abandono se pierde si solo se mira el volumen.
+function renderLlamadasCampana(filas) {
+  destruirGrafico('llamadasCampana');
+  graficos.llamadasCampana = new Chart(document.getElementById('chart-llamadas-campana'), {
+    type: 'bar',
+    data: {
+      labels: filas.map(f => f.Campana),
+      datasets: [
+        { label: 'Llamadas', data: filas.map(f => f.Llamadas), backgroundColor: PALETA.azul, yAxisID: 'y' },
+        { label: '% abandono', data: filas.map(f => f.AbandonoPct), type: 'line',
+          borderColor: PALETA.rojo, backgroundColor: PALETA.rojo, yAxisID: 'y1', tension: 0.25 },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: {
+        y:  { beginAtZero: true, position: 'left', ticks: { precision: 0 } },
+        y1: { beginAtZero: true, position: 'right', grid: { drawOnChartArea: false },
+              ticks: { callback: v => `${v}%` } }
+      }
+    }
+  });
+}
+
+function renderLlamadasHora(filas) {
+  destruirGrafico('llamadasHora');
+  graficos.llamadasHora = new Chart(document.getElementById('chart-llamadas-hora'), {
+    type: 'bar',
+    data: {
+      labels: filas.map(f => `${String(f.Hora).padStart(2, '0')}:00`),
+      datasets: [
+        { label: 'Contestadas', data: filas.map(f => f.Contestadas), backgroundColor: PALETA.verde },
+        { label: 'Abandonadas', data: filas.map(f => f.Abandonadas), backgroundColor: PALETA.rojo },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } } }
+    }
+  });
+}
+
+function renderLlamadasAgente(filas) {
+  destruirGrafico('llamadasAgente');
+  graficos.llamadasAgente = new Chart(document.getElementById('chart-llamadas-agente'), {
+    type: 'bar',
+    data: {
+      labels: filas.map(f => f.Agente),
+      datasets: [{ label: 'Llamadas atendidas', data: filas.map(f => f.Atendidas), backgroundColor: PALETA.cian }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        tooltip: {
+          callbacks: {
+            afterLabel: ctx => `Duracion promedio: ${mmss(filas[ctx.dataIndex].DuracionPromSeg)}`
+          }
+        }
+      },
+      scales: { x: { beginAtZero: true, ticks: { precision: 0 } } }
+    }
+  });
+}
+
+function renderLlamadas(d) {
+  renderKpisLlamadas(d.kpis ?? {});
+  renderLlamadasDia(d.tendencia ?? []);
+  renderLlamadasCampana(d.campana ?? []);
+  renderLlamadasHora(d.hora ?? []);
+  renderLlamadasAgente(d.agente ?? []);
+
+  // El catalogo llega con los datos y se llena una sola vez: si se repoblara
+  // en cada carga, se perderia la campana que el usuario acaba de elegir.
+  const sel = document.getElementById('f-campanas');
+  if (!sel.options.length && (d.catalogo ?? []).length) {
+    sel.innerHTML = d.catalogo
+      .map(c => `<option value="${escapeAttr(String(c.NumeroCola))}">${escapeHtml(c.Campana)}</option>`)
+      .join('');
+  }
+}
+
 async function cargarTodo() {
   const estado = document.getElementById('estado-carga');
   estado.textContent = 'Cargando...';
   try {
     const qs = paramsFiltros().toString();
-    const [kpis, tendencia, productividad, distribucion, detalle] = await Promise.all([
+    const [kpis, tendencia, productividad, distribucion, detalle, llamadas] = await Promise.all([
       obtenerJSON(`kpis.ashx?${qs}`),
       obtenerJSON(`tendencia.ashx?${qs}`),
       obtenerJSON(`productividad.ashx?${qs}`),
       obtenerJSON(`distribucion.ashx?${qs}`),
       obtenerJSON(`detalle.ashx?${qs}&top=500`),
+      obtenerJSON(`llamadas.ashx?${qs}`),
     ]);
     renderKpis(kpis);
     renderTendencia(tendencia);
@@ -542,6 +734,7 @@ async function cargarTodo() {
     renderBarraSimple('chart-prioridad', 'prioridad', distribucion.prioridad ?? [], PALETA.ambar);
     renderBarraSimple('chart-aging', 'aging', distribucion.aging ?? [], PALETA.morado);
     renderTablaDetalle(detalle);
+    renderLlamadas(llamadas);
     estado.textContent = `Actualizado ${new Date().toLocaleTimeString('es-MX')}`;
   } catch (err) {
     // Se muestra el mensaje real que devolvio el handler .ashx -antes decia
@@ -560,6 +753,7 @@ document.getElementById('btn-aplicar').addEventListener('click', cargarTodo);
 document.getElementById('btn-limpiar').addEventListener('click', () => {
   document.getElementById('f-grupos').selectedIndex = -1;
   document.getElementById('f-tecnicos').selectedIndex = -1;
+  document.getElementById('f-campanas').selectedIndex = -1;
   cargarTodo();
 });
 
