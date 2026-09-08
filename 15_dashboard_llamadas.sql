@@ -15,6 +15,17 @@
    Los filtros de grupo y tecnico NO aplican aqui: una llamada no tiene grupo
    resolutor. El filtro propio es la campana, y por eso va aparte.
 
+<<<<<<< HEAD
+=======
+   EL ABANDONO NO ES EL EVENTO CRUDO
+   ---------------------------------
+   Regla del area: cuenta como abandono solo si la persona espero MAS DE UN
+   MINUTO antes de colgar. Quien cuelga dentro del minuto se arrepintio o se
+   equivoco de numero, y eso no es una falla de atencion. El umbral vive en la
+   columna EsAbandonoContable (14_llamadas_callcenter.sql); aqui solo se usa,
+   para que no haya dos definiciones del mismo indicador.
+
+>>>>>>> 8be4438d2a0ebb0ca1397f7f90ff7258226386c9
    EL NIVEL DE SERVICIO
    --------------------
    El KPI de un Call Center no es el promedio de espera -que una sola llamada
@@ -23,6 +34,12 @@
    omision, que es el estandar de la industria) para poder ajustarlo al
    compromiso real cuando exista uno escrito.
 
+<<<<<<< HEAD
+=======
+   Su denominador excluye las que colgaron dentro del minuto, por lo mismo que
+   el abandono: si no cuentan como falla, tampoco deben castigar el indicador.
+
+>>>>>>> 8be4438d2a0ebb0ca1397f7f90ff7258226386c9
    QUE PROMEDIA QUE
    ----------------
    La duracion solo se promedia sobre las CONTESTADAS: en una abandonada es
@@ -80,6 +97,7 @@ BEGIN
         FechaFin    = @FechaFin,
         Llamadas    = COUNT_BIG(*),
         Contestadas = SUM(CONVERT(INT, EsContestada)),
+<<<<<<< HEAD
         Abandonadas = SUM(CONVERT(INT, EsAbandonada)),
         AbandonoPct = CONVERT(DECIMAL(6,2),
                       100.0 * SUM(CONVERT(INT, EsAbandonada)) / NULLIF(COUNT_BIG(*), 0)),
@@ -88,15 +106,38 @@ BEGIN
         -- total recibido. Se cuenta sobre TODAS las llamadas y no solo sobre
         -- las contestadas: una abandonada tambien es una persona a la que no
         -- se atendio a tiempo.
+=======
+        Abandonadas = SUM(CONVERT(INT, EsAbandonoContable)),
+        -- Se reportan aparte las que colgaron dentro del minuto: no son
+        -- abandono, pero dejarlas invisibles haria imposible cuadrar contra el
+        -- reporte del conmutador, que las cuenta todas juntas.
+        ColgadasRapido    = SUM(CONVERT(INT, EsColgadoRapido)),
+        AbandonadasEvento = SUM(CONVERT(INT, EsAbandonada)),
+        AbandonoPct = CONVERT(DECIMAL(6,2),
+                      100.0 * SUM(CONVERT(INT, EsAbandonoContable)) / NULLIF(COUNT_BIG(*), 0)),
+
+        -- El KPI de verdad: cuantas se contestaron antes del umbral. Se cuenta
+        -- sobre las llamadas CONTABLES -todas menos las que colgaron dentro
+        -- del minuto- y no solo sobre las contestadas: una abandonada tambien
+        -- es una persona a la que no se atendio a tiempo.
+>>>>>>> 8be4438d2a0ebb0ca1397f7f90ff7258226386c9
         NivelServicioPct = CONVERT(DECIMAL(6,2),
                            100.0 * SUM(CASE WHEN EsContestada = 1
                                              AND ISNULL(EsperaSeg, 0) <= @SegundosNivelServicio
                                             THEN 1 ELSE 0 END)
+<<<<<<< HEAD
                            / NULLIF(COUNT_BIG(*), 0)),
         UmbralNivelServicioSeg = @SegundosNivelServicio,
 
         EsperaPromSeg     = CONVERT(INT, AVG(CONVERT(FLOAT, EsperaSeg))),
         EsperaPromAbanSeg = CONVERT(INT, AVG(CASE WHEN EsAbandonada = 1
+=======
+                           / NULLIF(SUM(CASE WHEN EsColgadoRapido = 1 THEN 0 ELSE 1 END), 0)),
+        UmbralNivelServicioSeg = @SegundosNivelServicio,
+
+        EsperaPromSeg     = CONVERT(INT, AVG(CONVERT(FLOAT, EsperaSeg))),
+        EsperaPromAbanSeg = CONVERT(INT, AVG(CASE WHEN EsAbandonoContable = 1
+>>>>>>> 8be4438d2a0ebb0ca1397f7f90ff7258226386c9
                                                   THEN CONVERT(FLOAT, EsperaSeg) END)),
         EsperaMaxSeg      = MAX(EsperaSeg),
         DuracionPromSeg   = CONVERT(INT, AVG(CASE WHEN EsContestada = 1
@@ -135,6 +176,10 @@ BEGIN
     IF OBJECT_ID('tempdb..#B') IS NOT NULL DROP TABLE #B;
     SELECT l.FechaLlamadaDia, l.NumeroCola, l.Campana, l.NumeroAgente, l.NombreAgente,
            l.EsperaSeg, l.DuracionSeg, l.EsContestada, l.EsAbandonada,
+<<<<<<< HEAD
+=======
+           l.EsAbandonoContable, l.EsColgadoRapido,
+>>>>>>> 8be4438d2a0ebb0ca1397f7f90ff7258226386c9
            Hora = DATEPART(HOUR, l.FechaLlamada)
     INTO #B
     FROM dbo.Llamadas AS l
@@ -148,9 +193,15 @@ BEGIN
         Fecha       = FechaLlamadaDia,
         Llamadas    = COUNT(*),
         Contestadas = SUM(CONVERT(INT, EsContestada)),
+<<<<<<< HEAD
         Abandonadas = SUM(CONVERT(INT, EsAbandonada)),
         AbandonoPct = CONVERT(DECIMAL(6,2),
                       100.0 * SUM(CONVERT(INT, EsAbandonada)) / NULLIF(COUNT(*), 0))
+=======
+        Abandonadas = SUM(CONVERT(INT, EsAbandonoContable)),
+        AbandonoPct = CONVERT(DECIMAL(6,2),
+                      100.0 * SUM(CONVERT(INT, EsAbandonoContable)) / NULLIF(COUNT(*), 0))
+>>>>>>> 8be4438d2a0ebb0ca1397f7f90ff7258226386c9
     FROM #B
     GROUP BY FechaLlamadaDia
     ORDER BY FechaLlamadaDia;
@@ -161,9 +212,15 @@ BEGIN
         NumeroCola  = b.NumeroCola,
         Llamadas    = COUNT(*),
         Contestadas = SUM(CONVERT(INT, b.EsContestada)),
+<<<<<<< HEAD
         Abandonadas = SUM(CONVERT(INT, b.EsAbandonada)),
         AbandonoPct = CONVERT(DECIMAL(6,2),
                       100.0 * SUM(CONVERT(INT, b.EsAbandonada)) / NULLIF(COUNT(*), 0)),
+=======
+        Abandonadas = SUM(CONVERT(INT, b.EsAbandonoContable)),
+        AbandonoPct = CONVERT(DECIMAL(6,2),
+                      100.0 * SUM(CONVERT(INT, b.EsAbandonoContable)) / NULLIF(COUNT(*), 0)),
+>>>>>>> 8be4438d2a0ebb0ca1397f7f90ff7258226386c9
         EsperaPromSeg = CONVERT(INT, AVG(CONVERT(FLOAT, b.EsperaSeg)))
     FROM #B AS b
     LEFT JOIN dbo.CatCampanaLlamadas AS c ON c.NumeroCola = b.NumeroCola
@@ -181,7 +238,11 @@ BEGIN
         Hora        = h.h,
         Llamadas    = ISNULL(COUNT(b.Hora), 0),
         Contestadas = ISNULL(SUM(CONVERT(INT, b.EsContestada)), 0),
+<<<<<<< HEAD
         Abandonadas = ISNULL(SUM(CONVERT(INT, b.EsAbandonada)), 0)
+=======
+        Abandonadas = ISNULL(SUM(CONVERT(INT, b.EsAbandonoContable)), 0)
+>>>>>>> 8be4438d2a0ebb0ca1397f7f90ff7258226386c9
     FROM horas AS h
     LEFT JOIN #B AS b ON b.Hora = h.h
     GROUP BY h.h
@@ -229,6 +290,7 @@ GO
    4) Comprobaciones contra el archivo del 7 de septiembre
    =====================================================================================
 
+<<<<<<< HEAD
 -- Todo el periodo cargado: 9,260 llamadas, 23.4% de abandono
 -- (2,168 de 9,260 tras quitar las 77 repetidas).
 EXEC dbo.usp_Dash_LlamadasKpis @FechaInicio = '2025-10-01', @FechaFin = '2026-09-07';
@@ -237,6 +299,17 @@ EXEC dbo.usp_Dash_LlamadasKpis @FechaInicio = '2025-10-01', @FechaFin = '2026-09
 EXEC dbo.usp_Dash_LlamadasKpis @FechaInicio = '2025-11-01', @FechaFin = '2025-11-30';
 
 -- Enero de 2026 el mejor: 13.1%.
+=======
+-- Todo el periodo cargado: 9,260 llamadas y 16.48% de abandono (1,526
+-- contables de 2,161 con evento 'Abandonada'; las otras 635 colgaron dentro
+-- del minuto). Sin la regla del minuto daria 23.34%.
+EXEC dbo.usp_Dash_LlamadasKpis @FechaInicio = '2025-10-01', @FechaFin = '2026-09-07';
+
+-- Noviembre de 2025 es el peor mes: 31.2% (42.5% sin la regla).
+EXEC dbo.usp_Dash_LlamadasKpis @FechaInicio = '2025-11-01', @FechaFin = '2025-11-30';
+
+-- Enero de 2026 el mejor: 6.8% (13.1% sin la regla).
+>>>>>>> 8be4438d2a0ebb0ca1397f7f90ff7258226386c9
 EXEC dbo.usp_Dash_LlamadasKpis @FechaInicio = '2026-01-01', @FechaFin = '2026-01-31';
 
 -- Los cuatro bloques de las graficas.

@@ -186,6 +186,44 @@ IF COL_LENGTH('dbo.Llamadas', 'EsAbandonada') IS NULL
         ADD EsAbandonada AS (CASE WHEN Evento = N'Abandonada' THEN 1 ELSE 0 END) PERSISTED;
 GO
 
+<<<<<<< HEAD
+=======
+/* EL ABANDONO QUE SE REPORTA NO ES EL EVENTO CRUDO
+   -----------------------------------------------
+   Regla del area: una llamada cuenta como abandono solo si la persona espero
+   MAS DE UN MINUTO antes de colgar. Quien cuelga dentro del minuto se
+   arrepintio, se equivoco de numero o volvio a marcar; eso no es una falla de
+   atencion y no debe cargarse al indicador.
+
+   No es un detalle menor. En el archivo del 7 de septiembre, 635 de las 2,161
+   llamadas con evento 'Abandonada' colgaron dentro del minuto -la mitad de
+   ellas antes de 8 segundos-, y el indicador pasa de 23.34% a 16.48%.
+
+   EsAbandonada se conserva porque es el hecho: la llamada se colgo sin que
+   nadie la tomara. EsAbandonoContable es el indicador. Todo lo que se publica
+   -vistas, KPIs, tablero- usa el segundo.
+
+   El umbral vive AQUI y en ningun otro lado. Para cambiarlo:
+       ALTER TABLE dbo.Llamadas DROP COLUMN EsAbandonoContable;
+   y volver a correr este script con el valor nuevo. */
+IF COL_LENGTH('dbo.Llamadas', 'EsAbandonoContable') IS NULL
+    ALTER TABLE dbo.Llamadas
+        ADD EsAbandonoContable AS
+            (CASE WHEN Evento = N'Abandonada' AND ISNULL(EsperaSeg, 0) > 60
+                  THEN 1 ELSE 0 END) PERSISTED;
+GO
+
+/* La contracara: colgo antes del minuto. Se reporta aparte porque dice algo
+   distinto -cuanta gente marca y se arrepiente- y porque, si creciera mucho,
+   seria senal de que el problema esta antes de la cola. */
+IF COL_LENGTH('dbo.Llamadas', 'EsColgadoRapido') IS NULL
+    ALTER TABLE dbo.Llamadas
+        ADD EsColgadoRapido AS
+            (CASE WHEN Evento = N'Abandonada' AND ISNULL(EsperaSeg, 0) <= 60
+                  THEN 1 ELSE 0 END) PERSISTED;
+GO
+
+>>>>>>> 8be4438d2a0ebb0ca1397f7f90ff7258226386c9
 IF NOT EXISTS (SELECT 1 FROM sys.indexes
                WHERE name = 'UQ_Llamadas_Clave' AND object_id = OBJECT_ID('dbo.Llamadas'))
     CREATE UNIQUE INDEX UQ_Llamadas_Clave ON dbo.Llamadas (ClaveLlamada);
@@ -331,7 +369,13 @@ SELECT
     l.TipoLlamada,
     l.Evento,
     l.EsContestada,
+<<<<<<< HEAD
     l.EsAbandonada
+=======
+    l.EsAbandonada,
+    l.EsAbandonoContable,
+    l.EsColgadoRapido
+>>>>>>> 8be4438d2a0ebb0ca1397f7f90ff7258226386c9
 FROM dbo.Llamadas AS l
 LEFT JOIN dbo.CatCampanaLlamadas AS c ON c.NumeroCola = l.NumeroCola;
 GO
@@ -351,11 +395,24 @@ SELECT
     CampanaNombre = ISNULL(c.Nombre, l.Campana),
     Llamadas    = COUNT(*),
     Contestadas = SUM(CONVERT(INT, l.EsContestada)),
+<<<<<<< HEAD
     Abandonadas = SUM(CONVERT(INT, l.EsAbandonada)),
     PorcAbandono = CONVERT(DECIMAL(5,2),
                    100.0 * SUM(CONVERT(INT, l.EsAbandonada)) / NULLIF(COUNT(*), 0)),
     EsperaPromSeg      = CONVERT(INT, AVG(CONVERT(FLOAT, l.EsperaSeg))),
     EsperaPromAbanSeg  = CONVERT(INT, AVG(CASE WHEN l.EsAbandonada = 1
+=======
+    -- 'Abandonadas' publica el indicador, no el evento crudo (ver la nota del
+    -- umbral en la seccion 3). El evento se conserva aparte para poder
+    -- reconciliar contra el reporte del conmutador.
+    Abandonadas       = SUM(CONVERT(INT, l.EsAbandonoContable)),
+    ColgadasRapido    = SUM(CONVERT(INT, l.EsColgadoRapido)),
+    AbandonadasEvento = SUM(CONVERT(INT, l.EsAbandonada)),
+    PorcAbandono = CONVERT(DECIMAL(5,2),
+                   100.0 * SUM(CONVERT(INT, l.EsAbandonoContable)) / NULLIF(COUNT(*), 0)),
+    EsperaPromSeg      = CONVERT(INT, AVG(CONVERT(FLOAT, l.EsperaSeg))),
+    EsperaPromAbanSeg  = CONVERT(INT, AVG(CASE WHEN l.EsAbandonoContable = 1
+>>>>>>> 8be4438d2a0ebb0ca1397f7f90ff7258226386c9
                                                THEN CONVERT(FLOAT, l.EsperaSeg) END)),
     DuracionPromSeg    = CONVERT(INT, AVG(CASE WHEN l.EsContestada = 1
                                                THEN CONVERT(FLOAT, l.DuracionSeg) END)),
@@ -374,6 +431,7 @@ GO
 SELECT Llamadas = COUNT(*), Desde = MIN(FechaLlamada), Hasta = MAX(FechaLlamada)
 FROM dbo.Llamadas;
 
+<<<<<<< HEAD
 -- b) El corte por mes. Debe dar ~23% de abandono en el total, con noviembre de
 --    2025 disparado (42.5%) y enero de 2026 en el minimo (13.1%).
 SELECT AnioMes, Llamadas = COUNT(*),
@@ -382,6 +440,26 @@ SELECT AnioMes, Llamadas = COUNT(*),
 FROM dbo.vw_Llamadas
 GROUP BY AnioMes ORDER BY AnioMes;
 
+=======
+-- b) El corte por mes, con la regla del minuto aplicada: 16.5% en el total,
+--    noviembre de 2025 en 31.2% y enero de 2026 en 6.8%. Sin la regla darian
+--    23.3%, 42.5% y 13.1%.
+SELECT AnioMes, Llamadas = COUNT(*),
+       Abandonadas = SUM(CONVERT(INT, EsAbandonoContable)),
+       ColgadasRapido = SUM(CONVERT(INT, EsColgadoRapido)),
+       PorcAbandono = CONVERT(DECIMAL(5,2), 100.0 * SUM(CONVERT(INT, EsAbandonoContable)) / COUNT(*))
+FROM dbo.vw_Llamadas
+GROUP BY AnioMes ORDER BY AnioMes;
+
+-- b2) Reconciliacion contra el reporte del conmutador: 2,161 con evento
+--     'Abandonada', de las cuales 635 colgaron dentro del minuto y 1,526 son
+--     abandono contable.
+SELECT Evento = COUNT(*),
+       Contable = SUM(CONVERT(INT, EsAbandonoContable)),
+       DentroDelMinuto = SUM(CONVERT(INT, EsColgadoRapido))
+FROM dbo.vw_Llamadas WHERE EsAbandonada = 1;
+
+>>>>>>> 8be4438d2a0ebb0ca1397f7f90ff7258226386c9
 -- c) Por campana.
 SELECT CampanaNombre, Llamadas = COUNT(*),
        Abandonadas = SUM(CONVERT(INT, EsAbandonada)),
