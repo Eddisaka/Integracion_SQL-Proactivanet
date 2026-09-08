@@ -162,8 +162,13 @@ def _filas(datos: Any) -> list[dict]:
 
 
 def pedir(sesion: requests.Session, url: str, params: dict, cfg_api: dict,
-          reintentos: int = 3) -> list[dict]:
-    """GET con reintentos y mensajes claros para los errores tipicos."""
+          reintentos: int = 3, vacio_si_404: bool = False) -> list[dict]:
+    """GET con reintentos y mensajes claros para los errores tipicos.
+
+    vacio_si_404: cuando se busca UN codigo concreto, Proactivanet responde 404
+    si no lo encuentra, en vez de devolver una lista vacia. Eso no es un fallo
+    del proceso -es la respuesta a "este ticket no existe"-, asi que quien
+    busca de uno en uno lo pide asi y sigue con el siguiente."""
     espera = 2
     for intento in range(1, reintentos + 1):
         try:
@@ -195,6 +200,9 @@ def pedir(sesion: requests.Session, url: str, params: dict, cfg_api: dict,
             time.sleep(espera)
             espera *= 2
             continue
+
+        if r.status_code == 404 and vacio_si_404:
+            return []
 
         r.raise_for_status()  # 200 y 206 (contenido parcial) pasan derecho
         try:
@@ -269,8 +277,15 @@ def resolver_uno_por_uno(sesion, url, cfg_api, codigos: list[str]) -> dict[str, 
     """Una peticion por codigo. Conviene cuando faltan pocos —el caso de la
     corrida diaria—, porque cada llamada trae una sola fila."""
     encontrados: dict[str, str] = {}
+    sin_rastro: list[str] = []
     for n, codigo in enumerate(codigos, 1):
-        filas = pedir(sesion, url, {"Code": codigo, "$fields": "Code", "$limit": 5}, cfg_api)
+        # vacio_si_404: un codigo que el API no encuentra devuelve 404, y eso
+        # tumbaba la corrida entera. Pasa a diario con los tickets que
+        # Proactivanet renombra de INC a REQ: el codigo viejo deja de existir.
+        filas = pedir(sesion, url, {"Code": codigo, "$fields": "Code", "$limit": 5},
+                      cfg_api, vacio_si_404=True)
+        if not filas:
+            sin_rastro.append(codigo)
         # 'Code=' hace busqueda exacta, pero el operador '%' del API permite
         # coincidencias parciales: se verifica el codigo devuelto antes de
         # dar por bueno el GUID.
@@ -281,6 +296,10 @@ def resolver_uno_por_uno(sesion, url, cfg_api, codigos: list[str]) -> dict[str, 
                 break
         if n % 50 == 0:
             LOG.info("Resueltos %d de %d codigos...", len(encontrados), n)
+    if sin_rastro:
+        LOG.info("El API no encontro %d codigo(s); se reintentan en la proxima "
+                 "corrida. Los primeros: %s",
+                 len(sin_rastro), ", ".join(sin_rastro[:5]))
     return encontrados
 
 

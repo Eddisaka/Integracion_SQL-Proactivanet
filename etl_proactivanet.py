@@ -185,6 +185,14 @@ def _extraer_lote(datos, ruta_items):
     return _a_lista(datos)
 
 
+def _url_sin_secretos(u: str) -> str:
+    """La URL del reporte puede llevar el token pegado como parametro, y los
+    logs se comparten para diagnosticar. Se enmascara antes de escribirla."""
+    import re as _re
+    return _re.sub(r"((?:token|apikey|api_key|authorization|password|pwd)=)[^&#]*",
+                   r"\1***", u, flags=_re.IGNORECASE)
+
+
 def _paginar_reporte(sesion, url_cruda: str, cfg_api: dict, etiqueta: str) -> list[dict]:
     """Descarga (paginando) un solo reporte de Proactivanet y devuelve sus filas."""
     import re as _re, time as _time
@@ -282,14 +290,28 @@ def _paginar_reporte(sesion, url_cruda: str, cfg_api: dict, etiqueta: str) -> li
                                 pagina, dt, r.status_code, intento + 1, reintentos)
                     _time.sleep(espera_reintento)
                     continue
+                # El 204 tiene DOS causas distintas y el tiempo las separa.
+                # Confundirlas cuesta horas: el mensaje mandaba a partir el
+                # reporte por fechas aunque el problema fuera la URL.
+                if dt >= 60:
+                    raise RuntimeError(
+                        f"Respuesta VACÍA / HTTP 204 tras {dt:.0f}s en el reporte '{etiqueta}'. "
+                        f"Tardó lo que tarda el corte del servidor, así que el reporte es "
+                        f"DEMASIADO GRANDE: Proactivanet no alcanza a generarlo dentro de su "
+                        f"límite (~120s). La solución NO es paginar más chico (el corte ocurre al "
+                        f"generar el reporte, antes de paginar), sino DIVIDIRLO por fechas: crea "
+                        f"reportes por mes/trimestre en Proactivanet y pásalos como LISTA en "
+                        f"'url_cruda_completa'. Ver TIMEOUT_REPORTE_TOTAL.md.")
                 raise RuntimeError(
-                    f"Respuesta VACÍA / HTTP 204 tras {dt:.0f}s en el reporte '{etiqueta}'. "
-                    f"El servidor de Proactivanet no alcanza a generar este reporte dentro de su "
-                    f"límite (~120s): es demasiado grande. La solución NO es paginar más chico "
-                    f"(el corte ocurre al generar el reporte, antes de paginar), sino DIVIDIRLO por "
-                    f"fechas: crea reportes por mes/trimestre en Proactivanet y pásalos como lista "
-                    f"en 'url_cruda_completa'. Ver TIMEOUT_REPORTE_TOTAL.md. El reporte incremental "
-                    f"(3 días) sí debería funcionar para la operación diaria.")
+                    f"Respuesta VACÍA / HTTP 204 tras solo {dt:.0f}s en el reporte '{etiqueta}'. "
+                    f"Respondió de inmediato, así que NO es el timeout del reporte grande: el "
+                    f"servidor entendió la petición y contestó que no hay nada. Revisa, en este "
+                    f"orden: 1) que la URL esté completa y bien copiada (se corta fácil al pegarla "
+                    f"desde Proactivanet); 2) que el reporte siga existiendo y el token tenga "
+                    f"permiso de verlo; 3) que su filtro de fechas no esté dejando fuera todo. "
+                    f"Ábrela en el navegador con la sesión iniciada: si ahí tampoco da filas, el "
+                    f"problema está en el reporte, no en el ETL. "
+                    f"URL: {_url_sin_secretos(url)}")
 
             # 3) HTML = problema de autenticación
             if cuerpo.lstrip()[:1] == "<":
@@ -359,6 +381,11 @@ def extraer(cfg: dict, fecha_desde: datetime | None, completa: bool = False) -> 
             raise RuntimeError("Falta la URL del reporte solicitado en el config.")
 
         lista = urls if isinstance(urls, list) else [urls]
+        # Se dice cuantas son a proposito: si se capturan varias URLs en el
+        # bloque equivocado del config, el ETL usa una sola y no hay forma de
+        # notarlo. Las URLs de tickets se leen de entidades.<nombre>, NO del
+        # bloque 'api' de la raiz (ver procesar_entidad).
+        LOG.info("Reporte(s) a descargar: %d URL(s).", len(lista))
         filas: list[dict] = []
         for i, u in enumerate(lista, 1):
             etq = etiqueta if len(lista) == 1 else f"{etiqueta} {i}/{len(lista)}"
