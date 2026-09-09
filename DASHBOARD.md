@@ -12,7 +12,8 @@ desde SQL Server. Corre **100% en IIS con ASP.NET; no usa Python**.
   original de productividad).
 - **`*.ashx` + `App_Code/DashboardDb.cs`** — la API en ASP.NET (C#). Expone
   `catalogos.ashx`, `kpis.ashx`, `tendencia.ashx`, `productividad.ashx`,
-  `distribucion.ashx` y `detalle.ashx`, que es lo que llama el HTML. IIS
+  `distribucion.ashx`, `detalle.ashx`, `llamadas.ashx` y
+  `carga_combinada.ashx`, que es lo que llama el HTML. IIS
   compila `App_Code/` solo, en el primer request: no hay proyecto de Visual
   Studio ni `dotnet build`.
 - **`Web.config.ejemplo`** — plantilla de configuracion de IIS (cadena de
@@ -21,7 +22,11 @@ desde SQL Server. Corre **100% en IIS con ASP.NET; no usa Python**.
   (ver "Solucion de problemas"). `Web.config` esta en `.gitignore`, no se
   sube con credenciales.
 - **`dashboard.html`** — pestaña **SLA y productividad**: filtros, tarjetas
-  KPI, 5 graficos (Chart.js via CDN) y una tabla de detalle.
+  KPI, 5 graficos (Chart.js via CDN) y una tabla de detalle. Abajo, en la
+  misma pestaña y con los mismos filtros de fecha, el bloque de **Call
+  Center** (tarjetas y 4 graficas de llamadas) y el de **carga combinada**,
+  que es el unico lugar donde tickets y llamadas caen en la misma fila: dice
+  quien cierra pocos tickets porque se le fue el dia en el telefono.
 - **`backlog.html`** + **`backlog_*.ashx`** — pestaña **Backlog**, con la
   misma estructura que el correo diario (ver `CORREO_BACKLOG.md`): KPIs,
   tendencia total y por lider, backlog por lider y por prioridad,
@@ -118,6 +123,11 @@ confirme si no tienes permisos para activarla tu mismo.
 - `dashboard.html`
 - `catalogos.ashx`, `kpis.ashx`, `tendencia.ashx`, `productividad.ashx`,
   `distribucion.ashx`, `detalle.ashx`, `diagnostico.ashx`
+- `llamadas.ashx` y `carga_combinada.ashx` (bloques de Call Center y de carga
+  combinada, al final de la pestaña de SLA y productividad). Necesitan
+  `14_llamadas_callcenter.sql`, `15_dashboard_llamadas.sql` y
+  `16_cruce_llamadas_tickets.sql` corridos en la base. Si faltan, el resto del
+  tablero sigue funcionando: el bloque del cruce se apaga solo y dice por que
 - `backlog.html` y `backlog_catalogos.ashx`, `backlog_resumen.ashx`,
   `backlog_historico.ashx`, `backlog_antiguos.ashx` (pestaña de Backlog)
 - la carpeta `App_Code/` completa (con `DashboardDb.cs` adentro)

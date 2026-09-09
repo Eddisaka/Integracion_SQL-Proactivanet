@@ -316,6 +316,31 @@
       <div class="lienzo"><canvas id="chart-llamadas-agente"></canvas></div>
     </div>
   </section>
+
+  <!-- Cruce llamadas <-> tickets. Es la unica parte del tablero donde las dos
+       fuentes se juntan en la misma fila, y contesta la pregunta que las dos
+       de arriba dejan abierta: quien cierra pocos tickets porque se le fue el
+       dia en el telefono. Solo aparece la gente que esta en
+       dbo.CatAgenteTecnico, que es la que hace las dos cosas. -->
+  <h2 class="titulo-bloque">Carga combinada: tickets y llamadas por tecnico</h2>
+  <div class="nota" id="nota-carga">Solo los tecnicos con extension telefonica registrada en el catalogo. Los tickets se cuentan por fecha de firma de solucion y las llamadas solo si fueron contestadas.</div>
+
+  <section class="graficos" id="graficos-carga">
+    <div class="panel ancho">
+      <h2>Atenciones por tecnico: tickets vs llamadas (top 15)</h2>
+      <div class="lienzo"><canvas id="chart-carga-tecnico"></canvas></div>
+    </div>
+    <div class="panel ancho">
+      <h2>Del equipo, por dia: tickets cerrados vs llamadas atendidas</h2>
+      <div class="lienzo"><canvas id="chart-carga-dia"></canvas></div>
+    </div>
+  </section>
+
+  <section class="tabla-wrap">
+    <h2>Detalle por tecnico</h2>
+    <div class="nota">Atenciones = tickets + llamadas. No mide esfuerzo, mide cuantas cosas despacho la persona.</div>
+    <div id="tabla-carga"></div>
+  </section>
 </main>
 
 <script>
@@ -465,7 +490,7 @@ function renderTendencia(filas) {
   graficos.tendencia = new Chart(ctx, {
     type: 'line',
     data: {
-      labels: filas.map(f => f.Fecha),
+      labels: filas.map(f => soloFecha(f.Fecha)),
       datasets: [
         { label: 'Creados', data: filas.map(f => f.TicketsCreados), borderColor: PALETA.azul, backgroundColor: PALETA.azul, tension: 0.25 },
         { label: 'Cerrados', data: filas.map(f => f.TicketsCerrados), borderColor: PALETA.verde, backgroundColor: PALETA.verde, tension: 0.25 },
@@ -620,7 +645,7 @@ function renderLlamadasDia(filas) {
   graficos.llamadasDia = new Chart(document.getElementById('chart-llamadas-dia'), {
     type: 'line',
     data: {
-      labels: filas.map(f => f.Fecha),
+      labels: filas.map(f => soloFecha(f.Fecha)),
       datasets: [
         { label: 'Recibidas', data: filas.map(f => f.Llamadas), borderColor: PALETA.azul, backgroundColor: PALETA.azul, tension: 0.25 },
         { label: 'Contestadas', data: filas.map(f => f.Contestadas), borderColor: PALETA.verde, backgroundColor: PALETA.verde, tension: 0.25 },
@@ -718,11 +743,144 @@ function renderLlamadas(d) {
   }
 }
 
+// Las columnas DATE llegan como '2026-08-01T00:00:00': SqlDataReader las
+// entrega como DateTime y DashboardDb las serializa con hora. Puesta tal cual
+// de etiqueta en el eje X, la hora ocupa mas que la fecha y no dice nada.
+function soloFecha(v) {
+  return String(v ?? '').slice(0, 10);
+}
+
+function renderCargaTecnico(filas) {
+  destruirGrafico('cargaTecnico');
+  // El panel mide 320px: con las 20 filas que devuelve el procedimiento las
+  // barras quedan de tres pixeles. La tabla de abajo si las trae todas.
+  const top = filas.slice(0, 15);
+  graficos.cargaTecnico = new Chart(document.getElementById('chart-carga-tecnico'), {
+    type: 'bar',
+    data: {
+      labels: top.map(f => f.Tecnico),
+      datasets: [
+        { label: 'Tickets cerrados', data: top.map(f => f.Tickets), backgroundColor: PALETA.azul },
+        { label: 'Llamadas atendidas', data: top.map(f => f.Llamadas), backgroundColor: PALETA.cian },
+      ]
+    },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      // Apiladas a proposito: el largo total de la barra es el total de
+      // atenciones, y el color dice como se reparte. Lado a lado se compara
+      // ticket contra llamada, que no es la pregunta.
+      scales: {
+        x: { stacked: true, beginAtZero: true, ticks: { precision: 0 } },
+        y: { stacked: true }
+      },
+      plugins: {
+        tooltip: {
+          callbacks: {
+            // footer y no afterLabel: afterLabel se repetiria en cada uno de
+            // los dos datasets del mismo tecnico.
+            footer: items => {
+              const f = top[items[0].dataIndex];
+              return `Atenciones: ${f.Atenciones} (${f.LlamadasPct ?? 0}% llamadas) · ${f.MinutosHablados ?? 0} min hablados`;
+            }
+          }
+        }
+      }
+    }
+  });
+}
+
+function renderCargaDia(filas) {
+  destruirGrafico('cargaDia');
+  graficos.cargaDia = new Chart(document.getElementById('chart-carga-dia'), {
+    type: 'line',
+    data: {
+      labels: filas.map(f => soloFecha(f.Fecha)),
+      datasets: [
+        { label: 'Tickets cerrados', data: filas.map(f => f.Tickets), borderColor: PALETA.azul, backgroundColor: PALETA.azul, tension: 0.25 },
+        { label: 'Llamadas atendidas', data: filas.map(f => f.Llamadas), borderColor: PALETA.cian, backgroundColor: PALETA.cian, tension: 0.25 },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+    }
+  });
+}
+
+function renderTablaCarga(filas) {
+  const filasHtml = filas.map(f => `<tr>
+      <td>${escapeHtml(f.Tecnico)}</td>
+      <td>${escapeHtml(f.Grupo)}</td>
+      <td>${f.Tickets ?? 0}</td>
+      <td>${f.Llamadas ?? 0}</td>
+      <td>${f.Atenciones ?? 0}</td>
+      <td>${f.LlamadasPct ?? 0}%</td>
+      <td>${f.MinutosHablados ?? 0}</td>
+    </tr>`).join('');
+  document.getElementById('tabla-carga').innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>Tecnico</th><th>Grupo</th><th>Tickets cerrados</th>
+          <th>Llamadas atendidas</th><th>Atenciones</th><th>% llamadas</th>
+          <th>Minutos hablados</th>
+        </tr>
+      </thead>
+      <tbody>${filasHtml}</tbody>
+    </table>`;
+}
+
+function renderCargaCombinada(d) {
+  const filas = d.tecnicos ?? [];
+  const graf = document.getElementById('graficos-carga');
+  const cont = document.getElementById('tabla-carga');
+
+  if (!filas.length) {
+    // Sin filas, las graficas quedarian como dos recuadros vacios sin explicar
+    // nada. El caso mas probable no es que no haya actividad, sino que el
+    // catalogo de extensiones no este capturado, asi que se dice.
+    destruirGrafico('cargaTecnico');
+    destruirGrafico('cargaDia');
+    graf.style.display = 'none';
+    cont.innerHTML = `<div class="vacio">
+      Sin cruce para este filtro. Se busco en los grupos: ${escapeHtml(d.grupos ?? '')}.<br>
+      Si el rango si tuvo actividad, revisa que dbo.CatAgenteTecnico tenga capturadas las extensiones de esos grupos.
+    </div>`;
+    return;
+  }
+
+  graf.style.display = '';
+  renderCargaTecnico(filas);
+  renderCargaDia(d.serie ?? []);
+  renderTablaCarga(filas);
+}
+
+function errorCargaCombinada(err) {
+  destruirGrafico('cargaTecnico');
+  destruirGrafico('cargaDia');
+  document.getElementById('graficos-carga').style.display = 'none';
+  document.getElementById('tabla-carga').innerHTML =
+    `<div class="vacio">No se pudo cargar el cruce: ${escapeHtml(err.message)}</div>`;
+  console.error(err);
+}
+
 async function cargarTodo() {
   const estado = document.getElementById('estado-carga');
   estado.textContent = 'Cargando...';
   try {
     const qs = paramsFiltros().toString();
+
+    // El cruce va aparte del Promise.all: depende de 16_cruce_llamadas_tickets.sql
+    // y del catalogo de extensiones. Dentro del Promise.all, un servidor que
+    // todavia no tiene ese procedimiento tumbaria el tablero COMPLETO por un
+    // bloque que es el ultimo de la pagina. Se lanza aqui para que salga en
+    // paralelo con los demas, pero se espera abajo con su propio manejo.
+    const pCarga = obtenerJSON(`carga_combinada.ashx?${qs}`).then(
+      datos => ({ ok: true, datos: datos }),
+      err => ({ ok: false, err: err })
+    );
+
     const [kpis, tendencia, productividad, distribucion, detalle, llamadas] = await Promise.all([
       obtenerJSON(`kpis.ashx?${qs}`),
       obtenerJSON(`tendencia.ashx?${qs}`),
@@ -739,6 +897,11 @@ async function cargarTodo() {
     renderBarraSimple('chart-aging', 'aging', distribucion.aging ?? [], PALETA.morado);
     renderTablaDetalle(detalle);
     renderLlamadas(llamadas);
+
+    const carga = await pCarga;
+    if (carga.ok) renderCargaCombinada(carga.datos);
+    else errorCargaCombinada(carga.err);
+
     estado.textContent = `Actualizado ${new Date().toLocaleTimeString('es-MX')}`;
   } catch (err) {
     // Se muestra el mensaje real que devolvio el handler .ashx -antes decia
