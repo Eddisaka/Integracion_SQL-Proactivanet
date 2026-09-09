@@ -65,12 +65,26 @@ GO
 /* =====================================================================================
    1) Nombre -> clave comparable
 
-      Se quitan comas, puntos, guiones y espacios, y la comparacion se deja en
-      una intercalacion que ignora acentos y mayusculas (Latin1_General_CI_AI).
-      Con eso:
+      Se quitan comas, puntos, guiones, espacios y ACENTOS:
 
           'Santillan Trejo, David Oswaldo'  ->  SANTILLANTREJODAVIDOSWALDO
           'Santillan Trejo David Oswaldo'   ->  SANTILLANTREJODAVIDOSWALDO
+          'Carrizales Lopez, Angel Daniel'  ->  CARRIZALESLOPEZANGELDANIEL
+          'Carrizales Lopez Angel Daniel'   ->  CARRIZALESLOPEZANGELDANIEL
+
+      LOS ACENTOS SE QUITAN A MANO, NO CON COLLATE
+      La primera version terminaba en 'RETURN @s COLLATE Latin1_General_CI_AI'
+      y no servia: T-SQL convierte el valor de retorno al tipo declarado usando
+      la intercalacion de la BASE, asi que el COLLATE de la expresion se pierde
+      y, si la base es acento-sensible, LOPEZ deja de ser igual a LOPEZ con
+      tilde. Paso de verdad: la extension 7345 no empato con su tecnico y la
+      unica diferencia entre los dos nombres era esa tilde.
+
+      Quitando los acentos aqui, la clave queda en ASCII y deja de importar
+      como este configurada la base.
+
+      La N con virgulilla tambien se normaliza: MUNOZ y MU(N)OZ deben empatar,
+      que es justo lo que se busca al comparar personas.
 
       Sirve para PROPONER, no para decidir: dos personas con el mismo nombre
       darian la misma clave, y a una persona le basta con que le falte un
@@ -88,15 +102,39 @@ BEGIN
     SET @s = REPLACE(@s, N'.', N'');
     SET @s = REPLACE(@s, N'-', N'');
     SET @s = REPLACE(@s, N'_', N'');
+    SET @s = REPLACE(@s, N'''', N'');
     SET @s = REPLACE(@s, N' ', N'');
-    RETURN @s COLLATE Latin1_General_CI_AI;
+
+    -- Acentos, por codigo de caracter para que el script no dependa de como
+    -- se guarde el archivo. Ya viene en mayusculas, asi que basta con estas.
+    SET @s = REPLACE(@s, NCHAR(193), N'A');   -- A aguda
+    SET @s = REPLACE(@s, NCHAR(201), N'E');
+    SET @s = REPLACE(@s, NCHAR(205), N'I');
+    SET @s = REPLACE(@s, NCHAR(211), N'O');
+    SET @s = REPLACE(@s, NCHAR(218), N'U');
+    SET @s = REPLACE(@s, NCHAR(220), N'U');   -- U con dieresis
+    SET @s = REPLACE(@s, NCHAR(209), N'N');   -- N con virgulilla
+    SET @s = REPLACE(@s, NCHAR(192), N'A');   -- graves, por si acaso
+    SET @s = REPLACE(@s, NCHAR(200), N'E');
+    SET @s = REPLACE(@s, NCHAR(204), N'I');
+    SET @s = REPLACE(@s, NCHAR(210), N'O');
+    SET @s = REPLACE(@s, NCHAR(217), N'U');
+    SET @s = REPLACE(@s, NCHAR(196), N'A');   -- dieresis
+    SET @s = REPLACE(@s, NCHAR(203), N'E');
+    SET @s = REPLACE(@s, NCHAR(207), N'I');
+    SET @s = REPLACE(@s, NCHAR(214), N'O');
+    RETURN @s;
 END;
 GO
 
-/* Comprobacion: las dos deben dar lo mismo.
+/* Comprobacion: los dos pares deben dar lo mismo. El segundo es el que
+   fallaba antes de quitar los acentos a mano.
 
 SELECT dbo.fn_ClaveNombre(N'Santillan Trejo, David Oswaldo'),
        dbo.fn_ClaveNombre(N'Santillan Trejo David Oswaldo');
+
+SELECT dbo.fn_ClaveNombre(N'Carrizales L' + NCHAR(243) + N'pez, Angel Daniel'),
+       dbo.fn_ClaveNombre(N'Carrizales Lopez Angel Daniel');
 */
 
 /* =====================================================================================
@@ -396,11 +434,46 @@ EXEC dbo.usp_CatAgenteTecnico_Sembrar @Simulacion = 1;
 -- 3. Sembrar.
 EXEC dbo.usp_CatAgenteTecnico_Sembrar @Simulacion = 0;
 
--- 4. Completar a mano lo que quedo suelto. El nombre del tecnico se copia
---    EXACTO de dbo.Tickets, o el JOIN no empata:
+-- 4. Completar a mano lo que quedo suelto. Con los datos del 8 de septiembre
+--    empataron solas 16 de 20 extensiones; las otras cuatro fallaron por
+--    diferencias de captura entre los dos sistemas, y son de tres tipos:
+--
+--      a) El nombre esta escrito distinto: 'Bratli Yeczel' contra 'Bratly
+--         Yetzel', o 'Correa' contra 'Corea'. Una letra, pero ninguna
+--         normalizacion razonable las junta sin arriesgarse a juntar tambien
+--         a dos personas distintas.
+--      b) Falta un apellido de un lado: el conmutador tiene solo el paterno.
+--      c) El acento. Ese SI lo resuelve fn_ClaveNombre desde que los quita a
+--         mano; antes fallaba.
+--
+--    El nombre del tecnico se copia EXACTO de dbo.Tickets, o el JOIN no
+--    empata. Los nombres reales no van en este archivo: el repositorio es
+--    publico, igual que con los catalogos de 11_correo_servicio.sql.
 --
 -- INSERT INTO dbo.CatAgenteTecnico (NumeroAgente, NombreAgente, Tecnico, Grupo, Nota)
--- VALUES (7350, N'...', N'...', N'Service Desk', N'Extension reasignada en agosto');
+-- VALUES (0000, N'<como lo escribe el conmutador>',
+--               N'<EXACTO como en dbo.Tickets>', N'Service Desk',
+--               N'Capturado a mano: el apellido difiere entre los dos sistemas');
+
+-- 4b. Antes de dar por buena una fila 'auto', vale la pena buscar si el mismo
+--     tecnico esta capturado DOS VECES en Proactivanet con el nombre escrito
+--     distinto. Si es asi, el cruce solo cuenta los tickets de una de las dos
+--     variantes y la persona sale con menos carga de la que tiene.
+SELECT c.NumeroAgente, c.Tecnico, TicketsDelCatalogo = (
+           SELECT COUNT(*) FROM dbo.Tickets t
+           WHERE LTRIM(RTRIM(t.TecnicoSegundaLinea)) = c.Tecnico),
+       PosibleDuplicado = o.TecnicoSegundaLinea, o.Tickets
+FROM dbo.CatAgenteTecnico AS c
+CROSS APPLY (
+    SELECT TOP 3 t.TecnicoSegundaLinea, Tickets = COUNT(*)
+    FROM dbo.Tickets AS t
+    WHERE LTRIM(RTRIM(t.TecnicoSegundaLinea)) <> c.Tecnico
+      AND LEFT(dbo.fn_ClaveNombre(t.TecnicoSegundaLinea), 10)
+        = LEFT(dbo.fn_ClaveNombre(c.Tecnico), 10)
+    GROUP BY t.TecnicoSegundaLinea
+    ORDER BY COUNT(*) DESC
+) AS o
+ORDER BY o.Tickets DESC;
 
 -- 5. Revisar lo que decidio la maquina.
 SELECT * FROM dbo.CatAgenteTecnico WHERE Origen = N'auto' ORDER BY NumeroAgente;
