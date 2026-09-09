@@ -42,9 +42,23 @@
      ticket registrado el lunes y resuelto el viernes es carga del viernes.
    - Solo cuentan las llamadas CONTESTADAS: una abandonada no la atendio nadie.
 
+   UNA PERSONA, VARIOS NOMBRES EN PROACTIVANET
+   -------------------------------------------
+   Cuando alguien tuvo mal escrito su usuario y se lo corrigieron, sus tickets
+   quedaron partidos entre el nombre viejo y el nuevo. Paso con dos personas:
+   una tenia 210 tickets con un apellido y 1,737 con el otro. Si el cruce se
+   queda con uno solo, esa persona aparece con la novena parte de la carga que
+   de verdad tuvo.
+
+   Por eso los nombres viejos se registran como ALIAS y se consolidan bajo el
+   nombre principal. La llave sigue siendo la extension del conmutador, que es
+   la que no cambia.
+
    Objetos:
    - dbo.fn_ClaveNombre               nombre -> clave comparable
-   - dbo.CatAgenteTecnico             extension <-> tecnico
+   - dbo.CatAgenteTecnico             extension <-> tecnico (nombre actual)
+   - dbo.CatAgenteTecnicoAlias        nombres viejos de la misma persona
+   - dbo.vw_TecnicoAgente             cualquier nombre -> el principal
    - dbo.usp_CatAgenteTecnico_Sugerir que empata y que no
    - dbo.usp_CatAgenteTecnico_Sembrar siembra los empates seguros
    - dbo.vw_CargaTecnicoDia           una fila por tecnico y dia
@@ -171,6 +185,69 @@ END;
 GO
 
 /* =====================================================================================
+   2.1) Nombres viejos de la misma persona
+
+      Proactivanet no reescribe los tickets historicos cuando se corrige el
+      nombre de un usuario: los viejos se quedan con el nombre viejo. El
+      resultado es la misma persona partida en dos, y el cruce contandole solo
+      la mitad.
+
+      Aqui se registra el nombre que ya no se usa, apuntando a la extension. La
+      PK es el nombre porque un nombre pertenece a una sola persona; la
+      extension se repite tantas veces como nombres haya tenido.
+
+      El nombre ACTUAL no va aqui: ese vive en CatAgenteTecnico.Tecnico. Se
+      valida para que no se capture dos veces.
+   ===================================================================================== */
+IF OBJECT_ID('dbo.CatAgenteTecnicoAlias', 'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.CatAgenteTecnicoAlias
+    (
+        Tecnico      NVARCHAR(255) NOT NULL,   -- EXACTO como quedo en dbo.Tickets
+        NumeroAgente INT           NOT NULL,
+        Nota         NVARCHAR(400) NULL,
+        FechaAltaDW  DATETIME2(0)  NOT NULL
+            CONSTRAINT DF_CatAgenteTecnicoAlias_Alta DEFAULT (SYSDATETIME()),
+        CONSTRAINT PK_CatAgenteTecnicoAlias PRIMARY KEY CLUSTERED (Tecnico),
+        CONSTRAINT FK_CatAgenteTecnicoAlias_Agente FOREIGN KEY (NumeroAgente)
+            REFERENCES dbo.CatAgenteTecnico (NumeroAgente)
+    );
+END;
+GO
+
+/* =====================================================================================
+   2.2) Cualquier nombre -> el principal
+
+      Una fila por cada nombre con el que la persona aparece en dbo.Tickets,
+      apuntando siempre al nombre principal. Es lo que permite sumar los
+      tickets de las dos epocas bajo una sola persona.
+   ===================================================================================== */
+CREATE OR ALTER VIEW dbo.vw_TecnicoAgente
+AS
+SELECT NumeroAgente    = c.NumeroAgente,
+       TecnicoPrincipal = c.Tecnico,          -- como se muestra
+       TecnicoEnTickets = c.Tecnico,          -- como se busca en dbo.Tickets
+       Grupo            = c.Grupo,
+       EsAlias          = CONVERT(BIT, 0)
+FROM dbo.CatAgenteTecnico AS c
+WHERE c.Habilitado = 1
+  AND NULLIF(LTRIM(RTRIM(c.Tecnico)), N'') IS NOT NULL
+UNION ALL
+SELECT a.NumeroAgente,
+       c.Tecnico,
+       a.Tecnico,
+       c.Grupo,
+       CONVERT(BIT, 1)
+FROM dbo.CatAgenteTecnicoAlias AS a
+INNER JOIN dbo.CatAgenteTecnico AS c ON c.NumeroAgente = a.NumeroAgente
+WHERE c.Habilitado = 1
+  AND NULLIF(LTRIM(RTRIM(c.Tecnico)), N'') IS NOT NULL
+  -- Si alguien capturo como alias el mismo nombre principal, se ignora: si no,
+  -- los tickets de esa persona se contarian dos veces.
+  AND a.Tecnico <> c.Tecnico;
+GO
+
+/* =====================================================================================
    3) Que empata y que no
 
       Se corre a mano para revisar antes de sembrar. Devuelve dos bloques: lo
@@ -238,7 +315,10 @@ BEGIN
     /* ---------- 3) Tecnicos de esos grupos sin extension ----------
        Para el caso contrario: alguien que solo hace tickets, o cuya extension
        aun no aparece en ningun archivo cargado. */
-    SELECT t.Tecnico, t.Grupo, t.Tickets
+    SELECT t.Tecnico, t.Grupo, t.Tickets,
+           YaEsAlias = CASE WHEN EXISTS (SELECT 1 FROM dbo.CatAgenteTecnicoAlias x
+                                         WHERE x.Tecnico = t.Tecnico)
+                            THEN 1 ELSE 0 END
     FROM #T AS t
     WHERE NOT EXISTS (SELECT 1 FROM #A AS a
                       WHERE dbo.fn_ClaveNombre(t.Tecnico) = dbo.fn_ClaveNombre(a.NombreAgente))
@@ -323,17 +403,30 @@ GO
       FULL OUTER JOIN a proposito: hay dias en que alguien solo cerro tickets y
       dias en que solo tomo llamadas. Con un INNER se perderian justo los dias
       que explican por que no hizo lo otro.
+
+      LOS ALIAS SE CONSOLIDAN AQUI
+      Los tickets se agrupan por el nombre PRINCIPAL, no por el que traiga cada
+      ticket: asi los de antes de que le corrigieran el usuario a una persona
+      se suman con los de despues. Quien no este en el catalogo conserva su
+      propio nombre y sigue apareciendo, solo que sin llamadas.
+
+      Las llamadas se unen contra CatAgenteTecnico y NO contra vw_TecnicoAgente:
+      esa vista tiene una fila por cada nombre que ha tenido la persona, asi
+      que unir por extension multiplicaria las llamadas por el numero de alias.
    ===================================================================================== */
 CREATE OR ALTER VIEW dbo.vw_CargaTecnicoDia
 AS
 WITH tk AS (
-    SELECT Tecnico = LTRIM(RTRIM(t.TecnicoSegundaLinea)),
+    SELECT Tecnico = ISNULL(m.TecnicoPrincipal, LTRIM(RTRIM(t.TecnicoSegundaLinea))),
            Dia     = CONVERT(DATE, t.FechaFirmaSolucion),
            Tickets = COUNT(*)
     FROM dbo.Tickets AS t
+    LEFT JOIN dbo.vw_TecnicoAgente AS m
+           ON m.TecnicoEnTickets = LTRIM(RTRIM(t.TecnicoSegundaLinea))
     WHERE t.FechaFirmaSolucion IS NOT NULL
       AND NULLIF(LTRIM(RTRIM(t.TecnicoSegundaLinea)), N'') IS NOT NULL
-    GROUP BY LTRIM(RTRIM(t.TecnicoSegundaLinea)), CONVERT(DATE, t.FechaFirmaSolucion)
+    GROUP BY ISNULL(m.TecnicoPrincipal, LTRIM(RTRIM(t.TecnicoSegundaLinea))),
+             CONVERT(DATE, t.FechaFirmaSolucion)
 ),
 ll AS (
     SELECT c.Tecnico,
@@ -455,10 +548,21 @@ EXEC dbo.usp_CatAgenteTecnico_Sembrar @Simulacion = 0;
 --               N'<EXACTO como en dbo.Tickets>', N'Service Desk',
 --               N'Capturado a mano: el apellido difiere entre los dos sistemas');
 
--- 4b. Antes de dar por buena una fila 'auto', vale la pena buscar si el mismo
---     tecnico esta capturado DOS VECES en Proactivanet con el nombre escrito
---     distinto. Si es asi, el cruce solo cuenta los tickets de una de las dos
---     variantes y la persona sale con menos carga de la que tiene.
+-- 4b. LO MAS IMPORTANTE DE ESTE SCRIPT, y lo que mas facil se pasa por alto:
+--     buscar al mismo tecnico capturado DOS VECES en Proactivanet. Cuando a
+--     alguien le corrigen el usuario, sus tickets viejos se quedan con el
+--     nombre viejo, y el cruce solo cuenta los de una de las dos variantes.
+--     En los datos del 8 de septiembre aparecieron dos casos, y en uno de
+--     ellos la persona salia con 210 de sus 1,947 tickets.
+--
+--     Lo que devuelva esta consulta se da de alta como alias:
+--
+-- INSERT INTO dbo.CatAgenteTecnicoAlias (Tecnico, NumeroAgente, Nota)
+-- VALUES (N'<el nombre VIEJO, exacto como quedo en dbo.Tickets>', 0000,
+--         N'Nombre anterior; le corrigieron el usuario');
+--
+--     El nombre ACTUAL no se da de alta aqui: ese ya vive en
+--     CatAgenteTecnico.Tecnico y la vista lo ignoraria de todos modos.
 SELECT c.NumeroAgente, c.Tecnico, TicketsDelCatalogo = (
            SELECT COUNT(*) FROM dbo.Tickets t
            WHERE LTRIM(RTRIM(t.TecnicoSegundaLinea)) = c.Tecnico),
@@ -488,7 +592,17 @@ FROM dbo.Llamadas AS l
 LEFT JOIN dbo.CatAgenteTecnico AS c ON c.NumeroAgente = l.NumeroAgente
 WHERE l.EsContestada = 1;
 
--- 7. El cruce.
+-- 7. Que quedo consolidado. Cada persona con alias debe salir con la SUMA de
+--    sus dos nombres; si alguna sigue con el conteo de uno solo, el alias no
+--    quedo bien capturado.
+SELECT v.TecnicoPrincipal, v.TecnicoEnTickets, v.EsAlias,
+       Tickets = (SELECT COUNT(*) FROM dbo.Tickets t
+                  WHERE LTRIM(RTRIM(t.TecnicoSegundaLinea)) = v.TecnicoEnTickets)
+FROM dbo.vw_TecnicoAgente AS v
+WHERE v.NumeroAgente IN (SELECT NumeroAgente FROM dbo.CatAgenteTecnicoAlias)
+ORDER BY v.NumeroAgente, v.EsAlias;
+
+-- 8. El cruce.
 EXEC dbo.usp_Dash_CargaCombinada @FechaInicio = '2026-08-01', @FechaFin = '2026-08-31';
 
 */
@@ -498,4 +612,5 @@ EXEC dbo.usp_Dash_CargaCombinada @FechaInicio = '2026-08-01', @FechaFin = '2026-
    =====================================================================================
 GRANT EXECUTE ON dbo.usp_Dash_CargaCombinada TO [PROACTIVANETAD];
 GRANT SELECT  ON dbo.vw_CargaTecnicoDia      TO [PROACTIVANETAD];
+GRANT SELECT  ON dbo.vw_TecnicoAgente        TO [PROACTIVANETAD];
 */
