@@ -597,11 +597,13 @@ SELECT
     TipoCedis = c.Tipo,
 
     t.Grupo,
-    -- Los dos, no uno. En el 13.66% de los tickets el asignado y el que firma
-    -- son personas distintas, y no por un error de captura: son escalaciones
-    -- reales. En una hoja de detalle esa diferencia es informacion, no ruido.
+    -- Aqui viaja a quien estaba ASIGNADO el ticket. Quien firmo la solucion
+    -- viaja tambien, mas abajo, con el resto de las columnas del export: en el
+    -- 13.66% de los tickets no son la misma persona -son escalaciones reales,
+    -- no errores de captura- y en una hoja de detalle esa diferencia es
+    -- informacion. No agregar FirmaSolucion aqui: ya esta, y repetirla tumba
+    -- la vista entera con "Column names in each view must be unique".
     t.TecnicoSegundaLinea,
-    t.FirmaSolucion,
     t.Estado,
     t.Subestado,
     t.Prioridad,

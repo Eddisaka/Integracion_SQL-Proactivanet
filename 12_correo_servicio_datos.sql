@@ -407,8 +407,11 @@ BEGIN
             ELSE N'Fuera SLA' END,
 
         v.Grupo,
+        -- FirmaSolucion NO va aqui: ya sale mas abajo, junto a las fechas de
+        -- firma. Un procedimiento si admite dos columnas con el mismo nombre
+        -- -no truena como la vista-, pero el Excel saldria con la columna
+        -- repetida y nadie sabria cual mirar.
         v.TecnicoSegundaLinea,
-        v.FirmaSolucion,
         v.Estado,
         v.Subestado,
         v.Tipo,
