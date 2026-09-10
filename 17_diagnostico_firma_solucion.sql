@@ -31,6 +31,52 @@
         seguro y mecanico.
       - Si dice que son distintos, ANTES de cambiar codigo hay que decidir cual
         de los dos formatos es el bueno y volver a sembrar el catalogo.
+
+   -------------------------------------------------------------------------------------
+   RESULTADO DE LA CORRIDA DEL 9 DE SEPTIEMBRE DE 2026
+   -------------------------------------------------------------------------------------
+   Se deja escrito porque es lo que justifica los cambios que ya se hicieron en
+   04, 05, 11, 12 y 16, y lo que explica por que 07 y 09 NO se tocaron. Volver
+   a correr el script sirve para ver si algo de esto cambio.
+
+   1. Formato: IDENTICO en los dos campos ('Apellido Apellido, Nombre'). El
+      cambio resulto mecanico y el catalogo de extensiones NO hubo que
+      recapturarlo.
+
+   2. Cobertura en los 436,188 tickets resueltos:
+        FirmaSolucion llena ....... 100%
+        TecnicoSegundaLinea ....... 79%
+        resueltos con asignado y sin firma ... 0
+      La firma es un superconjunto: se recuperan 91,270 tickets que salian como
+      'Sin tecnico' y no se pierde ninguno.
+
+   3. Coincidencia con los dos llenos: 86.34% son la misma persona. De los que
+      no, CERO eran el mismo nombre escrito distinto -o sea, no hay nada que
+      normalizar-: son escalaciones reales. El caso mayor son 9,756 tickets
+      asignados a una persona y firmados por otra.
+
+   4. El cruce con llamadas era el mas afectado: de las 20 extensiones del
+      catalogo, 13 subieron de tickets, varias por un factor de diez (una paso
+      de 250 a 3,832). Una quedo en cero: es alguien que toma llamadas y no
+      firma soluciones.
+
+   5. Tickets SIN resolver: 9,491, de los cuales traen firma CERO. Por eso el
+      backlog no puede usar este campo -el detalle, en 07_correo_backlog.sql-.
+
+   6. Pendiente que este diagnostico destapo y que NO es parte del cambio:
+      cuentas que no son personas y que ahora entran a las graficas de
+      productividad. Las que aparecieron con volumen:
+        User, Setup ....................  9,877
+        Proactivanet, Customer Service ..  3,305
+        Energeticos, Control ............  1,219
+        Soriana, Consulta ...............    559
+        Operaciones, Operaciones ........    122
+        MAC, Mesa .......................     30
+      A estas se suman las que ya estaban antes del cambio y que tampoco son
+      personas: 'Desk, Smart' -la mas grande de toda la base- y las varias
+      'Proveedor, <nombre>'. Hace falta un catalogo de cuentas-no-persona para
+      excluirlas de las graficas; mientras no exista, la barra mas alta de
+      productividad no es de nadie.
    ===================================================================================== */
 
 USE [Tickets_Proactivanet];
@@ -365,16 +411,21 @@ GO
                                    volverlo a sembrar DESPUES del cambio.
 
    ---------------------------------------------------------------------------
-   C) DEPENDE DEL DIAGNOSTICO - pasan el campo tal cual a una salida
+   C) RESUELTO - pasan el campo tal cual a una salida
    ---------------------------------------------------------------------------
-   Aqui TecnicoSegundaLinea es una columna mas del Excel o del detalle. Si los
-   dos campos resultan ser la misma persona, se sustituye; si resultan ser
-   personas distintas (bloque 5), lo correcto es MOSTRAR LAS DOS, porque son
-   dos datos distintos: a quien estaba asignado y quien lo resolvio.
+   Aqui TecnicoSegundaLinea es una columna mas del Excel o del detalle. Como el
+   bloque 5 mostro que cuando los dos difieren son personas distintas de
+   verdad, se decidio MOSTRAR LAS DOS: son dos datos, a quien estaba asignado y
+   quien lo resolvio.
 
-     09_slots_por_mes.sql:144      vista de slots por mes
-     11_correo_servicio.sql:600    vw_ServicioTickets
-     12_correo_servicio_datos.sql:410  hojas de detalle del correo por servicio
+     11_correo_servicio.sql        vw_ServicioTickets: se agrego FirmaSolucion
+     12_correo_servicio_datos.sql  hojas de detalle: se agrego la columna
+
+   NO se toco 09_slots_por_mes.sql. Ahi el tecnico viaja como columna suelta y
+   nadie agrupa por el -las vistas agrupan por C1, Aplica y TipoRelacion-, asi
+   que agregar la columna no daria nada y si romperia la cobertura del indice
+   IX_Tickets_SlotsPivot, que trae TecnicoSegundaLinea en su INCLUDE y se crea
+   fuera de este repositorio.
 
    ---------------------------------------------------------------------------
    D) NO SE TOCA - el backlog son tickets ABIERTOS

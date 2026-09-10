@@ -67,9 +67,44 @@ SELECT
     t.FechaFirmaCierre,
 
     Grupo = ISNULL(NULLIF(LTRIM(RTRIM(t.Grupo)), N''), N'Sin grupo'),
-    Tecnico = ISNULL(NULLIF(LTRIM(RTRIM(t.TecnicoSegundaLinea)), N''), N'Sin tecnico'),
+
+    /* QUIEN ES "EL TECNICO" DE UN TICKET
+
+       Se prefiere FirmaSolucion -quien firmo la solucion- sobre
+       TecnicoSegundaLinea -a quien estaba asignado-, y se cae al asignado solo
+       mientras el ticket sigue sin resolver, que es cuando todavia no hay
+       firma.
+
+       Medido el 9 de septiembre de 2026 con 17_diagnostico_firma_solucion.sql,
+       sobre 436,188 tickets resueltos:
+         - FirmaSolucion viene llena en el 100%
+         - TecnicoSegundaLinea, solo en el 79%
+         - tickets resueltos con asignado y SIN firma: cero
+       O sea que para lo ya resuelto la firma es un superconjunto: el cambio
+       recupera 91,270 tickets que hoy salen como 'Sin tecnico' y no pierde
+       ninguno. Grupos enteros dejan de estar en blanco -Soporte RH tenia sus
+       6,339 tickets resueltos sin un solo tecnico-.
+
+       LO QUE ESTO MUEVE, Y HAY QUE SABERLO ANTES DE MIRAR LAS GRAFICAS
+       En el 13.66% de los tickets el asignado y el que firma son personas
+       DISTINTAS, y ahi el credito cambia de manos. No es un error de captura:
+       al comparar los nombres sin acentos ni comas, cero pares resultaron ser
+       el mismo nombre escrito distinto. Son escalaciones y reasignaciones
+       reales, y el caso mas grande son 9,756 tickets asignados a una persona y
+       firmados por otra. Alguien que hoy aparece arriba en la grafica de
+       productividad puede bajar bastante, y no sera un error del tablero.
+    */
+    Tecnico = COALESCE(NULLIF(LTRIM(RTRIM(t.FirmaSolucion)), N''),
+                       NULLIF(LTRIM(RTRIM(t.TecnicoSegundaLinea)), N''),
+                       N'Sin tecnico'),
+
+    -- Los dos por separado, para poder ver en el detalle quien lo tenia y
+    -- quien lo cerro cuando no son la misma persona.
+    TecnicoAsignado = ISNULL(NULLIF(LTRIM(RTRIM(t.TecnicoSegundaLinea)), N''), N'Sin asignar'),
+    TecnicoResolvio = ISNULL(NULLIF(LTRIM(RTRIM(t.FirmaSolucion)),       N''), N'Sin firmar'),
 
     t.TecnicoSegundaLinea,
+    t.FirmaSolucion,
     t.Estado,
     t.Subestado,
     t.Prioridad,
@@ -367,6 +402,10 @@ BEGIN
         FechaRegistro,
         Grupo,
         Tecnico,
+        -- Se mandan los dos: cuando difieren, el detalle es el unico lugar
+        -- donde se puede ver que el ticket cambio de manos.
+        TecnicoAsignado,
+        TecnicoResolvio,
         Estado,
         Subestado,
         Prioridad,

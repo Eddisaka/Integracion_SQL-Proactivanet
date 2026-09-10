@@ -185,6 +185,10 @@
 
   .vacio { color: var(--text-muted); font-size: 0.85rem; padding: 20px; text-align: center; }
 
+  /* El ticket lo resolvio alguien distinto del asignado. Con cursor de ayuda
+     para que se note que el asterisco tiene algo que decir al pasar encima. */
+  .marca-reasignado { color: var(--amber); font-weight: 700; cursor: help; }
+
   /* Pestañas del encabezado. Cada una es un enlace a su propia pagina: los
      filtros de cada tablero son distintos, asi que conviven mejor separadas
      que alternandose con JavaScript en un solo archivo. */
@@ -285,7 +289,7 @@
 
   <section class="tabla-wrap">
     <h2>Detalle de tickets</h2>
-    <div class="nota">Se muestran hasta 500 tickets del rango filtrado, ordenados por fecha de registro descendente.</div>
+    <div class="nota">Se muestran hasta 500 tickets del rango filtrado, ordenados por fecha de registro descendente. El tecnico es quien firmo la solucion; un asterisco marca los tickets que resolvio alguien distinto del asignado, y el tooltip dice quien los tenia.</div>
     <div id="tabla-detalle"></div>
   </section>
 
@@ -555,6 +559,18 @@ function renderBarraSimple(idCanvas, idGrafico, filas, color) {
   });
 }
 
+// "El tecnico" es quien firmo la solucion. En cerca de uno de cada siete
+// tickets esa persona NO es la que lo tenia asignado -son escalaciones y
+// reasignaciones reales, no errores de captura-, y ese caso vale la pena
+// verlo. Se marca con un asterisco y el nombre del asignado en el tooltip, en
+// vez de con una columna aparte: la tabla ya trae once y solo aplica al 14%.
+function celdaTecnico(f) {
+  const tecnico = escapeHtml(f.Tecnico);
+  const asignado = f.TecnicoAsignado;
+  if (!asignado || asignado === 'Sin asignar' || asignado === f.Tecnico) return tecnico;
+  return `${tecnico} <span class="marca-reasignado" title="Estaba asignado a: ${escapeAttr(asignado)}">*</span>`;
+}
+
 function renderTablaDetalle(filas) {
   const cont = document.getElementById('tabla-detalle');
   if (!filas.length) {
@@ -569,7 +585,7 @@ function renderTablaDetalle(filas) {
       <td>${escapeHtml(f.CodigoTicket)}</td>
       <td>${escapeHtml((f.FechaRegistro || '').replace('T', ' ').slice(0, 16))}</td>
       <td>${escapeHtml(f.Grupo)}</td>
-      <td>${escapeHtml(f.Tecnico)}</td>
+      <td>${celdaTecnico(f)}</td>
       <td>${escapeHtml(f.Estado)}</td>
       <td>${escapeHtml(f.Prioridad)}</td>
       <td>${escapeHtml(f.Categoria)}</td>

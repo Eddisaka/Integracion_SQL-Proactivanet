@@ -597,7 +597,11 @@ SELECT
     TipoCedis = c.Tipo,
 
     t.Grupo,
+    -- Los dos, no uno. En el 13.66% de los tickets el asignado y el que firma
+    -- son personas distintas, y no por un error de captura: son escalaciones
+    -- reales. En una hoja de detalle esa diferencia es informacion, no ruido.
     t.TecnicoSegundaLinea,
+    t.FirmaSolucion,
     t.Estado,
     t.Subestado,
     t.Prioridad,

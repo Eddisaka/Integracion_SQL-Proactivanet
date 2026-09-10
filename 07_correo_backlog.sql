@@ -174,6 +174,31 @@ GO
       de dbo.vw_Backlog: esta es la fuente correcta para "hoy" (Estado y SLA
       vigentes en tiempo real). No sirve para fechas pasadas -ver el
       Backfill mas abajo-.
+
+      POR QUE EL BACKLOG NO USA FirmaSolucion
+      El resto del proyecto cambio de TecnicoSegundaLinea a FirmaSolucion para
+      dejar de mostrar "Sin tecnico" (ver 04_dashboard_sla.sql). Aqui NO, y no
+      es un olvido:
+
+      FirmaSolucion es quien firmo la solucion, asi que existe solo cuando el
+      ticket ya se resolvio. El backlog excluye los resueltos a proposito -esta
+      vista quita 'Cerrada' y 'Rechazada', y el proc quita 'Resuelta' aparte-,
+      asi que en lo que queda ese campo esta vacio siempre. Medido el 9 de
+      septiembre de 2026: de 9,491 tickets sin resolver, los que traen firma
+      son CERO.
+
+      El Backfill es el caso que engaña. Ese si alcanza tickets que hoy ya
+      estan resueltos -los incluye mientras la fecha de salida sea posterior al
+      corte que se esta armando-, y para esos la firma si viene llena. Usarla
+      seria meter informacion del futuro en una foto del pasado: el dia del
+      corte todavia no habia firmado nadie. Ademas partiria la serie historica
+      en dos, con los cortes viejos llenos y los nuevos vacios, que es
+      exactamente el escalon contra el que advierte el resto de este archivo.
+
+      Consecuencia que hay que aceptar: el backlog seguira mostrando tickets
+      sin tecnico -de los 9,491 sin resolver, solo 1,357 traen asignado-. Eso
+      no se arregla con este cambio; se arregla asignando los tickets en
+      Proactivanet.
    ===================================================================================== */
 CREATE OR ALTER PROCEDURE dbo.usp_CorreoBacklog_PrepararCorte
     @FechaCorte DATE = NULL,

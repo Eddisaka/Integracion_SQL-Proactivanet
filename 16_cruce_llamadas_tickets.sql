@@ -155,8 +155,14 @@ SELECT dbo.fn_ClaveNombre(N'Carrizales L' + NCHAR(243) + N'pez, Angel Daniel'),
    2) El catalogo
 
       Una fila por extension del conmutador. 'Tecnico' guarda el valor EXACTO
-      de dbo.Tickets.TecnicoSegundaLinea, porque es por ese texto por el que se
-      une: si se guardara "arreglado" dejaria de empatar.
+      como aparece en dbo.Tickets.FirmaSolucion, porque es por ese texto por el
+      que se une: si se guardara "arreglado" dejaria de empatar.
+
+      Los dos campos de dbo.Tickets escriben el nombre IGUAL -'Apellido
+      Apellido, Nombre' en los dos-, asi que un catalogo sembrado con la
+      version vieja, contra TecnicoSegundaLinea, sigue empatando. Se comprobo
+      el 9 de septiembre de 2026: de 20 extensiones, 19 siguieron empatando
+      solas al cambiar el campo.
 
       Origen dice de donde salio la fila, para poder revisar despues solo lo
       que decidio la maquina:
@@ -273,20 +279,30 @@ BEGIN
     ) q WHERE rn = 1;
 
     -- Los tecnicos de los grupos que hacen las dos cosas, con su volumen.
+    -- El nombre sale de la MISMA regla que usa el resto del proyecto: quien
+    -- firmo la solucion y, si no hay firma, a quien estaba asignado. Si aqui
+    -- se agrupara distinto que en vw_CargaTecnicoDia, el catalogo y el cruce
+    -- no cuadrarian entre si.
     IF OBJECT_ID('tempdb..#T') IS NOT NULL DROP TABLE #T;
     SELECT Tecnico, Grupo, Tickets
     INTO #T
     FROM (
-        SELECT Tecnico = LTRIM(RTRIM(t.TecnicoSegundaLinea)),
+        SELECT Tecnico = COALESCE(NULLIF(LTRIM(RTRIM(t.FirmaSolucion)), N''),
+                                  NULLIF(LTRIM(RTRIM(t.TecnicoSegundaLinea)), N'')),
                Grupo   = LTRIM(RTRIM(t.Grupo)),
                Tickets = COUNT(*),
-               rn = ROW_NUMBER() OVER (PARTITION BY LTRIM(RTRIM(t.TecnicoSegundaLinea))
-                                       ORDER BY COUNT(*) DESC)
+               rn = ROW_NUMBER() OVER (
+                        PARTITION BY COALESCE(NULLIF(LTRIM(RTRIM(t.FirmaSolucion)), N''),
+                                              NULLIF(LTRIM(RTRIM(t.TecnicoSegundaLinea)), N''))
+                        ORDER BY COUNT(*) DESC)
         FROM dbo.Tickets AS t
-        WHERE NULLIF(LTRIM(RTRIM(t.TecnicoSegundaLinea)), N'') IS NOT NULL
+        WHERE COALESCE(NULLIF(LTRIM(RTRIM(t.FirmaSolucion)), N''),
+                       NULLIF(LTRIM(RTRIM(t.TecnicoSegundaLinea)), N'')) IS NOT NULL
           AND (NULLIF(LTRIM(RTRIM(@Grupos)), N'') IS NULL
                OR LTRIM(RTRIM(t.Grupo)) IN (SELECT Valor FROM dbo.fn_Dash_SplitList(@Grupos)))
-        GROUP BY LTRIM(RTRIM(t.TecnicoSegundaLinea)), LTRIM(RTRIM(t.Grupo))
+        GROUP BY COALESCE(NULLIF(LTRIM(RTRIM(t.FirmaSolucion)), N''),
+                          NULLIF(LTRIM(RTRIM(t.TecnicoSegundaLinea)), N'')),
+                 LTRIM(RTRIM(t.Grupo))
     ) q WHERE rn = 1;
 
     /* ---------- 1) Empates propuestos ---------- */
@@ -356,16 +372,24 @@ BEGIN
         WHERE rn = 1
     ),
     tec AS (
+        -- Misma regla de nombre que usp_CatAgenteTecnico_Sugerir y que
+        -- vw_CargaTecnicoDia: firma primero, asignado como respaldo.
         SELECT Tecnico, Grupo
-        FROM (SELECT Tecnico = LTRIM(RTRIM(t.TecnicoSegundaLinea)),
+        FROM (SELECT Tecnico = COALESCE(NULLIF(LTRIM(RTRIM(t.FirmaSolucion)), N''),
+                                        NULLIF(LTRIM(RTRIM(t.TecnicoSegundaLinea)), N'')),
                      Grupo   = LTRIM(RTRIM(t.Grupo)),
-                     rn = ROW_NUMBER() OVER (PARTITION BY LTRIM(RTRIM(t.TecnicoSegundaLinea))
-                                             ORDER BY COUNT(*) DESC)
+                     rn = ROW_NUMBER() OVER (
+                              PARTITION BY COALESCE(NULLIF(LTRIM(RTRIM(t.FirmaSolucion)), N''),
+                                                    NULLIF(LTRIM(RTRIM(t.TecnicoSegundaLinea)), N''))
+                              ORDER BY COUNT(*) DESC)
               FROM dbo.Tickets AS t
-              WHERE NULLIF(LTRIM(RTRIM(t.TecnicoSegundaLinea)), N'') IS NOT NULL
+              WHERE COALESCE(NULLIF(LTRIM(RTRIM(t.FirmaSolucion)), N''),
+                             NULLIF(LTRIM(RTRIM(t.TecnicoSegundaLinea)), N'')) IS NOT NULL
                 AND (NULLIF(LTRIM(RTRIM(@Grupos)), N'') IS NULL
                      OR LTRIM(RTRIM(t.Grupo)) IN (SELECT Valor FROM dbo.fn_Dash_SplitList(@Grupos)))
-              GROUP BY LTRIM(RTRIM(t.TecnicoSegundaLinea)), LTRIM(RTRIM(t.Grupo))) q
+              GROUP BY COALESCE(NULLIF(LTRIM(RTRIM(t.FirmaSolucion)), N''),
+                                NULLIF(LTRIM(RTRIM(t.TecnicoSegundaLinea)), N'')),
+                       LTRIM(RTRIM(t.Grupo))) q
         WHERE rn = 1
     )
     SELECT a.NumeroAgente, a.NombreAgente, t.Tecnico, t.Grupo,
@@ -417,15 +441,32 @@ GO
 CREATE OR ALTER VIEW dbo.vw_CargaTecnicoDia
 AS
 WITH tk AS (
-    SELECT Tecnico = ISNULL(m.TecnicoPrincipal, LTRIM(RTRIM(t.TecnicoSegundaLinea))),
+    /* EL TECNICO ES QUIEN FIRMO LA SOLUCION
+       No a quien estaba asignado. Con TecnicoSegundaLinea el cruce contaba de
+       menos, y mucho: medido el 9 de septiembre de 2026, de las 20 extensiones
+       del catalogo, 13 subieron de tickets al cambiar el campo, varias por un
+       factor de diez -una paso de 250 a 3,832-. Eran tickets que esa persona
+       resolvio sin tenerlos asignados, y el tablero se los daba a nadie.
+
+       Se conserva el COALESCE aunque aqui el filtro ya exige fecha de firma y
+       la firma viene llena en el 100% de los resueltos: si alguna vez entra un
+       ticket con fecha y sin firma, se cae al asignado en vez de desaparecer
+       de la vista sin dejar rastro. */
+    SELECT Tecnico = ISNULL(m.TecnicoPrincipal,
+                            COALESCE(NULLIF(LTRIM(RTRIM(t.FirmaSolucion)), N''),
+                                     NULLIF(LTRIM(RTRIM(t.TecnicoSegundaLinea)), N''))),
            Dia     = CONVERT(DATE, t.FechaFirmaSolucion),
            Tickets = COUNT(*)
     FROM dbo.Tickets AS t
     LEFT JOIN dbo.vw_TecnicoAgente AS m
-           ON m.TecnicoEnTickets = LTRIM(RTRIM(t.TecnicoSegundaLinea))
+           ON m.TecnicoEnTickets = COALESCE(NULLIF(LTRIM(RTRIM(t.FirmaSolucion)), N''),
+                                            NULLIF(LTRIM(RTRIM(t.TecnicoSegundaLinea)), N''))
     WHERE t.FechaFirmaSolucion IS NOT NULL
-      AND NULLIF(LTRIM(RTRIM(t.TecnicoSegundaLinea)), N'') IS NOT NULL
-    GROUP BY ISNULL(m.TecnicoPrincipal, LTRIM(RTRIM(t.TecnicoSegundaLinea))),
+      AND COALESCE(NULLIF(LTRIM(RTRIM(t.FirmaSolucion)), N''),
+                   NULLIF(LTRIM(RTRIM(t.TecnicoSegundaLinea)), N'')) IS NOT NULL
+    GROUP BY ISNULL(m.TecnicoPrincipal,
+                    COALESCE(NULLIF(LTRIM(RTRIM(t.FirmaSolucion)), N''),
+                             NULLIF(LTRIM(RTRIM(t.TecnicoSegundaLinea)), N''))),
              CONVERT(DATE, t.FechaFirmaSolucion)
 ),
 ll AS (
@@ -565,16 +606,16 @@ EXEC dbo.usp_CatAgenteTecnico_Sembrar @Simulacion = 0;
 --     CatAgenteTecnico.Tecnico y la vista lo ignoraria de todos modos.
 SELECT c.NumeroAgente, c.Tecnico, TicketsDelCatalogo = (
            SELECT COUNT(*) FROM dbo.Tickets t
-           WHERE LTRIM(RTRIM(t.TecnicoSegundaLinea)) = c.Tecnico),
-       PosibleDuplicado = o.TecnicoSegundaLinea, o.Tickets
+           WHERE LTRIM(RTRIM(t.FirmaSolucion)) = c.Tecnico),
+       PosibleDuplicado = o.FirmaSolucion, o.Tickets
 FROM dbo.CatAgenteTecnico AS c
 CROSS APPLY (
-    SELECT TOP 3 t.TecnicoSegundaLinea, Tickets = COUNT(*)
+    SELECT TOP 3 t.FirmaSolucion, Tickets = COUNT(*)
     FROM dbo.Tickets AS t
-    WHERE LTRIM(RTRIM(t.TecnicoSegundaLinea)) <> c.Tecnico
-      AND LEFT(dbo.fn_ClaveNombre(t.TecnicoSegundaLinea), 10)
+    WHERE LTRIM(RTRIM(t.FirmaSolucion)) <> c.Tecnico
+      AND LEFT(dbo.fn_ClaveNombre(t.FirmaSolucion), 10)
         = LEFT(dbo.fn_ClaveNombre(c.Tecnico), 10)
-    GROUP BY t.TecnicoSegundaLinea
+    GROUP BY t.FirmaSolucion
     ORDER BY COUNT(*) DESC
 ) AS o
 ORDER BY o.Tickets DESC;
@@ -597,10 +638,28 @@ WHERE l.EsContestada = 1;
 --    quedo bien capturado.
 SELECT v.TecnicoPrincipal, v.TecnicoEnTickets, v.EsAlias,
        Tickets = (SELECT COUNT(*) FROM dbo.Tickets t
-                  WHERE LTRIM(RTRIM(t.TecnicoSegundaLinea)) = v.TecnicoEnTickets)
+                  WHERE LTRIM(RTRIM(t.FirmaSolucion)) = v.TecnicoEnTickets)
 FROM dbo.vw_TecnicoAgente AS v
 WHERE v.NumeroAgente IN (SELECT NumeroAgente FROM dbo.CatAgenteTecnicoAlias)
 ORDER BY v.NumeroAgente, v.EsAlias;
+
+-- 7b. DESPUES DE PASAR EL CRUCE A FirmaSolucion: revisar que ninguna extension
+--     se haya quedado en cero. El catalogo se sembro con los nombres de
+--     TecnicoSegundaLinea, y aunque los dos campos escriben igual, alguien que
+--     nunca firma soluciones -porque escala todo- se queda sin tickets.
+--
+--     El 9 de septiembre de 2026 esto devolvia una sola extension. Si es gente
+--     que de verdad no resuelve, esta bien que salga en cero: hace llamadas y
+--     no cierra tickets, y eso es justamente lo que el tablero debe mostrar.
+--     Si no, hay que buscarle el nombre con el que si firma y darlo de alta
+--     como alias.
+SELECT c.NumeroAgente, c.Tecnico, c.Grupo,
+       TicketsPorFirma    = (SELECT COUNT(*) FROM dbo.Tickets t
+                             WHERE LTRIM(RTRIM(t.FirmaSolucion)) = c.Tecnico),
+       TicketsPorAsignado = (SELECT COUNT(*) FROM dbo.Tickets t
+                             WHERE LTRIM(RTRIM(t.TecnicoSegundaLinea)) = c.Tecnico)
+FROM dbo.CatAgenteTecnico AS c
+ORDER BY TicketsPorFirma;
 
 -- 8. El cruce.
 EXEC dbo.usp_Dash_CargaCombinada @FechaInicio = '2026-08-01', @FechaFin = '2026-08-31';

@@ -109,7 +109,14 @@ SELECT
     t.Subestado,
     t.Categoria,
     Grupo   = ISNULL(NULLIF(LTRIM(RTRIM(t.Grupo)), N''), N'Sin grupo'),
-    Tecnico = ISNULL(NULLIF(LTRIM(RTRIM(t.TecnicoSegundaLinea)), N''), N'Sin tecnico'),
+    -- Quien firmo la solucion, y solo si no hay firma, a quien estaba
+    -- asignado. Misma regla que dbo.vw_Dash_ProductividadBase; el porque, con
+    -- los numeros que lo sostienen, esta documentado alla y medido en
+    -- 17_diagnostico_firma_solucion.sql.
+    Tecnico = COALESCE(NULLIF(LTRIM(RTRIM(t.FirmaSolucion)), N''),
+                       NULLIF(LTRIM(RTRIM(t.TecnicoSegundaLinea)), N''),
+                       N'Sin tecnico'),
+    TecnicoAsignado = ISNULL(NULLIF(LTRIM(RTRIM(t.TecnicoSegundaLinea)), N''), N'Sin asignar'),
     t.Cliente,
     t.Sucursal,
     t.Tienda,
@@ -504,11 +511,36 @@ GO
 /* =====================================================================================
    9) Indice recomendado (el join contra dbo.Categorias es por Categoria)
    ===================================================================================== */
+/* La vista ahora lee tambien FirmaSolucion en cada fila, asi que esa columna
+   tiene que estar en el INCLUDE o el indice deja de cubrir la consulta y
+   aparece un Key Lookup por ticket.
+
+   Un IF NOT EXISTS a secas no bastaba: el indice YA existe en la base con la
+   lista vieja, y se habria quedado asi para siempre sin que nada avisara. Se
+   tira solo cuando le falte la columna. En una tabla de cientos de miles de
+   tickets tarda un rato la primera vez; despues es un no-op. */
+IF EXISTS (
+    SELECT 1
+    FROM sys.indexes AS i
+    WHERE i.name = 'IX_Tickets_CorreoQA_FechaCategoriaGrupo'
+      AND i.object_id = OBJECT_ID('dbo.Tickets')
+      AND NOT EXISTS (
+          SELECT 1
+          FROM sys.index_columns AS ic
+          INNER JOIN sys.columns AS c
+                  ON c.object_id = ic.object_id AND c.column_id = ic.column_id
+          WHERE ic.object_id = i.object_id
+            AND ic.index_id  = i.index_id
+            AND c.name = 'FirmaSolucion')
+)
+    DROP INDEX IX_Tickets_CorreoQA_FechaCategoriaGrupo ON dbo.Tickets;
+GO
+
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Tickets_CorreoQA_FechaCategoriaGrupo' AND object_id = OBJECT_ID('dbo.Tickets'))
 BEGIN
     CREATE INDEX IX_Tickets_CorreoQA_FechaCategoriaGrupo
     ON dbo.Tickets (FechaRegistro)
-    INCLUDE (Categoria, Grupo, TecnicoSegundaLinea, Estado, Subestado, Tipo, TipoRelacion, Titulo, Cliente, Sucursal, Tienda, CodigoTicket);
+    INCLUDE (Categoria, Grupo, TecnicoSegundaLinea, FirmaSolucion, Estado, Subestado, Tipo, TipoRelacion, Titulo, Cliente, Sucursal, Tienda, CodigoTicket);
 END;
 GO
 

@@ -408,6 +408,7 @@ BEGIN
 
         v.Grupo,
         v.TecnicoSegundaLinea,
+        v.FirmaSolucion,
         v.Estado,
         v.Subestado,
         v.Tipo,
