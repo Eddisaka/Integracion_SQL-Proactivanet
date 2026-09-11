@@ -181,3 +181,104 @@ WHERE t.FechaFirmaSolucion IS NOT NULL
 GROUP BY CONVERT(CHAR(7), t.FechaFirmaSolucion, 126)
 ORDER BY Mes;
 GO
+
+/* =====================================================================================
+   SEGUNDA VUELTA - 11 de septiembre de 2026
+
+   La primera corrida contesto casi todo, pero dejo dos cosas abiertas y una de
+   ellas es un error de este mismo script: el bloque 2c midio el formato de
+   TiempoPrimeraRespuesta, que resulto ser el campo que NO sirve. El util es
+   TiempoPrimeraRespuestaHorasMin, y de ese solo se vieron sus veinte valores
+   mas comunes -todos '0h NNm'-, que no alcanza para escribir una conversion.
+
+   Lo que si quedo claro de la primera corrida:
+     - Llenado del 100% en los seis campos para los tickets resueltos.
+     - TiempoPrimeraRespuesta trae SOLO digitos, un unico formato, sin dos
+       puntos ni letras, de 1 a 4 caracteres y 1,069 valores distintos.
+     - Pero 310,259 de 447,087 tickets valen '0'. Siete de cada diez en el
+       mismo cubo: eso no es un indicador, es una constante. La explicacion es
+       que el campo esta en HORAS ENTERAS, y la mesa contesta casi todo dentro
+       de la primera hora.
+   ===================================================================================== */
+
+/* =====================================================================================
+   6) Confirmar que TiempoPrimeraRespuesta esta en horas
+
+      Es una prueba que se puede fallar, no una corazonada: si el campo son
+      horas enteras, sus ceros tienen que ser EXACTAMENTE los mismos tickets
+      que los '0h NNm' del campo detallado. Si los dos numeros empatan, la
+      interpretacion queda confirmada y el campo simple se puede descartar con
+      confianza. Si no empatan, significa otra cosa y hay que averiguar que.
+   ===================================================================================== */
+SELECT
+    Bloque = '6) Horas enteras?',
+    Tickets = COUNT(*),
+    ValeCeroEnHoras   = SUM(CASE WHEN LTRIM(RTRIM(t.TiempoPrimeraRespuesta)) = N'0' THEN 1 ELSE 0 END),
+    EmpiezaCon0h      = SUM(CASE WHEN LTRIM(RTRIM(t.TiempoPrimeraRespuestaHorasMin)) LIKE N'0h %' THEN 1 ELSE 0 END),
+    -- Si esta es cero, los dos campos hablan de lo mismo y la lectura es correcta.
+    Discrepan = SUM(CASE
+        WHEN (CASE WHEN LTRIM(RTRIM(t.TiempoPrimeraRespuesta)) = N'0' THEN 1 ELSE 0 END)
+           <> (CASE WHEN LTRIM(RTRIM(t.TiempoPrimeraRespuestaHorasMin)) LIKE N'0h %' THEN 1 ELSE 0 END)
+        THEN 1 ELSE 0 END)
+FROM dbo.Tickets AS t
+WHERE NULLIF(LTRIM(RTRIM(t.TiempoPrimeraRespuesta)), N'') IS NOT NULL
+  AND NULLIF(LTRIM(RTRIM(t.TiempoPrimeraRespuestaHorasMin)), N'') IS NOT NULL;
+GO
+
+/* =====================================================================================
+   7) El formato de TiempoPrimeraRespuestaHorasMin, esta vez completo
+
+      Es el campo del que va a salir el indicador, asi que su formato hay que
+      conocerlo entero y no por los veinte valores mas comunes. Lo que importa
+      es NoEmpatanElPatron: si es cero, la conversion es segura; si no, ahi
+      estan los casos raros para verlos antes de escribir nada.
+   ===================================================================================== */
+SELECT
+    Bloque = '7) Formato de TiempoPrimeraRespuestaHorasMin',
+    Tickets  = COUNT(*),
+    -- Una o mas cifras de hora, 'h', espacio, dos cifras de minuto, 'm'.
+    EmpatanElPatron    = SUM(CASE WHEN LTRIM(RTRIM(t.TiempoPrimeraRespuestaHorasMin))
+                                       LIKE N'[0-9]%h [0-9][0-9]m' THEN 1 ELSE 0 END),
+    NoEmpatanElPatron  = SUM(CASE WHEN LTRIM(RTRIM(t.TiempoPrimeraRespuestaHorasMin))
+                                   NOT LIKE N'[0-9]%h [0-9][0-9]m' THEN 1 ELSE 0 END),
+    -- Cualquier caracter que no sea digito, 'h', 'm' o espacio delata otro formato.
+    ConCaracteresRaros = SUM(CASE WHEN LTRIM(RTRIM(t.TiempoPrimeraRespuestaHorasMin))
+                                       LIKE N'%[^0-9hm ]%' THEN 1 ELSE 0 END),
+    MinLargo = MIN(LEN(LTRIM(RTRIM(t.TiempoPrimeraRespuestaHorasMin)))),
+    MaxLargo = MAX(LEN(LTRIM(RTRIM(t.TiempoPrimeraRespuestaHorasMin)))),
+    ValoresDistintos = COUNT(DISTINCT LTRIM(RTRIM(t.TiempoPrimeraRespuestaHorasMin)))
+FROM dbo.Tickets AS t
+WHERE NULLIF(LTRIM(RTRIM(t.TiempoPrimeraRespuestaHorasMin)), N'') IS NOT NULL;
+
+-- Y los que no empatan, con nombre y apellido.
+SELECT TOP 25
+    Bloque = '7b) Valores que no empatan el patron',
+    Valor  = LTRIM(RTRIM(t.TiempoPrimeraRespuestaHorasMin)),
+    Tickets = COUNT(*)
+FROM dbo.Tickets AS t
+WHERE NULLIF(LTRIM(RTRIM(t.TiempoPrimeraRespuestaHorasMin)), N'') IS NOT NULL
+  AND LTRIM(RTRIM(t.TiempoPrimeraRespuestaHorasMin)) NOT LIKE N'[0-9]%h [0-9][0-9]m'
+GROUP BY LTRIM(RTRIM(t.TiempoPrimeraRespuestaHorasMin))
+ORDER BY COUNT(*) DESC;
+GO
+
+/* =====================================================================================
+   8) Que son los 15,151 tickets resueltos con CERO intentos de solucion
+
+      El 3.46% de lo resuelto. No son reabiertos ni resueltos al primer intento:
+      son una tercera cosa, y hay que saber cual antes de decidir si entran al
+      denominador del indicador. Si resultan ser cancelaciones o duplicados,
+      contarlos como "resueltos a la primera" inflaria el numero bueno.
+   ===================================================================================== */
+SELECT TOP 25
+    Bloque = '8) Resueltos con 0 intentos',
+    t.Estado,
+    t.Subestado,
+    t.Tipo,
+    Tickets = COUNT(*)
+FROM dbo.Tickets AS t
+WHERE t.FechaFirmaSolucion IS NOT NULL
+  AND t.IntentosSolucion = 0
+GROUP BY t.Estado, t.Subestado, t.Tipo
+ORDER BY COUNT(*) DESC;
+GO
