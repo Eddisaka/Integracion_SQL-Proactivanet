@@ -19,12 +19,13 @@
 
    Objetos creados:
    - dbo.fn_Dash_SplitList          (tabla: separa una lista "a,b,c" en filas)
+   - dbo.fn_Dash_SplitListPipe      (la misma, por '|': los nombres de tecnico traen comas)
    - dbo.vw_Dash_ProductividadBase  (CREATE OR ALTER, misma definicion que el script base)
    - dbo.usp_Dash_Catalogos         (catalogos de Grupo y Tecnico para poblar filtros)
    - dbo.usp_Dash_KpisMulti         (tarjetas KPI: total, cerrados, SLA, horas, etc.)
    - dbo.usp_Dash_TendenciaMulti    (serie diaria: creados / cerrados / vencidos SLA)
    - dbo.usp_Dash_ProductividadTecnicoMulti (tickets por tecnico, para grafico de barras)
-   - dbo.usp_Dash_DistribucionMulti (Estado, Prioridad y Aging, para graficos de pastel/barras)
+   - dbo.usp_Dash_DistribucionMulti (Prioridad y vencidos por grupo, para las graficas)
    - dbo.usp_Dash_DetalleMulti      (tabla de detalle, top N)
 
    Notas:
@@ -266,6 +267,26 @@ BEGIN
           AND b.FechaRegistro < DATEADD(DAY, 1, @FechaFin)
           AND (NULLIF(LTRIM(RTRIM(@Grupos)), N'') IS NULL OR b.Grupo IN (SELECT Valor FROM dbo.fn_Dash_SplitList(@Grupos)))
           AND (NULLIF(LTRIM(RTRIM(@Tecnicos)), N'') IS NULL OR b.Tecnico IN (SELECT Valor FROM dbo.fn_Dash_SplitListPipe(@Tecnicos)))
+    ),
+    /* Mediana y p90 de las horas de resolucion. El promedio no sirve para
+       esto: la distribucion tiene cola larga y unos cuantos tickets de semanas
+       lo empujan por encima de casi todos los demas, y el numero que sale no
+       describe a casi ningun ticket real.
+
+       Va como SEGUNDO CTE del mismo WITH, separado por coma. Dos ";WITH"
+       seguidos no son T-SQL valido -T-SQL admite varios CTE, pero un solo
+       WITH-, y encima repetir aqui el filtro de fechas y grupos abriria la
+       puerta a que un dia alguien cambie uno y no el otro.
+
+       TOP (1) porque PERCENTILE_CONT es funcion de ventana: devuelve el mismo
+       valor repetido en cada fila de entrada, no una sola. */
+    pct AS
+    (
+        SELECT TOP (1)
+            Mediana = PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY HorasResolucion) OVER (),
+            P90     = PERCENTILE_CONT(0.9) WITHIN GROUP (ORDER BY HorasResolucion) OVER ()
+        FROM base
+        WHERE HorasResolucion IS NOT NULL
     )
     SELECT
         FechaInicio = @FechaInicio,
@@ -284,6 +305,11 @@ BEGIN
         GruposActivos = COUNT(DISTINCT Grupo),
         TecnicosActivos = COUNT(DISTINCT Tecnico),
         HorasResolucionPromedio = CAST(AVG(HorasResolucion) AS DECIMAL(18,2)),
+        -- Subconsultas escalares y no un JOIN: si ningun ticket del rango
+        -- tiene horas, pct no devuelve filas y un CROSS JOIN dejaria el
+        -- resultado entero vacio, o sea el tablero sin KPIs.
+        HorasResolucionMediana = (SELECT TOP (1) CAST(Mediana AS DECIMAL(18,2)) FROM pct),
+        HorasResolucionP90     = (SELECT TOP (1) CAST(P90     AS DECIMAL(18,2)) FROM pct),
         HorasCicloPromedio = CAST(AVG(HorasCiclo) AS DECIMAL(18,2)),
         ReasignacionesPromedio = CAST(AVG(CAST(ReasignacionesGrupo AS DECIMAL(18,2))) AS DECIMAL(18,2)),
         TicketsAltaPrioridad = SUM(CASE WHEN Prioridad IN (N'Alta', N'Crítica', N'Critica', N'Urgente') THEN 1 ELSE 0 END)
@@ -307,7 +333,13 @@ BEGIN
         Fecha = FechaRegistroDia,
         TicketsCreados = COUNT_BIG(*),
         TicketsCerrados = SUM(CASE WHEN EstaCerrado = 1 THEN 1 ELSE 0 END),
-        TicketsSlaVencidos = SUM(CASE WHEN SlaVencido = 1 THEN 1 ELSE 0 END)
+        TicketsSlaVencidos = SUM(CASE WHEN SlaVencido = 1 THEN 1 ELSE 0 END),
+        -- Para la grafica de cumplimiento en el tiempo. Se mandan los dos
+        -- conteos y no el porcentaje: el tablero agrupa por dia, mes o SLOT
+        -- segun el rango, y un porcentaje diario no se puede promediar para
+        -- sacar el del mes -un dia con 2 tickets pesaria igual que uno con 200-.
+        TicketsSlaEvaluable = SUM(CASE WHEN SlaEvaluable = 1 THEN 1 ELSE 0 END),
+        TicketsDentroSla    = SUM(CASE WHEN SlaEvaluable = 1 AND DentroSla = 1 THEN 1 ELSE 0 END)
     FROM dbo.vw_Dash_ProductividadBase b
     WHERE b.FechaRegistro >= @FechaInicio
       AND b.FechaRegistro < DATEADD(DAY, 1, @FechaFin)
@@ -354,7 +386,17 @@ END;
 GO
 
 /* =====================================================================================
-   6) Distribuciones: Estado, Prioridad y Aging (3 result sets)
+   6) Distribuciones: Prioridad y vencidos por grupo (2 result sets)
+
+      ERAN TRES: Estado, Prioridad y Aging. Estado y Aging se quitaron de la
+      pestaña porque describian en que situacion estan los tickets AHORA, que
+      es lo que contesta el tablero de Backlog, y encima sobre otro recorte -la
+      camada creada en el rango-, asi que las dos pestañas daban numeros
+      distintos para lo que la gente lee como lo mismo.
+
+      En su lugar entra el desglose de los vencidos. "Vencidos SLA: 1,234" es
+      un numero con el que no se puede hacer nada; saber que la mayoria sale de
+      tres grupos si dice con quien hay que sentarse.
    ===================================================================================== */
 CREATE OR ALTER PROCEDURE dbo.usp_Dash_DistribucionMulti
     @FechaInicio DATE,
@@ -366,12 +408,14 @@ BEGIN
     SET NOCOUNT ON;
 
     /* Un CTE solo es visible para el SELECT que le sigue de inmediato; como
-       aqui se necesitan tres SELECT sobre el mismo subconjunto filtrado, se
+       aqui se necesitan dos SELECT sobre el mismo subconjunto filtrado, se
        materializa una vez en una tabla temporal en vez de usar ";WITH base". */
     SELECT
-        Estado,
+        Grupo,
         Prioridad,
-        AgingBucket
+        SlaVencido,
+        SlaEvaluable,
+        DentroSla
     INTO #DistribucionBase
     FROM dbo.vw_Dash_ProductividadBase b
     WHERE b.FechaRegistro >= @FechaInicio
@@ -380,33 +424,30 @@ BEGIN
       AND (NULLIF(LTRIM(RTRIM(@Tecnicos)), N'') IS NULL OR b.Tecnico IN (SELECT Valor FROM dbo.fn_Dash_SplitListPipe(@Tecnicos)));
 
     SELECT
-        Valor = ISNULL(NULLIF(LTRIM(RTRIM(Estado)), N''), N'Sin estado'),
-        Tickets = COUNT_BIG(*)
-    FROM #DistribucionBase
-    GROUP BY ISNULL(NULLIF(LTRIM(RTRIM(Estado)), N''), N'Sin estado')
-    ORDER BY Tickets DESC;
-
-    SELECT
         Valor = ISNULL(NULLIF(LTRIM(RTRIM(Prioridad)), N''), N'Sin prioridad'),
         Tickets = COUNT_BIG(*)
     FROM #DistribucionBase
     GROUP BY ISNULL(NULLIF(LTRIM(RTRIM(Prioridad)), N''), N'Sin prioridad')
     ORDER BY Tickets DESC;
 
-    SELECT
-        Valor = AgingBucket,
-        Tickets = COUNT_BIG(*)
+    /* Solo los grupos con al menos un vencido: los demas llenarian la grafica
+       de barras en cero. TOP 12 porque a partir de ahi las barras dejan de
+       leerse y la cola son grupos con uno o dos. */
+    SELECT TOP (12)
+        Valor      = ISNULL(NULLIF(LTRIM(RTRIM(Grupo)), N''), N'Sin grupo'),
+        Vencidos   = SUM(CASE WHEN SlaVencido = 1 THEN 1 ELSE 0 END),
+        Evaluables = SUM(CASE WHEN SlaEvaluable = 1 THEN 1 ELSE 0 END),
+        -- El porcentaje va junto al volumen a proposito: un grupo chico con 8
+        -- vencidos de 10 tickets esta peor que uno grande con 50 de 5,000, y
+        -- mirando solo la barra se concluiria al reves.
+        CumplimientoPct = CAST(
+            100.0 * SUM(CASE WHEN SlaEvaluable = 1 AND DentroSla = 1 THEN 1 ELSE 0 END)
+            / NULLIF(SUM(CASE WHEN SlaEvaluable = 1 THEN 1 ELSE 0 END), 0)
+            AS DECIMAL(6,2))
     FROM #DistribucionBase
-    GROUP BY AgingBucket
-    ORDER BY CASE AgingBucket
-        WHEN N'0-1 dias' THEN 1
-        WHEN N'2-3 dias' THEN 2
-        WHEN N'4-7 dias' THEN 3
-        WHEN N'8-15 dias' THEN 4
-        WHEN N'16-30 dias' THEN 5
-        WHEN N'31+ dias' THEN 6
-        ELSE 99
-    END;
+    GROUP BY ISNULL(NULLIF(LTRIM(RTRIM(Grupo)), N''), N'Sin grupo')
+    HAVING SUM(CASE WHEN SlaVencido = 1 THEN 1 ELSE 0 END) > 0
+    ORDER BY Vencidos DESC;
 
     DROP TABLE #DistribucionBase;
 END;
