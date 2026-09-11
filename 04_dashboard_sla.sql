@@ -156,39 +156,81 @@ SELECT
     EstaCerrado = CASE WHEN t.FechaFirmaCierre IS NOT NULL THEN CONVERT(bit, 1) ELSE CONVERT(bit, 0) END,
     EstaAbierto = CASE WHEN t.FechaFirmaCierre IS NULL THEN CONVERT(bit, 1) ELSE CONVERT(bit, 0) END,
 
+    /* EL VEREDICTO DE SLA SE DA CONTRA LA FIRMA DE SOLUCION, NO CONTRA LA DE
+       CIERRE. Es el cambio que mas mueve los numeros de todo el tablero.
+
+       El SLA es el compromiso de RESOLVER. El cierre lo hace Proactivanet
+       solo, y medido el 10 de septiembre de 2026 tarda 1.44 dias de promedio
+       en llegar: medir contra el cierre castiga al tecnico por un tramite
+       administrativo en el que no participa.
+
+       Lo que estaba en juego, sobre 437,251 tickets resueltos:
+         contra la firma de solucion ... 90.12% de cumplimiento
+         contra la firma de cierre ..... 67.05%
+         tickets que cambian de veredicto ... 86,019, uno de cada cinco
+       Son 23 puntos. La pestaña de SLA reportaba 67% mientras el correo
+       diario del Backlog reportaba 90% con los mismos tickets, y quien viera
+       las dos cosas concluia que el area estaba en crisis.
+
+       SE QUITARON LAS RAMAS DE 'Caducada' y no es una simplificacion cosmetica.
+       Esa columna manda sobre las fechas -si viene en 1, el ticket es vencido
+       sin mirar nada mas-, pero viene NULL en los 437,251 tickets resueltos:
+       nunca se ejecutaban. Dejarlas seria poner una trampa: el dia que
+       Proactivanet empiece a llenar ese campo, el calculo entero del SLA
+       cambiaria de fuente sin que nadie toque una linea de codigo ni reciba
+       un aviso. Si algun dia se llena, que sea una decision.
+
+       NO se adopto la prorroga OLA/UC que si aplica el correo de Backlog. El
+       SLA es el compromiso con el usuario; el OLA es entre areas y el UC con
+       el proveedor, y que el proveedor cumpla su contrato no significa que se
+       le haya cumplido al usuario. Ademas daba igual: son 1,104 tickets, el
+       0.25%, un cuarto de punto de cumplimiento.
+
+       LOS DOS NUMEROS NO VAN A EMPATAR AL DECIMAL, Y ESTA BIEN. El tablero
+       dara 89.98% donde el correo da 90.38%: 0.39 puntos, de dos diferencias
+       deliberadas. 0.25 es la prorroga OLA/UC que el correo acepta y aqui no.
+       Los otros 0.14 son los tickets SIN fecha compromiso -6,187-: aqui no
+       son evaluables y salen del denominador, alla cuentan como cumplidos. Si
+       no hubo compromiso no hay nada que cumplir ni que incumplir. */
     SlaEvaluable = CASE
-        WHEN t.Caducada IS NOT NULL THEN CONVERT(bit, 1)
         WHEN t.FechaEstimadaResolucion IS NOT NULL THEN CONVERT(bit, 1)
         ELSE CONVERT(bit, 0)
     END,
 
     SlaVencido = CASE
-        WHEN t.Caducada = 1 THEN CONVERT(bit, 1)
-        WHEN t.Caducada = 0 THEN CONVERT(bit, 0)
-        WHEN t.FechaEstimadaResolucion IS NOT NULL
-             AND t.FechaFirmaCierre IS NOT NULL
-             AND t.FechaFirmaCierre > t.FechaEstimadaResolucion THEN CONVERT(bit, 1)
-        WHEN t.FechaEstimadaResolucion IS NOT NULL
-             AND t.FechaFirmaCierre IS NULL
+        WHEN t.FechaEstimadaResolucion IS NULL THEN CONVERT(bit, 0)
+        WHEN t.FechaFirmaSolucion IS NOT NULL
+             AND t.FechaFirmaSolucion > t.FechaEstimadaResolucion THEN CONVERT(bit, 1)
+        -- Todavia sin resolver y ya paso la fecha: vencido desde hoy.
+        WHEN t.FechaFirmaSolucion IS NULL
              AND SYSDATETIME() > t.FechaEstimadaResolucion THEN CONVERT(bit, 1)
         ELSE CONVERT(bit, 0)
     END,
 
     DentroSla = CASE
-        WHEN t.Caducada = 0 THEN CONVERT(bit, 1)
-        WHEN t.Caducada = 1 THEN CONVERT(bit, 0)
-        WHEN t.FechaEstimadaResolucion IS NOT NULL
-             AND t.FechaFirmaCierre IS NOT NULL
-             AND t.FechaFirmaCierre <= t.FechaEstimadaResolucion THEN CONVERT(bit, 1)
-        WHEN t.FechaEstimadaResolucion IS NOT NULL
-             AND t.FechaFirmaCierre IS NULL
+        WHEN t.FechaEstimadaResolucion IS NULL THEN CONVERT(bit, 0)
+        WHEN t.FechaFirmaSolucion IS NOT NULL
+             AND t.FechaFirmaSolucion <= t.FechaEstimadaResolucion THEN CONVERT(bit, 1)
+        -- Sin resolver pero todavia en tiempo: cuenta como dentro mientras no
+        -- se venza, igual que antes.
+        WHEN t.FechaFirmaSolucion IS NULL
              AND SYSDATETIME() <= t.FechaEstimadaResolucion THEN CONVERT(bit, 1)
         ELSE CONVERT(bit, 0)
     END,
 
+    /* Hasta la firma de SOLUCION, por la misma razon que el veredicto de SLA:
+       lo que mide es cuanto se tardo en resolver. Contra el cierre traia de
+       regalo 1.44 dias de tramite administrativo -promedio medido-, y con eso
+       adentro la mediana y el p90 de las tarjetas describirian a Proactivanet
+       cerrando tickets, no al equipo resolviendolos.
+
+       HorasCiclo se queda contra el cierre a proposito: ese SI es el ciclo
+       completo, de que entra a que termina el tramite, y es util justamente
+       como contraste. Es el par que deja ver cuanto del tiempo total es
+       resolver y cuanto es esperar el cierre. */
     HorasResolucion = CASE
-        WHEN t.FechaRegistro IS NOT NULL AND t.FechaFirmaCierre IS NOT NULL
-        THEN DATEDIFF(MINUTE, t.FechaRegistro, t.FechaFirmaCierre) / 60.0
+        WHEN t.FechaRegistro IS NOT NULL AND t.FechaFirmaSolucion IS NOT NULL
+        THEN DATEDIFF(MINUTE, t.FechaRegistro, t.FechaFirmaSolucion) / 60.0
         ELSE NULL
     END,
 
