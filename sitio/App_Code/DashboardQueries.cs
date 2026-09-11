@@ -196,6 +196,24 @@ public static class DashboardQueries
 ;WITH base AS
 (
     SELECT * FROM dbo.vw_Dash_ProductividadBase b WHERE {0}
+),
+/* Mediana y percentil 90 de las horas de resolucion.
+
+   EL PROMEDIO NO SIRVE PARA ESTO y por eso se agregan. La distribucion de
+   tiempos de un mesa de servicio tiene cola larga: un puñado de tickets de
+   semanas arrastra el promedio de cientos, y el numero que sale no describe a
+   casi ningun ticket real. La mediana si -la mitad tardo menos que eso- y el
+   p90 dice que tan mala es la cola sin dejar que la decidan tres casos.
+
+   TOP (1) porque PERCENTILE_CONT es funcion de ventana: devuelve el mismo
+   valor repetido en cada fila de entrada, no una sola. */
+pct AS
+(
+    SELECT TOP (1)
+        Mediana = PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY HorasResolucion) OVER (),
+        P90     = PERCENTILE_CONT(0.9) WITHIN GROUP (ORDER BY HorasResolucion) OVER ()
+    FROM base
+    WHERE HorasResolucion IS NOT NULL
 )
 SELECT
     FechaInicio = @FechaInicio,
@@ -214,6 +232,12 @@ SELECT
     GruposActivos = COUNT(DISTINCT Grupo),
     TecnicosActivos = COUNT(DISTINCT Tecnico),
     HorasResolucionPromedio = CAST(AVG(HorasResolucion) AS DECIMAL(18,2)),
+    /* Subconsultas escalares y no un JOIN contra pct: si ningun ticket del
+       rango tiene horas de resolucion, pct no devuelve filas y un CROSS JOIN
+       dejaria el resultado ENTERO en cero filas -el tablero sin KPIs-. Asi,
+       esos dos campos salen NULL y lo demas sigue. */
+    HorasResolucionMediana = (SELECT TOP (1) CAST(Mediana AS DECIMAL(18,2)) FROM pct),
+    HorasResolucionP90     = (SELECT TOP (1) CAST(P90     AS DECIMAL(18,2)) FROM pct),
     HorasCicloPromedio = CAST(AVG(HorasCiclo) AS DECIMAL(18,2)),
     ReasignacionesPromedio = CAST(AVG(CAST(ReasignacionesGrupo AS DECIMAL(18,2))) AS DECIMAL(18,2)),
     TicketsAltaPrioridad = SUM(CASE WHEN Prioridad IN (N'Alta', N'Crítica', N'Critica', N'Urgente') THEN 1 ELSE 0 END),
@@ -241,7 +265,15 @@ SELECT
     Fecha = FechaRegistroDia,
     TicketsCreados = COUNT_BIG(*),
     TicketsCerrados = SUM(CASE WHEN EstaCerrado = 1 THEN 1 ELSE 0 END),
-    TicketsSlaVencidos = SUM(CASE WHEN SlaVencido = 1 THEN 1 ELSE 0 END)
+    TicketsSlaVencidos = SUM(CASE WHEN SlaVencido = 1 THEN 1 ELSE 0 END),
+    /* Para la grafica de cumplimiento en el tiempo. Se mandan los dos conteos
+       y no el porcentaje ya calculado: el tablero agrupa la tendencia por dia,
+       por mes o por SLOT segun el rango, y un porcentaje diario NO se puede
+       promediar para obtener el del mes -un dia con 2 tickets pesaria igual
+       que uno con 200-. Con numerador y denominador, cada bucket suma y
+       divide, que es lo correcto. */
+    TicketsSlaEvaluable = SUM(CASE WHEN SlaEvaluable = 1 THEN 1 ELSE 0 END),
+    TicketsDentroSla    = SUM(CASE WHEN SlaEvaluable = 1 AND DentroSla = 1 THEN 1 ELSE 0 END)
 FROM dbo.vw_Dash_ProductividadBase b
 WHERE {0}
 GROUP BY FechaRegistroDia
@@ -275,27 +307,30 @@ ORDER BY TicketsTotales DESC, Tecnico;";
         return Unico(sql, f, null);
     }
 
-    // Cuerpo de dbo.usp_Dash_DistribucionMulti: tres result sets (estado,
-    // prioridad, aging) sobre el mismo subconjunto materializado una vez.
+    /* Dos result sets -prioridad y vencidos por grupo- sobre el mismo
+       subconjunto materializado una vez.
+
+       ERAN TRES: estado, prioridad y aging. Estado y aging se fueron con sus
+       graficas: describian la situacion actual de los tickets, que es lo que
+       contesta la pestaña de Backlog, y encima sobre otro recorte.
+
+       En su lugar entra el desglose de vencidos. "Vencidos SLA: 1,234" es un
+       numero con el que no se puede hacer nada; saber que la mayoria sale de
+       tres grupos si dice con quien hay que sentarse. */
     public static List<List<Dictionary<string, object>>> Distribucion(Filtros f)
     {
         const string sql = @"
 SET NOCOUNT ON;
 
 SELECT
-    Estado,
+    Grupo,
     Prioridad,
-    AgingBucket
+    SlaVencido,
+    SlaEvaluable,
+    DentroSla
 INTO #DistribucionBase
 FROM dbo.vw_Dash_ProductividadBase b
 WHERE {0};
-
-SELECT
-    Valor = ISNULL(NULLIF(LTRIM(RTRIM(Estado)), N''), N'Sin estado'),
-    Tickets = COUNT_BIG(*)
-FROM #DistribucionBase
-GROUP BY ISNULL(NULLIF(LTRIM(RTRIM(Estado)), N''), N'Sin estado')
-ORDER BY Tickets DESC;
 
 SELECT
     Valor = ISNULL(NULLIF(LTRIM(RTRIM(Prioridad)), N''), N'Sin prioridad'),
@@ -304,25 +339,29 @@ FROM #DistribucionBase
 GROUP BY ISNULL(NULLIF(LTRIM(RTRIM(Prioridad)), N''), N'Sin prioridad')
 ORDER BY Tickets DESC;
 
-SELECT
-    Valor = AgingBucket,
-    Tickets = COUNT_BIG(*)
+/* Solo los grupos que tienen al menos un vencido: los demas llenarian la
+   grafica de barras en cero. TOP 12 porque a partir de ahi las barras dejan
+   de leerse y la cola son grupos con uno o dos. */
+SELECT TOP (12)
+    Valor      = ISNULL(NULLIF(LTRIM(RTRIM(Grupo)), N''), N'Sin grupo'),
+    Vencidos   = SUM(CASE WHEN SlaVencido = 1 THEN 1 ELSE 0 END),
+    Evaluables = SUM(CASE WHEN SlaEvaluable = 1 THEN 1 ELSE 0 END),
+    -- El porcentaje va junto al volumen a proposito: un grupo chico con 8
+    -- vencidos de 10 tickets esta peor que uno grande con 50 de 5,000, y
+    -- mirando solo la barra se concluiria al reves.
+    CumplimientoPct = CAST(
+        100.0 * SUM(CASE WHEN SlaEvaluable = 1 AND DentroSla = 1 THEN 1 ELSE 0 END)
+        / NULLIF(SUM(CASE WHEN SlaEvaluable = 1 THEN 1 ELSE 0 END), 0)
+        AS DECIMAL(6,2))
 FROM #DistribucionBase
-GROUP BY AgingBucket
-ORDER BY CASE AgingBucket
-    WHEN N'0-1 dias' THEN 1
-    WHEN N'2-3 dias' THEN 2
-    WHEN N'4-7 dias' THEN 3
-    WHEN N'8-15 dias' THEN 4
-    WHEN N'16-30 dias' THEN 5
-    WHEN N'31+ dias' THEN 6
-    ELSE 99
-END;
+GROUP BY ISNULL(NULLIF(LTRIM(RTRIM(Grupo)), N''), N'Sin grupo')
+HAVING SUM(CASE WHEN SlaVencido = 1 THEN 1 ELSE 0 END) > 0
+ORDER BY Vencidos DESC;
 
 DROP TABLE #DistribucionBase;";
 
-        // SELECT ... INTO no abre result set en el reader, asi que los tres
-        // que salen son directamente estado, prioridad y aging.
+        // SELECT ... INTO no abre result set en el reader, asi que los dos que
+        // salen son directamente prioridad y vencidos por grupo.
         return Ejecutar(sql, f, null);
     }
 

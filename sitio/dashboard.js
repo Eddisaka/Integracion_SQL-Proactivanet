@@ -1361,8 +1361,16 @@ const TableroSla = (function () {
           s: cumpl !== null ? SEM(cumpl) : '' },
         { l: 'Vencidos SLA', v: FMT(vencidos),
           f: `${FMT(k.TicketsAltaPrioridad ?? 0)} de prioridad alta o critica`, s: vencidos > 0 ? 'sr' : 'sv' },
-        { l: 'Horas resolucion promedio', v: k.HorasResolucionPromedio ?? 'N/D',
-          f: k.HorasCicloPromedio ? `ciclo promedio ${k.HorasCicloPromedio} h` : 'solo tickets cerrados' },
+        /* Mediana en vez de promedio. El promedio de un tiempo de resolucion
+           lo decide la cola: unos cuantos tickets de semanas lo empujan por
+           encima de casi todos los demas, y el numero deja de describir a
+           ningun ticket real. "La mitad se resolvio en menos de X" si. El
+           promedio sigue en el pie, para quien lo tenga que cuadrar contra un
+           reporte viejo. */
+        { l: 'Horas resolucion (mediana)', v: k.HorasResolucionMediana ?? 'N/D',
+          f: k.HorasResolucionPromedio ? `promedio ${k.HorasResolucionPromedio} h` : 'solo tickets cerrados' },
+        { l: 'Horas resolucion (p90)', v: k.HorasResolucionP90 ?? 'N/D',
+          f: '9 de cada 10 tardaron menos' },
         { l: 'Tecnicos activos', v: FMT(k.TecnicosActivos ?? 0), f: `${FMT(k.GruposActivos ?? 0)} grupos activos` },
         { l: 'Reasignaciones promedio', v: k.ReasignacionesPromedio ?? 'N/D', f: 'cambios de grupo por ticket' },
       ];
@@ -1379,6 +1387,17 @@ const TableroSla = (function () {
       const cumpl = evaluables > 0 ? Math.round(1000 * dentro / evaluables) / 10 : null;
       const horas = f.map(r => r.HorasResolucion).filter(h => h !== null && h !== undefined);
       const promedio = horas.length ? Math.round(100 * horas.reduce((a, b) => a + Number(b), 0) / horas.length) / 100 : null;
+      /* Mediana de lo filtrado. El servidor manda la del rango completo; con
+         cross-filter activo hay que recalcularla sobre las filas cargadas,
+         igual que se hace con el promedio y el cumplimiento. Interpolada entre
+         los dos centrales cuando el conteo es par, que es lo mismo que hace
+         PERCENTILE_CONT en la consulta. */
+      const ordenadas = horas.map(Number).sort((a, b) => a - b);
+      const mediana = ordenadas.length
+        ? Math.round(100 * (ordenadas.length % 2
+            ? ordenadas[(ordenadas.length - 1) / 2]
+            : (ordenadas[ordenadas.length / 2 - 1] + ordenadas[ordenadas.length / 2]) / 2)) / 100
+        : null;
       const deN = `filtrado: ${FMT(n)} de ${FMT(cargadas)} cargados`;
 
       tarjetas = [
@@ -1388,7 +1407,8 @@ const TableroSla = (function () {
           f: evaluables ? `${FMT(dentro)} de ${FMT(evaluables)} evaluables` : 'sin SLA evaluable',
           s: cumpl !== null ? SEM(cumpl) : '' },
         { l: 'Vencidos SLA', v: FMT(vencidos), f: `${PCT(vencidos, n)} de lo filtrado`, s: vencidos > 0 ? 'sr' : 'sv' },
-        { l: 'Horas resolucion promedio', v: promedio ?? 'N/D', f: `${FMT(horas.length)} tickets cerrados` },
+        { l: 'Horas resolucion (mediana)', v: mediana ?? 'N/D',
+          f: `${FMT(horas.length)} tickets cerrados${promedio !== null ? ` · promedio ${promedio} h` : ''}` },
         { l: 'Tecnicos', v: FMT(new Set(f.map(r => r.Tecnico).filter(Boolean)).size), f: 'en lo filtrado' },
         { l: 'Grupos', v: FMT(new Set(f.map(r => r.Grupo).filter(Boolean)).size), f: 'en lo filtrado' },
       ];
@@ -1404,7 +1424,13 @@ const TableroSla = (function () {
 
   function renderTendencia() {
     const hint = document.getElementById('hint-tendencia');
-    let etiquetas, creados, cerrados, vencidos;
+    /* dentro/evaluables son el numerador y el denominador del cumplimiento de
+       SLA. Viajan por aqui, y no en su propia funcion, para que la grafica de
+       cumplimiento comparta EXACTAMENTE el mismo eje X: misma decision de
+       agrupar por dia, por mes o por SLOT, y hecha una sola vez. Si cada una
+       decidiera por su lado, dos graficas pegadas mostrarian periodos
+       distintos el dia que una cruce el tope y la otra no. */
+    let etiquetas, creados, cerrados, vencidos, dentro, evaluables;
 
     if (!hayFiltro()) {
       // Serie exacta del SP sobre todo el rango.
@@ -1417,6 +1443,8 @@ const TableroSla = (function () {
       creados = f.map(x => x.TicketsCreados);
       cerrados = f.map(x => x.TicketsCerrados);
       vencidos = f.map(x => x.TicketsSlaVencidos);
+      dentro = f.map(x => x.TicketsDentroSla ?? 0);
+      evaluables = f.map(x => x.TicketsSlaEvaluable ?? 0);
       hint.textContent = 'creados vs cerrados vs vencidos';
     } else {
       // Recalculada sobre las filas filtradas, agrupando por dia de registro.
@@ -1425,17 +1453,25 @@ const TableroSla = (function () {
       for (const r of f) {
         const d = String(r.FechaRegistro ?? '').slice(0, 10);
         if (!d) continue;
-        if (!porDia.has(d)) porDia.set(d, { c: 0, cer: 0, ven: 0 });
+        if (!porDia.has(d)) porDia.set(d, { c: 0, cer: 0, ven: 0, den: 0, num: 0 });
         const a = porDia.get(d);
         a.c++;
         if (r.FechaFirmaCierre) a.cer++;
-        if (r.SlaVencido === true || r.SlaVencido === 1) a.ven++;
+        const ven = (r.SlaVencido === true || r.SlaVencido === 1);
+        const den = (r.DentroSla === true || r.DentroSla === 1);
+        if (ven) a.ven++;
+        // Evaluable = tiene veredicto. El detalle no trae SlaEvaluable, pero
+        // un ticket con veredicto es exactamente eso.
+        if (ven || den) a.den++;
+        if (den) a.num++;
       }
       const dias = [...porDia.keys()].sort();
       etiquetas = dias;
       creados = dias.map(d => porDia.get(d).c);
       cerrados = dias.map(d => porDia.get(d).cer);
       vencidos = dias.map(d => porDia.get(d).ven);
+      dentro = dias.map(d => porDia.get(d).num);
+      evaluables = dias.map(d => porDia.get(d).den);
       hint.textContent = 'recalculada sobre lo filtrado';
     }
 
@@ -1454,23 +1490,23 @@ const TableroSla = (function () {
     if (enModoSlot()) {
       const unico = slotsAplicados === 1;
       const g = unico
-        ? subdividirSlot(etiquetas, [creados, cerrados, vencidos])
-        : agruparPorSlot(etiquetas, [creados, cerrados, vencidos], slotsAplicados);
+        ? subdividirSlot(etiquetas, [creados, cerrados, vencidos, dentro, evaluables])
+        : agruparPorSlot(etiquetas, [creados, cerrados, vencidos, dentro, evaluables], slotsAplicados);
       etiquetas = g.etiquetas;
       rangosBucket = g.rangos;
       ticksBucket = g.ticks || null;
-      [creados, cerrados, vencidos] = g.series;
+      [creados, cerrados, vencidos, dentro, evaluables] = g.series;
       hint.textContent = `${resumenSlots(slotsAplicados)} · ${unico
         ? `en tramos de ${DIAS_TRAMO} dias`
         : 'agrupado por SLOT'}`;
     } else if (etiquetas.length > TOPE_DIARIO) {
-      const g = agruparPorMes(etiquetas, [creados, cerrados, vencidos]);
+      const g = agruparPorMes(etiquetas, [creados, cerrados, vencidos, dentro, evaluables]);
       // Un solo mes agrupado seria un unico punto en lugar de sus dias: el
       // agrupado solo compensa si hay varios bloques que comparar.
       if (g.etiquetas.length > 1) {
         etiquetas = g.etiquetas;
         rangosBucket = g.rangos;
-        [creados, cerrados, vencidos] = g.series;
+        [creados, cerrados, vencidos, dentro, evaluables] = g.series;
         hint.textContent += ' · agrupado por mes';
       }
     }
@@ -1479,6 +1515,13 @@ const TableroSla = (function () {
     // de la config: asi la grafica se puede actualizar en vez de reconstruirse
     // cuando se pasa de vista diaria a agrupada por SLOT.
     rangosBucketVigente = rangosBucket;
+
+    /* Se pinta aqui, con el eje ya resuelto, y no en renderTodo(): asi las
+       dos graficas comparten etiquetas por construccion y no por coincidencia.
+       Va ANTES del early-return de abajo para que, cuando no haya tickets, la
+       de cumplimiento tambien muestre su propio mensaje en vez de quedarse
+       con el dibujo del rango anterior. */
+    renderSlaTiempo(etiquetas, dentro || [], evaluables || []);
 
     // Cuantas observaciones llegaron. Es el dato que distingue "el endpoint no
     // trajo nada" de "trajo un solo dia y se ve poco", que desde el navegador
@@ -1657,6 +1700,143 @@ const TableroSla = (function () {
      tarjeta: describia la situacion actual de los tickets, que es lo que
      contesta el Backlog, y encima sobre la camada del rango en vez de sobre
      todo lo pendiente, asi que las dos pestañas no cuadraban. */
+
+  /* Cumplimiento de SLA a lo largo del periodo.
+
+     Recibe el eje ya resuelto por renderTendencia -mismas etiquetas, misma
+     agrupacion- y los dos conteos por bucket. El porcentaje se calcula AQUI,
+     dividiendo las sumas del bucket, y no viene calculado del servidor: un
+     porcentaje por dia no se puede promediar para sacar el del mes, porque un
+     dia con dos tickets pesaria igual que uno con doscientos.
+
+     La tarjeta de KPI dice cuanto cumplimos; esto dice si vamos mejorando o
+     empeorando, que es lo que un solo numero no puede contestar. */
+  const META_SLA = 90;
+
+  function renderSlaTiempo(etiquetas, dentro, evaluables) {
+    const hint = document.getElementById('hint-sla-tiempo');
+    const totalNum = (dentro || []).reduce((a, b) => a + (Number(b) || 0), 0);
+    const totalDen = (evaluables || []).reduce((a, b) => a + (Number(b) || 0), 0);
+
+    if (!etiquetas.length || !totalDen) {
+      destruir('slaTiempo');
+      hint.textContent = '';
+      return renderEmptyChart('chart-sla-tiempo', hayFiltro()
+        ? 'Ningun ticket con SLA evaluable pasa los filtros activos.'
+        : 'Ningun ticket del rango tiene SLA evaluable.');
+    }
+
+    // null y no cero cuando el bucket no tuvo tickets evaluables: un cero
+    // dibujaria una caida al suelo que se lee como "incumplimos todo", cuando
+    // lo que paso es que no hubo nada que medir.
+    const pct = etiquetas.map((_, i) => {
+      const den = Number(evaluables[i]) || 0;
+      if (!den) return null;
+      return Math.round(1000 * (Number(dentro[i]) || 0) / den) / 10;
+    });
+
+    const global = Math.round(1000 * totalNum / totalDen) / 10;
+    hint.textContent = `${global}% en el periodo · meta ${META_SLA}%`;
+    const color = COLOR_SEM[SEM(global)];
+
+    dibujarGrafico(graficos, 'slaTiempo', 'chart-sla-tiempo',
+      () => ({
+        type: 'line',
+        data: {
+          labels: etiquetas,
+          datasets: [
+            { label: 'Cumplimiento', data: pct, borderColor: color, backgroundColor: color,
+              tension: .3, borderWidth: 2, pointRadius: 3, pointHoverRadius: 6, spanGaps: false },
+            // Linea de meta como dataset y no como anotacion: el plugin de
+            // anotaciones no esta cargado y no vale traerlo por una raya.
+            { label: `Meta ${META_SLA}%`, data: etiquetas.map(() => META_SLA),
+              borderColor: NEUTRO_SEM, borderDash: [5, 4], borderWidth: 1,
+              pointRadius: 0, pointHoverRadius: 0, fill: false },
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: {
+              label: c => {
+                if (c.datasetIndex === 1) return `Meta: ${META_SLA}%`;
+                if (c.raw === null) return 'Sin tickets evaluables';
+                const i = c.dataIndex;
+                return `${c.raw}% · ${FMT(dentro[i])} de ${FMT(evaluables[i])} evaluables`;
+              }
+            } },
+          },
+          scales: {
+            y: { beginAtZero: true, max: 100, ticks: { callback: v => `${v}%` } }
+          }
+        }
+      }),
+      gr => {
+        gr.data.labels = etiquetas;
+        gr.data.datasets[0].data = pct;
+        gr.data.datasets[0].borderColor = color;
+        gr.data.datasets[0].backgroundColor = color;
+        gr.data.datasets[1].data = etiquetas.map(() => META_SLA);
+        gr.data.datasets[1].label = `Meta ${META_SLA}%`;
+      });
+  }
+
+  /* Donde se pierde el SLA. Barras horizontales de vencidos por grupo, con el
+     cumplimiento del grupo en el tooltip.
+
+     No participa del cross-filter: el grupo ya es un filtro del servidor, en
+     la barra de arriba, y tener las dos cosas haria que el mismo campo se
+     filtre de dos maneras distintas segun donde se le haga clic. */
+  function renderVencidosGrupo() {
+    const filas = (datos && datos.distribucion && datos.distribucion.vencidosGrupo) || [];
+    if (!filas.length) {
+      destruir('vencidosGrupo');
+      // Que no haya vencidos es una buena noticia, no un tablero roto.
+      return renderEmptyChart('chart-vencidos-grupo',
+        hayFiltro() ? 'Ningun vencido pasa los filtros activos.'
+                    : 'Ningun grupo tiene tickets vencidos en el rango.');
+    }
+
+    const etiquetas = filas.map(x => String(x.Valor ?? ''));
+    const valores = filas.map(x => Number(x.Vencidos) || 0);
+    // El color lo decide el cumplimiento del grupo, no su volumen: una barra
+    // corta de un grupo que incumple la mitad de sus tickets tiene que
+    // distinguirse de una barra corta de un grupo que cumple el 95%.
+    const colores = filas.map(x => {
+      const c = x.CumplimientoPct;
+      return (c === null || c === undefined) ? NEUTRO_SEM : COLOR_SEM[SEM(Number(c))];
+    });
+
+    dibujarGrafico(graficos, 'vencidosGrupo', 'chart-vencidos-grupo',
+      () => ({
+        type: 'bar',
+        data: { labels: etiquetas, datasets: [{ data: valores, backgroundColor: colores, borderRadius: 4 }] },
+        options: {
+          indexAxis: 'y',
+          responsive: true, maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: {
+              label: c => `Vencidos: ${FMT(c.raw)}`,
+              afterLabel: c => {
+                const x = filas[c.dataIndex];
+                const cum = (x.CumplimientoPct === null || x.CumplimientoPct === undefined)
+                  ? 'sin SLA evaluable' : `cumplimiento ${x.CumplimientoPct}%`;
+                return `${cum} · ${FMT(x.Evaluables)} evaluables`;
+              }
+            } },
+          },
+          scales: { x: EJE_CONTEO }
+        }
+      }),
+      gr => {
+        gr.data.labels = etiquetas;
+        gr.data.datasets[0].data = valores;
+        gr.data.datasets[0].backgroundColor = colores;
+      });
+  }
 
   function renderBarraDim(idCanvas, idGrafico, dim, orden, colorFn, mensajeVacio) {
     const ent = entradasDim(dim, orden);
@@ -2237,6 +2417,7 @@ const TableroSla = (function () {
     /* Estado y Antiguedad ya no se pintan aqui: son la foto de hoy, que es la
        pregunta del Backlog. Con ellas se fueron sus dos dimensiones de
        cross-filter; quedan Prioridad y SLA. */
+    renderVencidosGrupo();
     renderBarraDim('chart-prioridad', 'prioridad', 'prioridad',
       null, l => COLOR_PRIORIDAD[l] ?? GRIS, 'Ningun ticket pasa los filtros activos.');
     if (motivo !== 'filtro') {
@@ -2253,7 +2434,7 @@ const TableroSla = (function () {
      estos casos como "sin datos" y pinta el estado vacio de siempre. */
   const DATASET_VACIO = {
     kpis: {}, tendencia: [], productividad: [],
-    distribucion: { estado: [], prioridad: [], aging: [] },
+    distribucion: { prioridad: [], vencidosGrupo: [] },
     detalle: [], topCerrados: [],
     // Call Center: si llamadas.ashx falla, el bloque pinta sus estados vacios
     // y el resto del tablero de SLA sigue igual que siempre.
