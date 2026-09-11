@@ -1,0 +1,343 @@
+/* =========================================================================
+   admin.css
+
+   Estilos exclusivos de admin/admin.html. dashboard.css se carga antes y aporta
+   las variables (--card, --line, --radius, --shadow, ...), la tipografia y
+   las clases base .wrap / .card / .btn / .badge. Aqui no se redefine nada
+   de esas: solo se agrega lo propio de la consola, con prefijo .admin-
+   para que no pueda colisionar con el tablero.
+   ========================================================================= */
+
+.admin-body { padding-bottom: 24px; }
+
+/* ---- Aviso de "solo visual" ---- */
+.admin-aviso {
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-line);
+  color: var(--accent-ink);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  font-size: 12.5px;
+  margin-bottom: 18px;
+}
+
+/* ---- Cabecera de seccion ---- */
+.admin-seccion { margin-bottom: 22px; }
+
+.admin-seccion-cab {
+  display: flex; align-items: baseline; gap: 10px;
+  margin: 0 2px 12px;
+}
+.admin-seccion-cab h2 {
+  font-size: 12px; font-weight: 800;
+  text-transform: uppercase; letter-spacing: 1px;
+  color: var(--ink-2);
+}
+.admin-seccion-cab::after {
+  content: ""; flex: 1; height: 1px; background: var(--line);
+}
+.admin-seccion-hint {
+  font-size: 10.5px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .4px; color: var(--muted-2);
+}
+
+/* ---- Rejilla responsiva ---- */
+.admin-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+.admin-grid.herramientas { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+/* Correos: dos tarjetas compactas arriba y la destacada abajo, a lo ancho. */
+.admin-grid.correos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+@media (max-width: 1100px) { .admin-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 720px) {
+  .admin-grid, .admin-grid.herramientas { grid-template-columns: 1fr; }
+}
+
+/* ---- Tarjeta de trabajo ---- */
+.job {
+  background: var(--card);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 14px 15px 13px;
+  display: flex; flex-direction: column; gap: 10px;
+  min-width: 0;
+  /* La franja izquierda es el indicador de estado mas visible. */
+  border-left: 4px solid var(--line);
+  transition: box-shadow .18s ease, border-color .18s ease;
+}
+.job:hover { box-shadow: var(--shadow-md); }
+
+.job[data-estado="listo"]      { border-left-color: var(--verde); }
+.job[data-estado="pendiente"]  { border-left-color: var(--ambr); }
+.job[data-estado="ejecutando"] { border-left-color: var(--ambr); }
+.job[data-estado="revision"]   { border-left-color: var(--accent); }
+
+.job-cab { display: flex; align-items: flex-start; gap: 10px; }
+.job-icono {
+  width: 32px; height: 32px; flex: none;
+  display: grid; place-items: center;
+  border-radius: var(--radius-xs);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-line);
+  font-size: 16px; line-height: 1;
+}
+.job-tit { min-width: 0; flex: 1; }
+.job-tit h3 {
+  font-size: 13.5px; font-weight: 700; letter-spacing: -.1px;
+  color: var(--ink);
+}
+.job-tit p {
+  font-size: 11.5px; color: var(--muted); margin-top: 3px;
+  line-height: 1.35;
+}
+
+/* ---- Linea de estado ---- */
+.job-estado {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 11.5px; font-weight: 600; color: var(--ink-2);
+  padding: 6px 9px;
+  background: var(--bg-2);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-xs);
+}
+.job-punto {
+  width: 8px; height: 8px; border-radius: var(--radius-pill);
+  background: var(--muted-2); flex: none;
+  box-shadow: 0 0 0 3px rgba(154, 160, 148, .18);
+}
+/* Amarillo: al flujo le falta algo. El latido queda solo para la ejecucion,
+   que si es un proceso en curso. */
+.job[data-estado="pendiente"] .job-punto {
+  background: var(--ambr); box-shadow: 0 0 0 3px rgba(217, 119, 6, .18);
+}
+.job[data-estado="ejecutando"] .job-punto {
+  background: var(--ambr); box-shadow: 0 0 0 3px rgba(217, 119, 6, .18);
+  animation: job-latido 1s ease-in-out infinite;
+}
+.job[data-estado="listo"] .job-punto,
+.job[data-estado="revision"] .job-punto {
+  background: var(--verde); box-shadow: 0 0 0 3px rgba(71, 139, 60, .22);
+}
+@keyframes job-latido { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) {
+  .job[data-estado="ejecutando"] .job-punto { animation: none; }
+}
+
+.job-script {
+  margin-left: auto;
+  font-size: 10px; font-weight: 700; letter-spacing: .3px;
+  color: var(--muted-2); text-transform: none;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  max-width: 46%;
+}
+
+/* ---- Botonera ---- */
+.job-pie { display: flex; align-items: center; gap: 8px; }
+/* En el pie solo queda la flecha que abre la revision: el unico boton que
+   ejecuta algo es ENVIAR, dentro de la revision. */
+.job-pie .btn { flex: none; }
+.job-pie .job-flecha { margin-left: auto; }
+
+.job-flecha {
+  flex: none;
+  width: 34px; height: 32px;
+  display: grid; place-items: center;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--line);
+  background: #fff; color: var(--ink-2);
+  font-size: 14px; font-weight: 800;
+  cursor: pointer;
+  transition: background .15s ease, color .15s ease, border-color .15s ease;
+}
+.job-flecha:hover:not(:disabled) {
+  background: var(--accent-soft); color: var(--accent-ink);
+  border-color: var(--accent-line);
+}
+.job-flecha:disabled { opacity: .4; cursor: not-allowed; }
+
+/* ---- Panel de revision ---- */
+.job-revision {
+  border-top: 1px dashed var(--line);
+  padding-top: 10px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.job-revision h4 {
+  font-size: 11px; font-weight: 800; text-transform: uppercase;
+  letter-spacing: .6px; color: var(--muted);
+}
+.job-datos {
+  display: grid; grid-template-columns: auto 1fr; gap: 5px 10px;
+  font-size: 12px;
+}
+.job-datos dt { color: var(--muted); }
+.job-datos dd {
+  color: var(--ink); font-weight: 600; text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.job-ok { color: var(--verde); font-weight: 800; }
+
+.job-nota {
+  font-size: 10.5px; color: var(--muted);
+  background: var(--bg-2); border: 1px solid var(--line-soft);
+  border-radius: var(--radius-xs); padding: 6px 8px;
+}
+
+.job-revision-pie { display: flex; align-items: center; gap: 8px; }
+.job-revision-pie .btn.enviar { flex: 1; }
+
+/* ---- Tarjeta destacada (Servicios) ----
+   Misma tarjeta .job, solo mas grande: ocupa el ancho completo de la seccion
+   y sube un poco el tamano del titulo. No cambia colores ni bordes. */
+.job.destacado {
+  grid-column: 1 / -1;
+  padding: 16px 18px 15px;
+  gap: 12px;
+}
+.job.destacado .job-icono { width: 38px; height: 38px; font-size: 19px; }
+.job.destacado .job-tit h3 { font-size: 15px; }
+.job.destacado .job-tit p { font-size: 12px; }
+.job.destacado .job-pie .btn { flex: none; min-width: 190px; }
+.job.destacado .job-pie { justify-content: flex-start; }
+.job.destacado .job-datos { grid-template-columns: auto minmax(0, 1fr); }
+
+/* ---- Controles de Servicios (seleccion + fecha) ---- */
+.serv-controles {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 12px;
+}
+@media (max-width: 720px) { .serv-controles { grid-template-columns: 1fr; } }
+/* En las tarjetas compactas (QA y Backlog) el contenedor lleva un solo
+   bloque -Destinatarios-, asi que no hay dos columnas que repartir. */
+.job:not(.destacado) .serv-controles { grid-template-columns: 1fr; }
+
+/* La flecha que abre la revision en la tarjeta de Servicios: la de 34x32 se
+   quedaba diminuta al pie de una tarjeta que ocupa todo el ancho. Aqui mide
+   mas del doble (72x64) y da un area de clic comoda. Selector limitado a
+   .job.destacado .job-pie: las flechas de QA, Backlog y la de "regresar" de
+   cualquier revision no cambian. */
+.job.destacado .job-pie .job-flecha {
+  width: 72px; height: 64px;
+  border-radius: var(--radius-sm);
+  font-size: 26px;
+}
+
+.serv-bloque {
+  background: var(--bg-2);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-xs);
+  padding: 10px 11px;
+  display: flex; flex-direction: column; gap: 8px;
+  min-width: 0;
+}
+.serv-bloque h4 {
+  font-size: 11px; font-weight: 800; text-transform: uppercase;
+  letter-spacing: .6px; color: var(--muted);
+}
+
+/* TODOS / LIMPIAR: atajos de la seleccion, arriba de las casillas. Van con
+   los botones de siempre (.btn / .btn.gris + .btn.chico), no con un estilo
+   propio. */
+.serv-acciones { display: flex; flex-wrap: wrap; gap: 7px; }
+.serv-acciones .btn { flex: none; letter-spacing: .4px; }
+
+/* Doce servicios en rejilla, no en una fila que se desborda: cuatro por
+   linea en el ancho normal de la tarjeta y menos si no caben. */
+.serv-lista {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+  gap: 7px;
+}
+/* Los avisos ("Cargando servicios...") ocupan la rejilla entera. */
+.serv-lista > .serv-nota-fecha { grid-column: 1 / -1; }
+.serv-casilla, .serv-radio {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 9px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  font-size: 12px; font-weight: 600; color: var(--ink-2);
+  cursor: pointer;
+  transition: background .15s ease, border-color .15s ease, color .15s ease;
+}
+.serv-casilla:hover, .serv-radio:hover { border-color: var(--accent-line); }
+.serv-casilla.marcada, .serv-radio.marcada {
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
+  color: var(--accent-ink);
+}
+.serv-casilla input, .serv-radio input { margin: 0; cursor: pointer; }
+
+.serv-conteo { font-size: 11.5px; color: var(--muted); }
+.serv-conteo b { color: var(--ink); font-variant-numeric: tabular-nums; }
+
+.serv-modos { display: flex; flex-wrap: wrap; gap: 7px; }
+
+/* Destinatarios temporales: solo se usan en el envio en curso. */
+.serv-destinatarios {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  background: #fff; color: var(--ink);
+  font: inherit; font-size: 12px;
+  resize: vertical;
+}
+
+.serv-fecha-manual { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.serv-fecha-manual input[type="date"] {
+  padding: 5px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  background: #fff; color: var(--ink);
+  font: inherit; font-size: 12px;
+}
+.serv-nota-fecha { font-size: 10.5px; color: var(--muted); }
+.btn.chico { padding: 5px 9px; font-size: 11.5px; }
+
+.serv-fecha-resumen { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.serv-fecha-valor {
+  font-size: 13px; font-weight: 800; color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+/* Deja claro de un vistazo si la fecha es la calculada o una escrita a mano. */
+.serv-etiqueta-modo {
+  font-size: 10px; font-weight: 800; text-transform: uppercase;
+  letter-spacing: .4px;
+  padding: 3px 7px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-line);
+  color: var(--accent-ink);
+}
+.serv-etiqueta-modo.manual {
+  background: rgba(217, 119, 6, .12);
+  border-color: rgba(217, 119, 6, .35);
+  color: var(--ambr);
+}
+
+/* ---- Modal de herramientas ---- */
+.admin-modal-fondo {
+  position: fixed; inset: 0; z-index: 50;
+  background: rgba(25, 25, 25, .48);
+  display: grid; place-items: center;
+  padding: 20px;
+}
+/* display:grid gana sobre el atributo hidden; hay que apagarlo a mano. */
+.admin-modal-fondo[hidden] { display: none; }
+.admin-modal {
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  border: 1px solid var(--line-soft);
+  padding: 20px 22px;
+  max-width: 420px; width: 100%;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.admin-modal h3 { font-size: 15px; font-weight: 700; }
+.admin-modal p { font-size: 12.5px; color: var(--ink-2); line-height: 1.5; }
+.admin-modal-pie { display: flex; justify-content: flex-end; margin-top: 4px; }

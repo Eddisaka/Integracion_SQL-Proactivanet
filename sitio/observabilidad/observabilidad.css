@@ -1,0 +1,66 @@
+/* PALETA CENTRALIZADA — misma escala verde que dashboard.css / qa.css.
+   Origen: el degradado de header.top,
+     linear-gradient(135deg, #478B3C 0%, #65BB2B 45%, #9DD323 100%)
+   --g-800 / --g-600 / --g-400 son esas paradas; el resto son
+   interpolaciones y tintes de ellas. --g-900 solo es tinta y hover. */
+:root{
+color-scheme:light;
+--g-50:#f4fae7;--g-100:#e9f5ce;--g-200:#d3e9ac;--g-300:#bae065;--g-400:#9dd323;
+--g-500:#81c727;--g-600:#65bb2b;--g-700:#56a333;--g-800:#478b3c;--g-900:#3a7431;
+--card:#fff;--bg-2:#f6f8f4;--muted:#5e5e5f;--muted-2:#9aa094;
+--line:#e3e7de;--line-soft:#eef1ea;--ink:#191919;--ink-2:#393939;
+--accent:var(--g-600);--accent-ink:var(--g-900);
+--verde:var(--g-800);--verde-strong:var(--g-900);
+--ambr:#d97706;   /* advertencia */
+/* Semaforo de los KPI: el "bien" de una tarjeta es el lima de la cabecera,
+   no --verde (verde profundo de marca, que usan flechas y badges). */
+--kpi-ok:var(--g-400);
+--rojo:#982a18;   /* negativo */
+--radius:14px;
+--grad-header:linear-gradient(135deg,#478B3C 0%,#65BB2B 45%,#9DD323 100%);
+--grad:linear-gradient(180deg,var(--g-400) 0%,var(--g-600) 55%,var(--g-800) 100%);
+/* Boton: rampa lima->verde con tinta carbon. */
+--grad-btn:linear-gradient(160deg,var(--g-400) 0%,var(--g-600) 55%,var(--g-700) 100%);
+--grad-btn-hover:linear-gradient(160deg,var(--g-500) 0%,var(--g-700) 55%,var(--g-800) 100%);
+--btn-ink:var(--ink);}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+background:var(--bg-2);color:var(--ink);padding:18px;line-height:1.4}
+.wrap{max-width:1320px;margin:0 auto}
+.maintab-content{display:none}
+.maintab-content.active{display:block}
+header.top{background:var(--grad-header);color:var(--ink);padding:22px 26px;
+border-radius:var(--radius);margin-bottom:16px}
+header.top h1{font-size:19px;font-weight:700}
+header.top .sub{font-size:13px;color:var(--ink-2);margin-top:3px}
+.selrow{display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;margin-top:14px}
+.selrow .grp{display:flex;flex-direction:column;gap:4px}
+.selrow label{font-size:11px;color:var(--ink-2);text-transform:uppercase;letter-spacing:.5px}
+.selrow select{padding:8px 12px;border-radius:8px;border:1px solid var(--line);
+background:#fff;color:var(--ink);font-size:13px;min-width:220px}
+.selrow select:hover{border-color:var(--g-300)}
+.selrow button{padding:8px 14px;border-radius:8px;border:1px solid var(--g-700);
+background:var(--grad-btn);color:var(--btn-ink);
+cursor:pointer;font-size:12px;font-weight:700}
+.selrow button:hover{background:var(--grad-btn-hover);border-color:var(--g-800)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:14px;margin-bottom:16px}
+.kpi{background:var(--card);border-radius:var(--radius);padding:16px 18px;box-shadow:0 1px 3px rgba(0,0,0,.07);
+border-left:5px solid var(--kpi-ok)}
+.kpi.sv{border-left-color:var(--kpi-ok)}
+.kpi.sa{border-left-color:var(--ambr)}
+.kpi.sr{border-left-color:var(--rojo)}
+.kpi .lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;font-weight:600}
+.kpi .val{font-size:25px;font-weight:800;margin-top:4px}
+.kpi .foot{font-size:11px;color:var(--muted);margin-top:3px}
+.card{background:var(--card);border-radius:var(--radius);padding:18px 20px;box-shadow:0 1px 3px rgba(0,0,0,.07)}
+.card h3{font-size:14px;font-weight:700;margin-bottom:14px}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{text-align:left;padding:9px 8px;border-bottom:2px solid var(--line);color:var(--muted);
+font-size:10.5px;text-transform:uppercase;letter-spacing:.3px;white-space:nowrap;cursor:pointer;user-select:none}
+th:hover{color:var(--ink)}
+td{padding:8px;border-bottom:1px solid var(--line-soft);vertical-align:top}
+td.num{text-align:right;font-variant-numeric:tabular-nums}
+tbody tr:hover{background:var(--g-50)}
+.chip{display:inline-block;padding:1px 7px;border-radius:6px;font-size:10px;font-weight:700}
+.empty{padding:26px;text-align:center;color:var(--muted);font-size:13px}
+footer{text-align:center;color:var(--muted);font-size:11px;margin-top:20px;padding:12px}

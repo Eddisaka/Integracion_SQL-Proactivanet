@@ -1,0 +1,65 @@
+/* =========================================================================
+   assets/css/barra-mini.css
+
+   El medidor `.mini`: la barrita de porcentaje que va dentro de una celda de
+   tabla, al lado de su cifra. UNA sola definicion para todas las vistas que
+   la pintan, que hoy son dos: dashboard.js (SLA, Backlog y Call Center) y
+   experiencia/experiencia.js.
+
+   Hermana de assets/js/barras.js, y por el mismo motivo: antes vivia copiada
+   en cada hoja y las copias se habian ido separando. Habia CUATRO, y dos de
+   ellas se contradecian:
+
+     dashboard.css     pista 60x7 redondeada, y el relleno con radio de
+                       pastilla (999px). Un radio de 999px se recorta a la
+                       mitad del lado corto, asi que un relleno estrecho se
+                       volvia un CIRCULO y uno lleno se leia PLANO.
+     experiencia.css   pista 56x7 de 4px, y el relleno SIN radio. El
+                       artefacto contrario: lleno se veia redondo -lo
+                       recortaba la pista- y estrecho dejaba la punta
+                       derecha cuadrada.
+
+   En los dos casos la forma de la barra cambiaba con el DATO. Y en
+   Experiencia el relleno ademas se colorea con el semaforo, asi que el verde
+   es por construccion la barra larga y el rojo la corta: color y forma
+   dependian del mismo valor y las dos nunca podian verse iguales.
+
+   POR QUE ESTOS NUMEROS
+   La pista lleva 3px de radio, MENOS de la mitad de sus 7px de alto: asi no
+   se lee como pastilla y no hay ningun tamaño en el que el radio se recorte.
+   El relleno va sin radio propio y su silueta la da el recorte de la pista,
+   que es la misma al 4% que al 100%. La barra ya no cambia de forma segun
+   cuanto marque.
+
+   POR QUE UNA HOJA APARTE Y NO DENTRO DE dashboard.css
+   Experiencia se ve por TRES caminos -pestaña con @scope, pagina suelta, y
+   el iframe de respaldo de montarEnMarco() cuando el navegador no soporta
+   @scope- y en cada uno alcanza un juego distinto de hojas. Con la regla
+   duplicada, cual ganaba dependia de la proximidad de scope. Con una sola
+   definicion, cargada por la pagina anfitriona Y por la suelta, los tres
+   caminos dan lo mismo por construccion. Es lo que ya hace desplegable.css.
+
+   Los tokens se leen con cadena de reserva por esa misma razon: no todas las
+   paginas declaran la escala de color completa.
+   ========================================================================= */
+
+.mini {
+  width: 60px;
+  height: 7px;
+  background: var(--line, #e3e7de);
+  border-radius: 3px;
+  overflow: hidden;
+  display: inline-block;
+  vertical-align: middle;
+  /* Hundido de un pixel: separa la pista vacia del fondo de la celda sin
+     necesidad de un borde, que a 7px de alto se comeria el relleno. */
+  box-shadow: inset 0 1px 1px rgba(25, 25, 25, .07);
+}
+
+/* El ancho y el color los pone el JS como estilo en linea (miniBar), porque
+   son datos: el porcentaje y, en Experiencia, el color del semaforo. Aqui
+   solo vive la geometria. */
+.mini > i {
+  display: block;
+  height: 100%;
+}

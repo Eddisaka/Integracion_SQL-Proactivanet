@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Observabilidad</title>
+<link rel="stylesheet" href="observabilidad.css">
+<!-- Desplegable compartido: el mismo componente que el resto del tablero. -->
+<link rel="stylesheet" href="../assets/css/desplegable.css">
+<script src="../assets/js/desplegable.js"></script>
+</head>
+<body>
+<div class="wrap">
+  <div id="tab-observabilidad" class="maintab-content active">
+    <header class="top">
+      <h1>Observabilidad</h1>
+      <div class="sub" id="subheadOb">Madurez de monitoreo de aplicaciones</div>
+      <div class="selrow">
+        <div class="grp"><label>Director</label>
+          <select id="selDirOb"><option value="">— Todos —</option></select></div>
+        <div class="grp"><label>Product Owner</label>
+          <select id="selPOOb"><option value="">— Todos —</option></select></div>
+        <button id="btnResetOb">Ver resumen general</button>
+        <a id="ligaHeaderOb" href="#" target="_blank" rel="noopener"
+           style="display:none;align-items:center;gap:6px;padding:8px 14px;border-radius:8px;
+           background:#d97706;color:var(--ink);font-size:12px;font-weight:700;text-decoration:none">
+           🔎 Consulta el Detalle</a>
+      </div>
+    </header>
+    <section class="kpis" id="kpisOb"></section>
+    <section class="card" style="margin-bottom:16px">
+      <h3>Cantidad de Aplicaciones por Nivel de Madurez de Monitoreo</h3>
+      <div id="nivelesGrid" style="display:grid;grid-template-columns:repeat(8,1fr);gap:8px;margin-top:8px"></div>
+      <p style="font-size:11px;color:var(--muted);margin-top:8px">Clic en un nivel para filtrar las aplicaciones.
+        <button id="btnClearNivel" style="display:none;margin-left:8px;padding:3px 10px;border-radius:6px;
+        border:1px solid var(--line);background:#fff;cursor:pointer;font-size:11px;font-weight:600">✕ Quitar filtro de nivel</button></p>
+    </section>
+    <section class="card">
+      <h3>Detalle de Aplicaciones</h3>
+      <p style="font-size:12px;font-weight:700;color:var(--ink);margin:6px 0" id="capApps"></p>
+      <div style="overflow-x:auto"><table id="tblApps"><thead><tr>
+        <th>Aplicación</th><th>Descripción</th><th>BIA</th><th>Propietario</th>
+        <th>Seguridad</th><th>Ciclo de Vida</th><th>Madurez Monitoreo</th>
+        <th>Product Owner / N3</th><th>Service Owner N2</th>
+      </tr></thead><tbody id="bodyApps"></tbody></table></div>
+    </section>
+    <footer>Generado el 02/09/2026 · Fuente: Concentrado Análisis de Jobs — db Aplicaciones.</footer>
+  </div><!-- fin tab-observabilidad -->
+</div>
+<script src="observabilidad.js"></script>
+</body></html>

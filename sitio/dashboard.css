@@ -1,0 +1,829 @@
+/* =========================================================================
+   dashboard.css
+
+   Hoja de estilos del tablero. Extraida del bloque <style> de
+   dashboard.html, que ahora la carga con <link rel="stylesheet">.
+
+   Las reglas van en el mismo orden que tenian inline. No se deduplico
+   nada -hay selectores repetidos a proposito, porque el modulo de
+   tableros extra trae los suyos y el orden de aparicion decide cual
+   gana-.
+
+   Lo que NO esta aqui: los atributos style="..." sueltos del marcado y
+   los que arma el JavaScript al generar tablas (colores por lider,
+   anchos de barra). Esos son estilos en linea, no reglas de hoja.
+   ========================================================================= */
+
+
+  /* ====================================================================
+     Sistema visual del tablero. Solo capa de presentacion: ningun
+     selector cambia de nombre, porque el JS genera HTML con estas mismas
+     clases (kpi, badge, mini, swatch, vacio, ...).
+     ==================================================================== */
+  :root {
+    /* El tema es claro y las superficies son blancas. Sin esto, el modo
+       oscuro automatico de Chrome reinvierte la pagina entera y se lleva
+       por delante el verde de marca. qa.css y qa_green.css ya lo declaran. */
+    color-scheme: light;
+
+    /* ==================================================================
+       PALETA CENTRALIZADA — escala verde de la cabecera.
+
+       Fuente de la verdad: el degradado de header.top, que es
+         linear-gradient(135deg, #478B3C 0%, #65BB2B 45%, #9DD323 100%)
+       Sus tres paradas son --g-800, --g-600 y --g-400. El resto de la
+       escala son interpolaciones y tintes de ESOS tres valores; no hay
+       ningun verde inventado fuera de esa recta.
+
+       Jerarquia: VERDE/LIMA = marca y enfasis · CARBON = texto y
+       estructura · BLANCO = superficie · GRIS CLARO = estructura
+       secundaria · ROJO = negativo · AMBAR = advertencia.
+       ================================================================== */
+    --g-50:  #f4fae7;   /* tinte mas suave (fondos de chip, filas) */
+    --g-100: #e9f5ce;
+    --g-200: #d3e9ac;   /* bordes tenues */
+    --g-300: #bae065;
+    --g-400: #9dd323;   /* LIMA  — parada 100% de la cabecera */
+    --g-500: #81c727;   /* interpolado 400 <-> 600 */
+    --g-600: #65bb2b;   /* VERDE — parada 45% de la cabecera */
+    --g-700: #56a333;   /* interpolado 600 <-> 800 */
+    --g-800: #478b3c;   /* VERDE PROFUNDO — parada 0% de la cabecera */
+    --g-900: #3a7431;   /* extension SOLO para texto/hover: nunca es
+                           parada de un degradado, para no cerrar la
+                           escala en un verde bosque. */
+
+    /* Paleta base */
+    --bg: #ffffff;
+    --bg-2: #f6f8f4;    /* gris muy claro con una gota de verde */
+    --card: #ffffff;
+    --line: #e3e7de;
+    --line-soft: #eef1ea;
+    --ink: #191919;     /* carbon, no pizarra azulada */
+    --ink-2: #393939;
+    --muted: #5e5e5f;
+    --muted-2: #9aa094;
+
+    /* Acento de marca = verde de la cabecera */
+    --accent: var(--g-600);
+    --accent-ink: var(--g-900);
+    --accent-soft: var(--g-50);
+    --accent-line: var(--g-200);
+    --verde: var(--g-800);        /* semantico "bien" = verde de marca */
+    --verde-strong: var(--g-900); /* relleno con texto blanco encima */
+    --ambr: #d97706;              /* advertencia: se conserva */
+    /* Semaforo de los KPI. Vive aparte de --verde (que es el verde profundo
+       de marca y lo usan flechas, badges y admin) porque el "bien" de una
+       tarjeta KPI es el lima de la cabecera, no el verde profundo. */
+    --kpi-ok: var(--g-400);       /* lima: estado bueno */
+    --rojo: #982a18;              /* negativo: unico rojo del tablero */
+    /* Nombres heredados que el JS y el CSS viejo siguen citando. Ya no
+       son morado ni cyan: son dos escalones mas de la misma escala. */
+    --morado: var(--g-500);
+    --cyan: var(--g-300);
+
+    /* Degradado de marca. La cabecera conserva su 135deg exacto; el resto
+       del tablero usa la MISMA progresion en vertical: lima arriba,
+       verde fresco abajo. */
+    --grad-header: linear-gradient(135deg, #478B3C 0%, #65BB2B 45%, #9DD323 100%);
+    --grad: linear-gradient(180deg, var(--g-400) 0%, var(--g-600) 55%, var(--g-800) 100%);
+    --grad-linea: linear-gradient(90deg, var(--g-400) 0%, var(--g-600) 50%, var(--g-800) 100%);
+
+    /* Botones: lima arriba -> verde fresco abajo, con tinta CARBON.
+       Blanco sobre lima no llega a 4.5:1; carbon sobre esta rampa va de
+       9.9:1 (lima) a 5.7:1 (--g-700), asi que el boton se lee entero. */
+    --grad-btn: linear-gradient(160deg, var(--g-400) 0%, var(--g-600) 55%, var(--g-700) 100%);
+    --grad-btn-hover: linear-gradient(160deg, var(--g-500) 0%, var(--g-700) 55%, var(--g-800) 100%);
+    --btn-ink: var(--ink);
+
+    /* Controles de filtro: dejaron de ser barras azul marino y tampoco son
+       cajas grises neutras. Superficie blanca -para que el dato se lea-,
+       pero ESTRUCTURA VERDE: el borde, la etiqueta, el hover y el foco
+       salen de la misma escala de la cabecera. Verde donde marca, blanco
+       donde se lee. */
+    --ctrl-bg: #ffffff;
+    --ctrl-bg-2: var(--g-50);
+    --ctrl-line: var(--g-200);
+    --ctrl-line-hover: var(--g-400);
+    --ctrl-ink: var(--ink);
+    --ctrl-label: var(--g-900);
+
+    /* Verde primario apagado para los botones del panel de filtros. */
+    --accent-deep: var(--g-700);
+    --accent-deep-2: var(--g-800);
+
+    /* Formas */
+    --radius: 14px;
+    --radius-sm: 9px;
+    --radius-xs: 7px;
+    --radius-pill: 999px;
+
+    /* Profundidad: una escala en vez de una sola sombra plana. */
+    --shadow: 0 1px 2px rgba(25, 25, 25, .05), 0 1px 3px rgba(25, 25, 25, .06);
+    --shadow-md: 0 2px 4px rgba(25, 25, 25, .05), 0 8px 20px -6px rgba(25, 25, 25, .12);
+    --shadow-lg: 0 24px 60px -18px rgba(25, 25, 25, .35);
+    --ring: 0 0 0 3px rgba(101, 187, 43, .30);
+
+    /* Alias de los nombres viejos: parte del CSS y del JS ya los usa. */
+    --panel: var(--card);
+    --border: var(--line);
+    --text: var(--ink);
+    --text-muted: var(--muted);
+    --blue: var(--accent);
+    --green: var(--verde);
+    --red: var(--rojo);
+    --amber: var(--ambr);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { -webkit-text-size-adjust: 100%; }
+
+  body {
+    font-family: "Segoe UI Variable Text", -apple-system, BlinkMacSystemFont, "Segoe UI",
+                 Roboto, "Helvetica Neue", Arial, sans-serif;
+    background: var(--bg);
+    /* Degradado muy suave: da profundidad sin ensuciar el fondo. */
+    background-image:
+      radial-gradient(1200px 520px at 50% -220px, rgba(157, 211, 35, .10) 0%, rgba(157, 211, 35, 0) 70%),
+      linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
+    background-attachment: fixed;
+    color: var(--ink);
+    padding: 20px 18px 8px;
+    line-height: 1.45;
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  .wrap { max-width: 1500px; margin: 0 auto; }
+
+  /* Foco visible y consistente en todo lo interactivo. */
+  a:focus-visible, button:focus-visible, select:focus-visible,
+  input:focus-visible, [data-panel]:focus-visible, [tabindex]:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: var(--radius-xs);
+  }
+
+  /* Barras de desplazamiento discretas (WebKit) + Firefox. */
+  * { scrollbar-width: thin; scrollbar-color: #cbd8c6 transparent; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    background: #cbd8c6; border-radius: var(--radius-pill);
+    border: 3px solid transparent; background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover { background: #aebba4; background-clip: content-box; }
+
+  /* ---- Pestañas principales ---- */
+  .maintabs {
+    display: flex; gap: 4px; margin-bottom: 16px;
+    background: rgba(227, 231, 222, .85);
+    padding: 5px; border-radius: 13px;
+    border: 1px solid rgba(255, 255, 255, .7);
+    box-shadow: inset 0 1px 2px rgba(25, 25, 25, .05);
+    -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  }
+  .mtab {
+    flex: 1; padding: 12px 16px; border: none; background: transparent; cursor: pointer;
+    font: inherit; font-size: 14px; font-weight: 700; color: var(--muted);
+    letter-spacing: .1px;
+    border-radius: var(--radius-sm); transition: background .16s ease, color .16s ease, box-shadow .16s ease;
+  }
+  .mtab.active {
+    background: var(--grad-btn); color: var(--btn-ink);
+    box-shadow: 0 1px 2px rgba(25, 25, 25, .08), 0 4px 10px -4px rgba(71, 139, 60, .28);
+  }
+  .mtab:hover:not(.active) { color: var(--ink); background: rgba(255, 255, 255, .55); }
+  .maintab-content { display: none; }
+  .maintab-content.active { display: block; animation: aparecer .22s ease both; }
+
+  /* Tablero_Experiencia.html va dentro de un iframe: es un documento
+     independiente y solo necesita ocupar el alto util de la pestaña. */
+  .tablero-externo {
+    width: 120%;
+    margin-left: -10%;
+    min-height: 1000px;
+    height: calc(100vh - 140px);
+    border: 0;
+    display: block;
+    background: transparent;
+    margin-top: -26px;
+  }
+  /* GEOMETRIA UNICA DE LA BARRA VERDE
+     ---------------------------------
+     La misma pieza en las seis pestañas: SLA, Backlog y Call Center la traen
+     de aqui; QA y Experiencia repiten estas medidas en qa.css y en
+     experiencia.css, porque sus paginas sueltas se abren sin dashboard.css.
+     Si cambia una, cambian las tres.
+
+     min-height 100px es el alto NATURAL de la cabecera mas alta -titulo de
+     20px y subtitulo de 12.5px sobre line-height 1.45, mas los 48px de
+     padding-, no un numero elegido a ojo. Las pestañas sin subtitulo llegan a
+     ese alto con aire, no estirando el texto: el contenido se centra
+     verticalmente y conserva su tipografia. */
+  header.top {
+    position: relative; overflow: hidden;
+    background: var(--grad-header);
+    color: var(--ink); padding: 24px 28px;
+    min-height: 100px;
+    border-radius: var(--radius); margin-bottom: 16px;
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 14px;
+    box-shadow: var(--shadow-md);
+  }
+  /* Brillo de esquina: le quita el aspecto de bloque plano. Antes llevaba
+     encima un rayado diagonal (repeating-linear-gradient a 115 grados) que
+     sobre el verde se leia como lineas negras, sobre todo con la barra alta. */
+  header.top::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background:
+      radial-gradient(520px 200px at 88% -40%, rgba(244, 250, 231, .40), transparent 70%);
+  }
+  header.top > * { position: relative; z-index: 1; }
+  header.top h1 { font-size: 20px; font-weight: 700; letter-spacing: -.2px; }
+  header.top .sub {
+    font-size: 12.5px; color: var(--ink-2); margin-top: 5px;
+    font-variant-numeric: tabular-nums;
+  }
+  header.top .estado { font-size: 12px; color: var(--ink-2); min-height: 16px; text-align: right; }
+  /* Sello del ETL como pastilla blanca: mismo trato visual que #corteFecha en
+     experiencia.css y que el chip de fecha de QA. Vale para las dos cabeceras
+     propias del tablero, SLA y Backlog. */
+  header.top #estado-carga,
+  header.top #estado-carga-bl {
+    display: inline-block; padding: 5px 12px;
+    border-radius: var(--radius-pill);
+    background: rgba(255, 255, 255, .92);
+    border: 1px solid rgba(255, 255, 255, .6);
+    box-shadow: 0 1px 2px rgba(25, 25, 25, .10);
+  }
+  header.top #estado-carga:empty,
+  header.top #estado-carga-bl:empty { display: none; }
+  /* En fila, no en columna: apilada, un bloque con dos hijos -el chip de fecha
+     y un boton, como en QA- crecia mas que el titulo y era ese bloque, y no la
+     cabecera, el que decidia el alto de la barra. En fila ninguna pestaña
+     empuja el alto por su cuenta. */
+  header.top .acciones-top {
+    display: flex; flex-direction: row; align-items: center;
+    justify-content: flex-end; flex-wrap: wrap; gap: 8px;
+  }
+
+  /* ---- Botones ---- */
+  .btn {
+    border: 1px solid transparent; border-radius: var(--radius-xs);
+    padding: 9px 16px; cursor: pointer;
+    font: inherit; font-size: 13px; font-weight: 700; color: var(--btn-ink);
+    background: var(--grad-btn);
+    box-shadow: 0 1px 2px rgba(25, 25, 25, .12);
+    transition: filter .15s ease, transform .06s ease, box-shadow .15s ease, background .15s ease;
+    white-space: nowrap;
+  }
+  .btn:hover { background: var(--grad-btn-hover); box-shadow: 0 3px 10px -3px rgba(71, 139, 60, .45); }
+  .btn:active { transform: translateY(1px); box-shadow: 0 1px 2px rgba(25, 25, 25, .12); }
+  /* Todas las variantes comparten el degradado; solo cambia el peso visual. */
+  .btn.gris { background: var(--grad-btn); opacity: .82; }
+  .btn.gris:hover { background: var(--grad-btn-hover); opacity: 1; }
+  .btn.cyan { background: var(--grad-btn); }
+  .btn.morado { background: var(--grad-btn); }
+  .btn.chico { padding: 6px 12px; font-size: 12px; }
+  /* Boton de contorno, al estilo de "ver categorias" del tablero de referencia. */
+  .btn.linea {
+    background: var(--grad-btn); color: var(--btn-ink); border-color: var(--g-700);
+    font-weight: 700; box-shadow: none;
+  }
+  .btn.linea:hover {
+    background: var(--grad-btn-hover); color: var(--btn-ink); border-color: var(--g-800);
+    filter: none; box-shadow: 0 2px 8px -2px rgba(71, 139, 60, .5);
+  }
+  .btn.linea.active, .btn.linea[aria-pressed="true"] {
+    background: var(--grad-btn-hover); color: var(--btn-ink); border-color: var(--g-800);
+  }
+  /* La cabecera ya es verde claro: el boton solo necesita un contorno
+     mas firme para no fundirse con el degradado de atras. */
+  header.top .btn {
+    border-color: rgba(25, 25, 25, .22);
+    box-shadow: 0 1px 2px rgba(25, 25, 25, .18);
+  }
+  header.top .btn:hover { border-color: rgba(25, 25, 25, .38); }
+
+  /* ---- Filtros del servidor ---- */
+  .filtros {
+    position: relative; overflow: hidden;
+    background: var(--card); border-radius: var(--radius);
+    box-shadow: var(--shadow); border: 1px solid var(--g-100);
+    padding: 18px 20px;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 16px 14px; align-items: end; margin-bottom: 16px;
+  }
+  /* Filo de marca al borde superior de la tarjeta: ata el panel de filtros
+     al degradado de la cabecera sin pintar de verde ningun control. */
+  .filtros::before {
+    content: ""; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: var(--grad-linea);
+  }
+  .filtros .campo {
+    display: flex; flex-direction: column; justify-content: flex-end;
+    gap: 6px; min-width: 0;
+  }
+  /* Dos lineas reservadas para la etiqueta: asi todas las barras de la fila
+     quedan alineadas aunque un titulo se parta en dos renglones. */
+  .filtros label {
+    font-size: 10.5px; font-weight: 700; color: var(--ctrl-label);
+    text-transform: uppercase; letter-spacing: .5px; line-height: 1.35;
+    min-height: 28px; display: flex; align-items: flex-end;
+  }
+  /* Barras claras: superficie blanca, estructura gris y acento verde al
+     enfocar. Todas miden lo mismo. */
+  .filtros input[type="date"],
+  .filtros select {
+    height: 40px; width: 100%;
+    border: 1px solid var(--ctrl-line); border-radius: var(--radius-xs);
+    padding: 0 11px;
+    font: inherit; font-size: 13px; font-weight: 500;
+    color: var(--ctrl-ink);
+    background: var(--ctrl-bg) !important;
+    color-scheme: light;
+    box-shadow: inset 0 1px 2px rgba(25, 25, 25, .05);
+    transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
+  }
+  .filtros select option {
+    color: var(--ink);
+    background-color: var(--ctrl-bg);
+}
+  .filtros input[type="date"]:hover,
+  .filtros select:hover { background: var(--ctrl-bg-2) !important; border-color: var(--ctrl-line-hover); }
+  .filtros input[type="date"]:focus,
+  .filtros select:focus {
+    outline: none; border-color: var(--accent); background: var(--ctrl-bg-2) !important;
+    box-shadow: var(--ring), inset 0 1px 2px rgba(25, 25, 25, .05);
+  }
+  .filtros input[type="date"] { padding: 0 11px; }
+  .filtros input[type="date"]::-webkit-calendar-picker-indicator { opacity: .55; cursor: pointer; }
+  .filtros input[type="date"]:hover::-webkit-calendar-picker-indicator { opacity: 1; }
+  /* Flecha propia solo en los select de una sola linea. */
+  .filtros select:not([multiple]) {
+    appearance: none; -webkit-appearance: none; -moz-appearance: none;
+    padding-right: 30px;
+    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23478b3c' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+  }
+  /* Los select multiples ya no son cajones altos: en reposo miden lo mismo
+     que las demas barras y se despliegan al enfocarlos. Sigue siendo un
+     <select multiple> nativo, asi que Ctrl/Cmd + clic funciona igual. */
+  .filtros select[multiple] {
+    height: 40px; min-height: 0; padding: 4px 5px;
+    overflow-y: auto; overscroll-behavior: contain;
+    transition: height .18s ease, border-color .15s ease, box-shadow .15s ease;
+  }
+  .filtros select[multiple]:focus {
+    height: 190px;
+    box-shadow: var(--ring), var(--shadow-md);
+  }
+  .filtros select[multiple] option {
+    padding: 6px 9px; margin: 1px 0; border-radius: 6px;
+    font-size: 12.5px; color: var(--ink-2); background: var(--ctrl-bg);
+  }
+  .filtros select[multiple] option:checked {
+    background: var(--g-100) linear-gradient(0deg, var(--g-100), var(--g-100));
+    color: var(--g-900); font-weight: 700;
+  }
+  /* ---- Desplegables propios ----
+     El multi-select propio de estos filtros ya no vive aqui: lo dibuja el
+     componente compartido de assets/css/desplegable.css, el mismo que usan
+     los desplegables de una opcion y los de Experiencia, QA, Observabilidad
+     y Orquestacion. Las reglas .filtros select de arriba se quedan: son la
+     apariencia nativa de reserva, la que se ve si desplegable.js no carga. */
+
+  /* Rango rapido: grupo segmentado que ocupa el alto de una barra. */
+  .filtros .rango-rapido { display: flex; gap: 6px; flex-wrap: wrap; height: 40px; }
+
+  /* Selector de SLOT: un stepper compacto - N +. Elegir N son "los ultimos N
+     SLOTs" (SLOT 0..N-1) y su unico efecto es fijar el rango de fechas, asi que
+     va a juego con Rango rapido, no con los desplegables. */
+  .filtros .slotstep {
+    display: flex; align-items: center; justify-content: space-between;
+    height: 40px; width: 100%; padding: 0 4px; gap: 0;
+    /* Una sola pieza, con la misma caja que el resto de la barra de filtros
+       (.dd-boton y los input[type=date]): mismo alto, borde, radio y fondo.
+       Antes eran tres controles sueltos flotando uno junto a otro. */
+    border: 1px solid var(--ctrl-line); border-radius: var(--radius-xs);
+    background: var(--ctrl-bg);
+    box-shadow: inset 0 1px 2px rgba(25, 25, 25, .05);
+    transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
+  }
+  .filtros .slotstep:hover { background: var(--ctrl-bg-2); border-color: var(--ctrl-line-hover); }
+  .filtros .slotstep:focus-within {
+    border-color: var(--accent); background: var(--ctrl-bg-2);
+    box-shadow: var(--ring), inset 0 1px 2px rgba(25, 25, 25, .05);
+  }
+  /* Los botones pierden su caja propia: dentro del control son solo el signo,
+     pero conservan toda su area de clic. */
+  .filtros .slotstep .btn {
+    flex: none; width: 32px; height: 38px; padding: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+    border: 0; border-radius: 6px;
+    background: transparent; color: var(--ctrl-ink);
+    font-size: 16px; font-weight: 700; line-height: 1;
+    box-shadow: none;
+  }
+  .filtros .slotstep .btn:hover:not(:disabled) {
+    background: rgba(101, 187, 43, .22); color: var(--ink);
+    box-shadow: none; filter: none;
+  }
+  .filtros .slotstep .btn:active:not(:disabled) {
+    transform: none; background: rgba(101, 187, 43, .34);
+  }
+  .filtros .slotstep .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .filtros .slotstep .btn:disabled { opacity: .35; cursor: default; background: transparent; }
+  .filtros .slotn {
+    flex: 1; min-width: 2.5ch; text-align: center;
+    font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums;
+    color: var(--ctrl-ink);
+  }
+  /* El acento marca el SLOT ya aplicado, no el numero preparado. Ahora se ve
+     tambien en el borde, porque el control es una sola pieza. */
+  .filtros .slotstep.sel { border-color: var(--accent); }
+  .filtros .slotstep.sel .slotn { color: var(--g-900); }
+  /* Con 0 SLOTs el control esta apagado: no hay periodo preparado ni aplicado,
+     manda el rango manual de las fechas. */
+  .filtros .slotstep.off { opacity: .6; }
+  .filtros .slotstep.off .slotn { color: var(--muted); }
+  /* En acento solo cuando el SLOT esta en vigor; inactivo o sin aplicar, apagado
+     para no anunciar un periodo que no es el de la grafica. */
+  .filtros .slotsum { width: 100%; font-size: 12px; font-weight: 700; color: var(--muted); }
+  .filtros .slotsum.sel { color: var(--g-900); }
+  /* La rejilla de filtros alinea los campos por abajo (align-items: end). Este
+     campo tiene una linea mas que los demas -el resumen del SLOT-, asi que su
+     barra quedaba un renglon mas arriba que las vecinas. El resumen se saca del
+     flujo: el campo vuelve a medir etiqueta + barra, el stepper queda a la
+     misma altura que los <input type="date"> y los desplegables de al lado, y
+     el texto se pinta en el hueco entre filas. Ni el control ni su logica
+     cambian. */
+  .filtros .campo-slot { position: relative; }
+  .filtros .campo-slot .slotsum {
+    position: absolute; top: 100%; left: 0;
+    margin-top: 4px; line-height: 1.2;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+
+  .filtros .rango-rapido .btn {
+    flex: 1 1 0; min-width: 0; height: 40px; padding: 0 10px;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  /* El display de la regla de arriba le gana al del atributo, asi que el
+     boton oculto -"Año" en Call Center, "Mes" en SLA- necesita decirlo aqui. */
+  .filtros .rango-rapido .btn[hidden] { display: none; }
+  /* Lo mismo para un campo entero de la barra: `.filtros .campo` pone
+     display:flex y le gana al del atributo. Lo usa el campo de SLOTs, que se
+     retira cuando la barra esta en la pestaña de Call Center. Al quitarse del
+     flujo no deja hueco: las barras vecinas se reparten el ancho. */
+  .filtros .campo[hidden] { display: none; }
+  /* Los botones de rango van a juego con las barras oscuras vecinas. */
+  .filtros .rango-rapido button {
+    border: 1px solid var(--g-700);
+    background: var(--grad-btn);
+    border-radius: 8px;
+    padding: 6px 10px;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--btn-ink);
+    cursor: pointer;
+  }
+
+  .filtros .rango-rapido button:hover {
+    background: var(--grad-btn-hover);
+    border-color: var(--g-800);
+    color: var(--btn-ink);
+  }
+  /* Aplicar / Limpiar: renglon propio al pie de la tarjeta, pegado a la
+     derecha. Ocupa todas las columnas de la rejilla de filtros. */
+  .filtros .acciones {
+    grid-column: 1 / -1;
+    display: flex; flex-direction: row; gap: 8px;
+    align-items: center; justify-content: flex-end;
+    flex-wrap: nowrap; height: auto; min-height: 40px;
+    padding-top: 4px;
+  }
+  /* "Limpiar" a la izquierda sin tocar el orden del HTML; mas chicos que las
+     barras de filtro, porque son acciones y no campos. */
+  .filtros .acciones .btn {
+    order: 2;
+    flex: 0 0 auto; min-width: 0; height: 34px; padding: 0 16px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: var(--radius-xs); font-size: 12.5px; letter-spacing: .1px;
+    border: 1px solid var(--g-700);
+    background: var(--grad-btn); color: var(--btn-ink);
+    box-shadow: inset 0 1px 2px rgba(25, 25, 25, .18);
+  }
+  .filtros .acciones .btn:hover {
+    background: var(--grad-btn-hover); border-color: var(--g-800);
+    filter: none; box-shadow: inset 0 1px 2px rgba(25, 25, 25, .18);
+  }
+  /* Limpiar es secundario: mismo degradado de marca, un punto mas apagado. */
+  .filtros .acciones .btn.gris {
+    order: 1;
+    background: var(--grad-btn); border-color: var(--g-700); color: var(--btn-ink);
+    opacity: .82;
+  }
+  .filtros .acciones .btn.gris:hover {
+    background: var(--grad-btn-hover); border-color: var(--g-800); color: var(--btn-ink);
+    opacity: 1;
+  }
+  .filtros .acciones .btn:active { transform: translateY(1px); }
+
+  /* ---- KPIs ---- */
+  .kpis {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 14px; margin-bottom: 16px;
+  }
+  .kpi {
+    position: relative; overflow: hidden;
+    background: var(--card); border-radius: var(--radius); padding: 16px 18px;
+    box-shadow: var(--shadow); border: 1px solid var(--line-soft);
+    border-left: 5px solid var(--kpi-ok);
+    transition: transform .15s ease, box-shadow .15s ease;
+  }
+  /* Lavado de color heredado del borde izquierdo. */
+  .kpi::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(100deg, currentColor 0%, transparent 46%);
+    opacity: .07; color: var(--kpi-ok);
+  }
+  .kpi:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+  /* Semaforo: un solo color plano en la franja izquierda por estado.
+     lima = bien, ambar = aviso, rojo = mal. No hay mas estados. */
+  .kpi.sv { border-left-color: var(--kpi-ok); }
+  .kpi.sa { border-left-color: var(--ambr); }
+  .kpi.sr { border-left-color: var(--rojo); }
+  .kpi.sv::after { color: var(--kpi-ok); }
+  .kpi.sa::after { color: var(--ambr); }
+  .kpi.sr::after { color: var(--rojo); }
+  .kpi .lbl {
+    font-size: 10.5px; color: var(--muted); text-transform: uppercase;
+    letter-spacing: .5px; font-weight: 700;
+  }
+  .kpi .val {
+    font-size: 27px; font-weight: 800; margin-top: 5px; line-height: 1.1;
+    letter-spacing: -.6px; font-variant-numeric: tabular-nums;
+  }
+  .kpi .foot { font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .kpi .badge { vertical-align: 2px; }
+
+  /* ---- Tarjetas y rejillas ---- */
+  .card {
+    background: var(--card); border-radius: var(--radius); padding: 18px 20px;
+    box-shadow: var(--shadow); border: 1px solid var(--line-soft);
+    min-width: 0;
+    transition: box-shadow .18s ease;
+  }
+  .card:hover { box-shadow: var(--shadow-md); }
+  .card h3 {
+    font-size: 13.5px; font-weight: 700; margin-bottom: 14px;
+    padding-bottom: 10px; border-bottom: 1px solid var(--line-soft);
+    display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap;
+    letter-spacing: -.1px;
+  }
+  .card h3 .hint {
+    font-weight: 600; font-size: 10.5px; color: var(--muted); margin-left: auto;
+    text-transform: uppercase; letter-spacing: .4px; white-space: nowrap;
+  }
+  .card .nota {
+    font-size: 11.5px; color: var(--muted); margin: 0 0 12px;
+    background: var(--bg-2); border: 1px solid var(--line-soft);
+    border-left: 3px solid var(--g-200);
+    border-radius: var(--radius-xs); padding: 8px 10px;
+  }
+  .lienzo { position: relative; height: 260px; }
+  .lienzo.alta { height: 320px; }
+  .grid2 { display: grid; grid-template-columns: 1.6fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 16px; }
+
+  /* ---- Sub-pestañas ---- */
+  .tabs {
+    display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap;
+    border-bottom: 1px solid var(--line-soft); padding-bottom: 14px;
+  }
+  .tab {
+    padding: 8px 14px; border-radius: var(--radius-xs);
+    border: 1px solid var(--line); background: #fff;
+    cursor: pointer; font-size: 13px; font-weight: 600; color: var(--muted);
+    transition: background .15s ease, color .15s ease, border-color .15s ease, box-shadow .15s ease;
+  }
+  .tab:hover { color: var(--ink); border-color: var(--g-300); background: var(--g-50); }
+  .tab.active {
+    background: var(--grad-btn); color: var(--btn-ink); border-color: var(--g-700);
+    box-shadow: 0 2px 8px -2px rgba(71, 139, 60, .55);
+  }
+  .panel { display: none; }
+  .panel.active { display: block; animation: aparecer .2s ease both; }
+  .scroll-x { overflow-x: auto; margin: 0 -4px; padding: 0 4px 4px; }
+
+  /* Linea que dice que filtro esta aplicado sobre cada tabla. */
+  .cap {
+    font-size: 12px; font-weight: 700; color: var(--ink); margin-bottom: 10px;
+    display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline;
+  }
+  .cap .suave { font-weight: 400; color: var(--muted); }
+
+  /* ---- Tablas ---- */
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th {
+    text-align: left; padding: 10px 8px; border-bottom: 2px solid var(--line);
+    color: var(--muted); background: #fff;
+    font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px;
+    white-space: nowrap; cursor: pointer; user-select: none;
+    transition: color .15s ease, background .15s ease;
+  }
+  th:hover { color: var(--ink); background: var(--g-50); }
+  th .ord { margin-left: 4px; color: var(--accent); }
+  td {
+    padding: 9px 8px; border-bottom: 1px solid var(--line-soft);
+    vertical-align: middle; color: var(--ink-2);
+  }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tbody tr { transition: background .12s ease; }
+  tbody tr:hover { background: var(--g-50); }
+  tbody tr:last-child td { border-bottom: none; }
+  .fecha-cell { white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+  /* ---- Drill-down jerarquico ---- */
+  .n1row { background: var(--bg-2); font-weight: 700; cursor: pointer; color: var(--ink); }
+  .n1row td { color: var(--ink); border-bottom-color: var(--line); }
+  .n1row:hover { background: var(--g-50); }
+  .n1row td:first-child::before { content: "\25B8 "; color: var(--muted); }
+  .n1row.open td:first-child::before { content: "\25BE "; }
+  .n2row { display: none; }
+  .n2row.show { display: table-row; }
+  .n2row td:first-child {
+    padding-left: 24px; color: var(--ink-2); font-weight: 400;
+    box-shadow: inset 3px 0 0 var(--line);
+  }
+  .n2exp { cursor: pointer; }
+  .n2exp td:first-child::before { content: "\25B8 "; color: var(--muted); font-size: 10px; }
+  .n2exp.open td:first-child::before { content: "\25BE "; font-size: 10px; }
+  .n3row { display: none; }
+  .n3row.show { display: table-row; }
+  .n3row td { background: #fbfcf8; }
+  .n3row td:first-child {
+    padding-left: 46px; color: var(--muted);
+    box-shadow: inset 3px 0 0 var(--line);
+  }
+  /* El nombre es lo unico que filtra; expandir/contraer es el resto de la fila. */
+  .filtrable {
+    cursor: pointer; color: var(--accent); text-decoration: underline dotted;
+    text-underline-offset: 3px;
+  }
+  .filtrable:hover { text-decoration-style: solid; color: var(--accent-ink); }
+  .fila-sel { background: var(--accent-soft) !important; }
+  .fila-sel td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+
+  /* ---- Indicadores ---- */
+  .pill {
+    display: inline-block; border-radius: var(--radius-pill);
+    padding: 2px 9px; font-size: 11px; font-weight: 700; white-space: nowrap;
+    border: 1px solid transparent;
+  }
+  .pill.vencido { background: #fdf4f2; color: var(--rojo); border-color: #edd3cd; }
+  .pill.dentro { background: var(--g-50); color: var(--g-900); border-color: var(--g-200); }
+  .pill.neutro { background: var(--bg-2); color: var(--muted); border-color: var(--line); }
+  /* ---- Indicadores ---- */
+  .badge {
+    display: inline-block; padding: 2px 9px; border-radius: var(--radius-pill);
+    font-size: 11px; font-weight: 700; color: #fff;
+    box-shadow: 0 1px 2px rgba(25, 25, 25, .15);
+  }
+  /* Relleno con texto blanco: se usa --verde-strong, no el lima, para que
+     el 11px siga leyendose. */
+  .bv { background: var(--verde-strong); } .ba { background: var(--ambr); } .br { background: var(--rojo); }
+  .chip {
+    display: inline-block; padding: 2px 8px; border-radius: 6px;
+    font-size: 10px; font-weight: 700; letter-spacing: .2px;
+  }
+  /* El medidor `.mini` vive en assets/css/barra-mini.css: lo pintan este
+     tablero y Experiencia, y tenerlo aqui obligaba a mantener dos copias que
+     se habian separado. */
+  .arrow-up { color: var(--rojo); font-weight: 800; }
+  .arrow-down { color: var(--verde); font-weight: 800; }
+  .arrow-eq { color: var(--muted); }
+  .legend {
+    display: flex; gap: 8px 12px; flex-wrap: wrap;
+    font-size: 11px; color: var(--muted); margin-top: 12px;
+    padding-top: 10px; border-top: 1px solid var(--line-soft);
+  }
+  .legend span {
+    display: flex; align-items: center; gap: 6px; cursor: pointer;
+    padding: 3px 8px; border-radius: var(--radius-pill); background: var(--bg-2);
+    transition: opacity .15s ease, background .15s ease, color .15s ease;
+  }
+  .legend span:hover { background: var(--g-50); color: var(--g-900); }
+  .legend span.apagado { opacity: .4; }
+  .legend i { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+  .vacio {
+    padding: 34px 26px; text-align: center; color: var(--muted); font-size: 13px;
+    background: var(--bg-2); border: 1px dashed var(--g-200);
+    border-radius: var(--radius);
+  }
+  .swatch {
+    display: inline-block; width: 10px; height: 10px; border-radius: 3px;
+    margin-right: 6px; vertical-align: middle;
+  }
+
+  /* ---- Avisos ---- */
+  .aviso {
+    background: #fffbeb; border: 1px solid #fde68a; color: #92400e;
+    border-left: 4px solid var(--ambr);
+    border-radius: var(--radius); padding: 11px 15px;
+    font-size: 12.5px; margin-bottom: 14px;
+    box-shadow: var(--shadow);
+  }
+
+  footer {
+    text-align: center; color: var(--muted); font-size: 11px;
+    margin-top: 22px; padding: 16px 12px;
+    border-top: 1px solid var(--line);
+  }
+  footer .badge { margin: 0 2px; }
+
+  /* ---- Propios del tablero de backlog ---- */
+  /* La franja va de color plano, como la de .aviso de aqui abajo. Antes era
+     border-image con el degradado de la cabecera, que ademas de pintar los
+     cuatro lados ANULA el render de border-radius: esta caja era la unica de
+     esquinas cuadradas del tablero. Mismo motivo -y mismo arreglo- por el que
+     las tarjetas KPI dejaron de usarlo.
+
+     El color es --accent, neutro a proposito: esto no es un semaforo. El
+     sentido de la variacion lo dice .delta con su flecha, y la caja sale
+     igual suba o baje, asi que teñir la franja de verde o rojo afirmaria algo
+     que el dato no siempre respalda. */
+  .tendencia-linea {
+    font-size: 13.5px; margin: 0 0 16px;
+    background: var(--card); border: 1px solid var(--line-soft);
+    border-left: 4px solid var(--accent);
+    border-radius: var(--radius); box-shadow: var(--shadow);
+    padding: 12px 16px; color: var(--ink-2);
+  }
+  .tendencia-linea:empty { display: none; }
+  .tendencia-linea .delta { font-weight: 700; }
+  .grupo-lider {
+    margin: 20px 0 8px; font-size: 14px; font-weight: 700;
+    display: flex; align-items: center; gap: 2px; flex-wrap: wrap;
+  }
+  .grupo-lider .conteo {
+    font-weight: 600; font-size: 10.5px; color: var(--muted); margin-left: 8px;
+    text-transform: uppercase; letter-spacing: .4px;
+  }
+  /* Señal visual de que la celda tiene tooltip; si no, nadie descubre que
+     pasando el raton aparece la descripcion. */
+  .con-hint { cursor: help; border-bottom: 1px dotted var(--muted-2); }
+  /* Codigo de ticket que si tiene GUID en el mapeo: abre el formulario de
+     edicion en Proactivanet. Los que no lo tienen se quedan como texto. */
+  .enlace-ticket { color: var(--accent); text-decoration: none; font-weight: 600; }
+  .enlace-ticket:hover { text-decoration: underline; }
+  .enlace-ticket::after { content: '\2197'; font-size: 0.72em; margin-left: 3px; opacity: 0.55; }
+  /* ---- Responsivo ---- */
+  @media (max-width: 1100px) {
+    .grid2 { grid-template-columns: 1fr 1fr; }
+    .grid3 { grid-template-columns: 1fr 1fr; }
+  }
+  @media (max-width: 900px) {
+    .grid2, .grid3 { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 700px) {
+    body { padding: 12px 12px 4px; }
+    /* Mismo criterio que en ancho completo, con las medidas de aqui: 17px de
+       titulo y 36px de padding dan 84px de alto natural. Sin recalcularlo, los
+       100px de arriba dejarian una franja verde vacia en pantalla chica. */
+    header.top { padding: 18px 18px; min-height: 84px; }
+    header.top h1 { font-size: 17px; }
+    /* Envuelta, la fila arranca por la izquierda: debajo del titulo, no
+       colgada a la derecha. */
+    header.top .acciones-top { justify-content: flex-start; }
+    header.top .estado { text-align: left; }
+    .mtab { padding: 10px 8px; font-size: 12.5px; }
+    .filtros { padding: 14px 14px; grid-template-columns: 1fr; }
+    .filtros label { min-height: 0; }
+    .filtros .rango-rapido { height: auto; }
+    .filtros .acciones { flex-wrap: wrap; justify-content: stretch; }
+    .filtros .acciones .btn { flex: 1 1 140px; min-width: 0; }
+    .card { padding: 14px 14px; }
+    .kpi .val { font-size: 23px; }
+    .lienzo { height: 230px; }
+    .lienzo.alta { height: 270px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: .001ms !important; animation-iteration-count: 1 !important;
+      transition-duration: .001ms !important;
+    }
+  }
+
+  @media print {
+    body { background: #fff; padding: 0; }
+    .maintabs, .filtros, .btn { display: none !important; }
+    .card, .kpi, .filtros { box-shadow: none; border: 1px solid var(--line); }
+    header.top { background: var(--grad-header) !important; color: var(--ink) !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }

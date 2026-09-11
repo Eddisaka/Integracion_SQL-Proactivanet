@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<!--
+  qa/qa.html - Modulo de QA (categorizacion de tickets).
+
+  Este archivo es a la vez la pagina suelta y la fuente de la pestaña "QA" de
+  dashboard.html: TableroQa (dashboard.js) trae este mismo marcado, le quita
+  <script> y <link>, desarma el envoltorio #tab-qa y lo monta dentro del
+  contenedor de la pestaña. No hay dos versiones del tablero de QA.
+
+  Por eso el contenido vive dentro de un <div id="tab-qa" class="maintab-content
+  active">: es el mismo contrato que ya usa experiencia/experiencia.html. Todo
+  lo que queda fuera de ese div (html, head, body, .wrap) es cascaron de la
+  pagina suelta y el montaje en el tablero lo descarta.
+
+  Todos los ids llevan el prefijo "qa-" porque en el tablero este marcado
+  convive en el MISMO documento que SLA y Backlog, que ya tienen un #kpis.
+  qa.js resuelve ese prefijo en su helper $().
+
+  Consume unicamente qa.ashx (nunca qa_data.json ni los XLSX). Se sirve por
+  HTTP desde el mismo sitio que el handler.
+
+  La pagina se pinta ENTERA antes de pedir nada: tarjetas, graficas, tablas y
+  controles ya estan aqui, en su sitio y con su tamano definitivo, y cada uno
+  muestra su propio "Calculando..." hasta que llegan sus datos. Ninguna
+  peticion decide si el tablero se ve o no.
+
+  Los datos llegan en dos fases: qa.ashx?action=summary trae KPIs, grupos,
+  tecnicos y recategorizacion; qa.ashx?action=qare completa despues la
+  distribucion por estado. El detalle y los catalogos solo se piden cuando el
+  usuario los pide.
+
+  Chart.js 4.4.4 local, en assets/vendor/ (no depende del CDN). En el tablero
+  esta etiqueta se descarta: dashboard.html ya carga su propio Chart.js y una
+  segunda copia reemplazaria el global que usan SLA y Backlog.
+-->
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="color-scheme" content="light">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>QA - Categorizacion de tickets</title>
+  <script src="../assets/vendor/chart.umd.min.js"></script>
+  <!-- Paleta categorica compartida (solo para la pagina suelta: embebida en
+       dashboard.html este <script> se quita y manda la copia de alli). -->
+  <script src="../assets/js/paleta.js"></script>
+  <!-- Geometria y cifra de las barras, con la misma nota: solo para la
+       pagina suelta. -->
+  <script src="../assets/js/barras.js"></script>
+  <!-- Desplegable compartido, con la misma nota: solo para la pagina suelta. -->
+  <script src="../assets/js/desplegable.js"></script>
+  <link rel="stylesheet" href="../assets/css/desplegable.css">
+  <link rel="stylesheet" href="qa.css">
+</head>
+<body>
+<div class="wrap">
+  <div id="tab-qa" class="maintab-content active">
+
+    <!-- Encabezado de seccion, no de pagina: mismo header.top que usan las
+         pestanas de SLA y de Backlog. Dentro del tablero ocupa el sitio de la
+         cabecera de la pestaña, debajo de la navegacion general; nunca repite
+         la navegacion ni el marco de la aplicacion. -->
+    <header class="top">
+      <div>
+        <h1>Tickets Proactivanet &mdash; QA de categorizacion</h1>
+        <div class="sub" id="qa-sub-fuente">Cargando origen de datos&hellip;</div>
+      </div>
+      <div class="acciones-top">
+        <span class="chip" id="qa-chip-fecha">Datos QA: &mdash;</span>
+        <button type="button" class="btn chico" id="qa-btn-recargar">Limpiar</button>
+      </div>
+    </header>
+
+    <!-- Aviso de error del resumen. Es una banda ARRIBA del tablero, no un
+         reemplazo: aunque falle, la estructura sigue en pantalla y los bloques
+         que si cargaron se siguen viendo. -->
+    <div id="qa-error-global" class="estado estado-error" hidden>
+      <strong>No se pudieron cargar los datos de QA.</strong>
+      <span id="qa-error-global-msg"></span>
+      <button type="button" class="btn chico" id="qa-btn-reintentar">Reintentar</button>
+    </div>
+
+    <section class="kpis" id="qa-kpis"></section>
+
+    <!-- Las dos graficas del top 10 son un par simetrico: misma rejilla de dos
+         columnas iguales y el mismo alto de lienzo, que fija qa.js. -->
+    <section class="grid2">
+      <div class="card">
+        <h3>
+          Top 10 grupos con tickets mal categorizados
+          <span class="hint" id="qa-hint-grupo"></span>
+        </h3>
+        <p class="nota-card">Solo tickets con <code>Validacion = Incorrecto</code>. Clic en una barra para ver su detalle.</p>
+        <div class="lienzo lienzo-barras" id="qa-lienzo-grupo">
+          <canvas id="qa-chart-grupo"></canvas>
+          <p class="lienzo-msg" id="qa-msg-grupo"><span class="spinner" aria-hidden="true"></span>Calculando&hellip;</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>
+          Top 10 tecnicos resolutores con tickets mal categorizados
+          <span class="hint" id="qa-hint-tecnico"></span>
+        </h3>
+        <p class="nota-card">Solo tickets con <code>Validacion = Incorrecto</code>. Clic en una barra para ver su detalle.</p>
+        <div class="lienzo lienzo-barras" id="qa-lienzo-tecnico">
+          <canvas id="qa-chart-tecnico"></canvas>
+          <p class="lienzo-msg" id="qa-msg-tecnico"><span class="spinner" aria-hidden="true"></span>Calculando&hellip;</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="grid-sec">
+      <div class="card">
+        <h3>Distribucion de validacion<span class="hint" id="qa-hint-validacion"></span></h3>
+        <div class="lienzo lienzo-dona">
+          <canvas id="qa-chart-validacion"></canvas>
+          <p class="lienzo-msg" id="qa-msg-validacion"><span class="spinner" aria-hidden="true"></span>Calculando&hellip;</p>
+        </div>
+        <div class="leyenda" id="qa-leyenda-validacion"></div>
+      </div>
+
+      <div class="card">
+        <h3>Recategorizacion<span class="hint" id="qa-hint-recat"></span></h3>
+        <p class="nota-card">Pares <code>Grupo</code> &rarr; <code>Grupo Correcto</code> de los tickets incorrectos.</p>
+        <div class="tabla-scroll tabla-recat">
+          <table class="tabla">
+            <thead>
+              <tr>
+                <th>Grupo actual</th>
+                <th>Grupo correcto</th>
+                <th class="num">Tickets</th>
+              </tr>
+            </thead>
+            <tbody id="qa-tbody-recat"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h3>Detalle de tickets<span class="hint" id="qa-hint-detalle">bajo demanda</span></h3>
+      <p class="nota-card">
+        El detalle no se carga con la pagina: se pide al servidor ya filtrado y paginado.
+      </p>
+
+      <div class="barra-detalle">
+        <button type="button" class="btn" id="qa-btn-detalle">Ver detalle de incorrectos</button>
+
+        <label class="campo">
+          <span>Filas por pagina</span>
+          <select id="qa-sel-tam">
+            <option value="50">50</option>
+            <option value="100" selected>100</option>
+            <option value="250">250</option>
+          </select>
+        </label>
+
+        <div class="filtros-qa" id="qa-filtros-activos"></div>
+      </div>
+
+      <div id="qa-detalle-cargando" class="estado estado-mini" hidden>
+        <span class="spinner" aria-hidden="true"></span><span>Consultando detalle&hellip;</span>
+      </div>
+
+      <div id="qa-detalle-error" class="estado estado-error estado-mini" hidden>
+        <strong>No se pudo cargar el detalle.</strong> <span id="qa-detalle-error-msg"></span>
+      </div>
+
+      <div id="qa-detalle-panel" hidden>
+        <div class="paginador">
+          <button type="button" class="btn btn-sec chico" id="qa-btn-prev">&larr; Anterior</button>
+          <span id="qa-paginacion-txt" class="paginacion-txt"></span>
+          <button type="button" class="btn btn-sec chico" id="qa-btn-next">Siguiente &rarr;</button>
+        </div>
+
+        <div class="tabla-scroll tabla-detalle">
+          <table class="tabla">
+            <thead>
+              <tr>
+                <th>Codigo</th>
+                <th>Fecha de registro</th>
+                <th>Titulo</th>
+                <th>Grupo</th>
+                <th>Tecnico de 2&ordf; linea</th>
+                <th>Categoria</th>
+                <th>Grupo Correcto</th>
+                <th>Validacion</th>
+              </tr>
+            </thead>
+            <tbody id="qa-tbody-detalle"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <footer class="pie" id="qa-pie-fuente"></footer>
+  </div>
+</div>
+
+<script src="qa.js"></script>
+</body>
+</html>

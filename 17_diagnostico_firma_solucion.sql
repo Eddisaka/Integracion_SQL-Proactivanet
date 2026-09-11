@@ -435,9 +435,9 @@ GO
    entero sin tecnico. El bloque 2 de este diagnostico lo confirma con numeros
    antes de que nadie lo intente.
 
-     07_correo_backlog.sql         snapshot y procedimientos del correo
-     backlog_antiguos.ashx         columnas del listado
-     backlog.html                  la celda de la tabla
+     07_correo_backlog.sql               snapshot y procedimientos del correo
+     sitio/handlers/backlog_antiguos.ashx  columnas del listado
+     sitio/dashboard.js                  la celda de la tabla
      Enviar_CorreoBacklog_direccion.ps1  la columna del Excel
 
    ---------------------------------------------------------------------------
