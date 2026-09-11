@@ -1,5 +1,8 @@
 <%@ WebHandler Language="C#" Class="Productividad" %>
 
+// Resueltos por tecnico. El procedimiento deja fuera las cuentas que no son
+// personas (dbo.CatCuentaNoPersona): no compiten en un ranking de gente.
+
 using System.Web;
 
 public class Productividad : IHttpHandler
@@ -8,9 +11,7 @@ public class Productividad : IHttpHandler
     {
         DashboardHandler.Responder(context, delegate
         {
-            // Ver App_Code/DashboardQueries.cs: reemplaza a
-            // dbo.usp_Dash_ProductividadTecnicoMulti por el filtro de tecnicos.
-            return DashboardQueries.Productividad(DashboardQueries.Filtros.Desde(context.Request));
+            return DashboardDb.Ejecutar("dbo.usp_Dash_ProductividadTecnicoMulti", DashboardParams.Sla(context.Request));
         });
     }
 

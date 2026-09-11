@@ -292,7 +292,7 @@ public static class QaDb
     // ------------------------------------------------- KPIs en una pasada
     // La unica consulta escrita a mano del lado de QA -- todo lo demas aqui
     // son EXEC de procedimientos que la base ya tenia --, con el mismo patron
-    // que ya usan App_Code/DashboardQueries.cs y ExperienciaQueries.cs: texto
+    // que ya usan App_Code/ExperienciaQueries.cs: texto
     // constante y valores como SqlParameter. Existe porque
     // dbo.usp_CorreoQA_Kpis tarda ~28,6 s y no se puede tocar la base:
     //

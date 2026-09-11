@@ -101,7 +101,7 @@ public static class DashboardDb
         return filas;
     }
 
-    // Expuesta para DashboardQueries, que abre su propia conexion para las
+    // Expuesta para ExperienciaQueries y QaDb, que abren su propia conexion para las
     // consultas de texto parametrizado del tablero de SLA.
     public static string CadenaConexion()
     {
@@ -230,5 +230,31 @@ public static class DashboardParams
     {
         int valor;
         return int.TryParse(request.QueryString[nombre], out valor) ? valor : porDefecto;
+    }
+
+    /* Los cuatro parametros que reciben los cinco procedimientos de la pestana
+       de SLA. Se arman en un solo lugar para que los cinco handlers no puedan
+       diferir entre si: cuando los parametros estaban repetidos en cada uno,
+       bastaba con olvidar el de tecnicos en uno para que esa grafica ignorara
+       el filtro sin fallar.
+
+       @Tecnicos viaja SEPARADO POR '|', no por coma, y el procedimiento lo
+       parte con dbo.fn_Dash_SplitListPipe. Los nombres de tecnico son
+       "Apellidos, Nombre" y SIEMPRE llevan coma adentro: partiendolos por coma,
+       'Lugo Solis, David' se rompe en dos valores que no existen y el tablero
+       entero se queda en cero en cuanto alguien elige un tecnico.
+       dashboard.js ya los manda asi. */
+    public static Dictionary<string, object> Sla(HttpRequest request)
+    {
+        string fi, ff;
+        RangoFechas(request, out fi, out ff);
+
+        return new Dictionary<string, object>
+        {
+            { "FechaInicio", fi },
+            { "FechaFin",    ff },
+            { "Grupos",      ListaONulo(request, "grupos") },
+            { "Tecnicos",    ListaONulo(request, "tecnicos") },
+        };
     }
 }

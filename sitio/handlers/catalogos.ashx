@@ -23,10 +23,8 @@
 // buscarlo por nombre de columna, asi el handler no depende de como se llame
 // esa columna dentro del procedimiento.
 //
-// A diferencia de kpis/tendencia/productividad/distribucion/detalle, aqui SI
-// se usa el stored procedure: esos cinco pasaron a consulta de texto porque
-// los nombres de tecnico llevan coma y los procedimientos *Multi los partian
-// mal, problema que este no tiene (no recibe ninguna lista).
+// Los dos procedimientos se leen igual: result sets de UNA columna que se
+// aplanan con ValoresDe().
 
 using System;
 using System.Collections.Generic;
@@ -40,19 +38,18 @@ public class Catalogos : IHttpHandler
         {
             var sets = DashboardDb.EjecutarMultiple("dbo.usp_Dash_Catalogos", null);
 
-            // El subconjunto del Call Center NO sale del procedimiento: se
-            // consulta aparte (DashboardQueries.CatalogosCallCenter) contra la
-            // misma vista que el resto del tablero, que es donde vive la
-            // relacion tecnico -> grupo. Asi el procedimiento se queda como
-            // esta y las listas de SLA no cambian ni un valor.
-            var call = DashboardQueries.CatalogosCallCenter();
+            // El subconjunto del Call Center sale de su propio procedimiento,
+            // contra la misma vista que el resto del tablero, que es donde vive
+            // la relacion tecnico -> grupo. Asi usp_Dash_Catalogos se queda
+            // como esta y las listas de SLA no cambian ni un valor.
+            var call = DashboardDb.EjecutarMultiple("dbo.usp_Dash_CatalogosCallCenter", null);
 
             return new Dictionary<string, object>
             {
                 { "grupos",       ValoresDe(sets, 0) },
                 { "tecnicos",     ValoresDe(sets, 1) },
-                { "gruposCall",   call["grupos"] },
-                { "tecnicosCall", call["tecnicos"] },
+                { "gruposCall",   ValoresDe(call, 0) },
+                { "tecnicosCall", ValoresDe(call, 1) },
             };
         });
     }

@@ -1400,7 +1400,17 @@ const TableroSla = (function () {
         { l: 'Reabiertos', v: k.ReabiertosPct !== null && k.ReabiertosPct !== undefined ? `${k.ReabiertosPct}%` : 'N/D',
           f: `${FMT(k.TicketsReabiertos ?? 0)} volvieron despues de darse por resueltos`,
           s: SEM_REABIERTOS(k.ReabiertosPct) },
-        { l: 'Tecnicos activos', v: FMT(k.TecnicosActivos ?? 0), f: `${FMT(k.GruposActivos ?? 0)} grupos activos` },
+        /* Lo que resolvieron las cuentas que NO son personas -'Desk, Smart' y
+           companía-. Se ensena para que sacarlas del ranking no las esconda:
+           si la automatizacion cierra cuatro de cada diez tickets, eso es
+           informacion y no ruido. El catalogo es dbo.CatCuentaNoPersona. */
+        /* El porcentaje es sobre TicketsResueltos, que YA incluye estas
+           cuentas: la exclusion solo aplica al ranking y a la grafica por
+           tecnico, no al volumen. Sumarlas otra vez al denominador las
+           contaria dos veces. */
+        { l: 'Automatizado', v: FMT(k.TicketsAutomatizados ?? 0),
+          f: `${PCT(k.TicketsAutomatizados ?? 0, totalRango)} de lo resuelto · fuera del ranking` },
+        { l: 'Tecnicos activos', v: FMT(k.TecnicosActivos ?? 0), f: `${FMT(k.GruposActivos ?? 0)} grupos · solo personas` },
         { l: 'Reasignaciones promedio', v: k.ReasignacionesPromedio ?? 'N/D', f: 'cambios de grupo por ticket' },
       ];
     } else {

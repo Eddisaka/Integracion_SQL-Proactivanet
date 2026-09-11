@@ -1,5 +1,9 @@
 <%@ WebHandler Language="C#" Class="Distribucion" %>
 
+// Tres result sets de dbo.usp_Dash_DistribucionMulti, sobre el mismo
+// subconjunto: prioridad de lo resuelto, vencidos por grupo y reabiertos por
+// grupo.
+
 using System.Collections.Generic;
 using System.Web;
 
@@ -9,19 +13,14 @@ public class Distribucion : IHttpHandler
     {
         DashboardHandler.Responder(context, delegate
         {
-            // Ver App_Code/DashboardQueries.cs: reemplaza a
-            // dbo.usp_Dash_DistribucionMulti por el filtro de tecnicos.
-            //
-            // Eran tres result sets (estado, prioridad, aging). Estado y aging
-            // se quitaron de la pestaña -contestaban la pregunta del Backlog- y
-            // en su lugar entra el desglose de los vencidos por grupo.
-            var resultados = DashboardQueries.Distribucion(DashboardQueries.Filtros.Desde(context.Request));
+            var r = DashboardDb.EjecutarMultiple("dbo.usp_Dash_DistribucionMulti", DashboardParams.Sla(context.Request));
+            var vacio = new List<Dictionary<string, object>>();
 
             return new Dictionary<string, object>
             {
-                { "prioridad", resultados.Count > 0 ? resultados[0] : new List<Dictionary<string, object>>() },
-                { "vencidosGrupo", resultados.Count > 1 ? resultados[1] : new List<Dictionary<string, object>>() },
-                { "reabiertosGrupo", resultados.Count > 2 ? resultados[2] : new List<Dictionary<string, object>>() },
+                { "prioridad",       r.Count > 0 ? r[0] : vacio },
+                { "vencidosGrupo",   r.Count > 1 ? r[1] : vacio },
+                { "reabiertosGrupo", r.Count > 2 ? r[2] : vacio },
             };
         });
     }

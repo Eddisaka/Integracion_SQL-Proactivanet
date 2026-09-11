@@ -21,7 +21,9 @@
    - dbo.fn_Dash_SplitList          (tabla: separa una lista "a,b,c" en filas)
    - dbo.fn_Dash_SplitListPipe      (la misma, por '|': los nombres de tecnico traen comas)
    - dbo.vw_Dash_ProductividadBase  (CREATE OR ALTER, misma definicion que el script base)
+   - dbo.CatCuentaNoPersona         (cuentas de sistema que no compiten en el ranking)
    - dbo.usp_Dash_Catalogos         (catalogos de Grupo y Tecnico para poblar filtros)
+   - dbo.usp_Dash_CatalogosCallCenter (el subconjunto de los grupos con telefono)
    - dbo.usp_Dash_KpisMulti         (tarjetas KPI: total, cerrados, SLA, horas, etc.)
    - dbo.usp_Dash_TendenciaMulti    (serie diaria: creados por registro vs resueltos por solucion)
    - dbo.usp_Dash_ProductividadTecnicoMulti (tickets por tecnico, para grafico de barras)
@@ -83,6 +85,75 @@ RETURN
     FROM STRING_SPLIT(ISNULL(@Lista, N''), N'|')
     WHERE LTRIM(RTRIM(value)) <> N''
 );
+GO
+
+/* =====================================================================================
+   0c) Cuentas que no son personas
+
+      Proactivanet firma soluciones con cuentas que no corresponden a nadie:
+      automatizaciones, cuentas genericas de area y cuentas de proveedor. En el
+      ranking de productividad compiten contra la gente y ganan siempre.
+
+      Medido el 9 de septiembre de 2026: 'Desk, Smart' firma 178,694 tickets.
+      Es la barra mas alta de todo el tablero por un margen enorme y no es
+      nadie. Detras vienen 'User, Setup' con 9,877 y 'Proactivanet, Customer
+      Service' con 3,305.
+
+      DONDE SE EXCLUYEN Y DONDE NO. Salen de las vistas que hablan de PERSONAS
+      -la grafica por tecnico, el ranking y el conteo de tecnicos activos-
+      porque ahi distorsionan. NO salen de los volumenes ni del cumplimiento de
+      SLA: ese trabajo SI se hizo, y sacarlo haria que el tablero dejara de
+      cuadrar con la realidad y con el Backlog. Lo que resuelve la
+      automatizacion se ensena en su propia tarjeta, para que no se pierda de
+      vista al sacarlo del ranking.
+
+      La tabla se administra a mano. Solo van cuentas que no son personas:
+      nombres de gente real NO se capturan aqui, ni siquiera para ocultarlos.
+   ===================================================================================== */
+IF OBJECT_ID('dbo.CatCuentaNoPersona', 'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.CatCuentaNoPersona
+    (
+        -- EXACTO como aparece en dbo.Tickets.FirmaSolucion, o no empata.
+        Cuenta      NVARCHAR(255) NOT NULL,
+        -- 'Automatizacion' | 'Generica' | 'Proveedor'. Sirve para poder
+        -- separar despues cuanto resuelve un bot de cuanto resuelve un
+        -- proveedor, que son dos preguntas distintas.
+        Tipo        NVARCHAR(30)  NOT NULL
+            CONSTRAINT DF_CatCuentaNoPersona_Tipo DEFAULT (N'Generica'),
+        Nota        NVARCHAR(400) NULL,
+        Habilitado  BIT           NOT NULL
+            CONSTRAINT DF_CatCuentaNoPersona_Hab  DEFAULT (1),
+        FechaAltaDW DATETIME2(0)  NOT NULL
+            CONSTRAINT DF_CatCuentaNoPersona_Alta DEFAULT (SYSDATETIME()),
+        CONSTRAINT PK_CatCuentaNoPersona PRIMARY KEY CLUSTERED (Cuenta)
+    );
+END;
+GO
+
+/* Siembra de las que ya se detectaron. Idempotente: no pisa lo que ya haya,
+   asi que se puede volver a correr el script sin deshacer lo capturado a mano.
+
+   Estas son cuentas de sistema y de area, no de personas, por eso si pueden
+   vivir en el repositorio -que es publico-. Si alguna se quiere volver a
+   contar como persona, se pone Habilitado = 0 en vez de borrarla: asi queda
+   el rastro de que se decidio. */
+INSERT INTO dbo.CatCuentaNoPersona (Cuenta, Tipo, Nota)
+SELECT v.Cuenta, v.Tipo, v.Nota
+FROM (VALUES
+    (N'Desk, Smart',                    N'Automatizacion', N'178,694 tickets al 9-sep-2026: la barra mas alta del tablero'),
+    (N'User, Setup',                    N'Generica',       N'9,877 tickets'),
+    (N'Proactivanet, Customer Service', N'Generica',       N'3,305 tickets'),
+    (N'Energeticos, Control',           N'Generica',       N'1,219 tickets'),
+    (N'Soriana, Consulta',              N'Generica',       N'559 tickets'),
+    (N'Operaciones, Operaciones',       N'Generica',       N'122 tickets'),
+    (N'MAC, Mesa',                      N'Generica',       N'30 tickets'),
+    (N'NetLogistik, NetLogistik Soporte', N'Proveedor',    N'3 tickets')
+    -- Falta una cuenta mas, 'Soporte_NetLogistik3, ...', que en la salida del
+    -- diagnostico salio cortada. Es 1 ticket, y sembrarla adivinando el texto
+    -- no empataria con nada: se captura cuando se tenga el valor exacto.
+) AS v (Cuenta, Tipo, Nota)
+WHERE NOT EXISTS (SELECT 1 FROM dbo.CatCuentaNoPersona c WHERE c.Cuenta = v.Cuenta);
 GO
 
 /* =====================================================================================
@@ -195,6 +266,16 @@ SELECT
        rechazar. Esa diferencia es la que explica el hueco entre las dos lineas
        y por eso el tablero la ensena como tarjeta aparte. */
     EsRechazado = CASE WHEN t.Estado = N'Rechazada' THEN CONVERT(bit, 1) ELSE CONVERT(bit, 0) END,
+
+    /* Si el que firmo es una persona o una cuenta de sistema. Ver el catalogo
+       en 0c) y, sobre todo, DONDE se excluyen: de las vistas de personas si,
+       de los volumenes no. */
+    EsPersona = CASE WHEN EXISTS (
+                        SELECT 1 FROM dbo.CatCuentaNoPersona c
+                        WHERE c.Habilitado = 1
+                          AND c.Cuenta = COALESCE(NULLIF(LTRIM(RTRIM(t.FirmaSolucion)), N''),
+                                                  NULLIF(LTRIM(RTRIM(t.TecnicoSegundaLinea)), N'')))
+                     THEN CONVERT(bit, 0) ELSE CONVERT(bit, 1) END,
 
     /* Minutos hasta la primera respuesta, sacados del texto 'Nh NNm'.
 
@@ -438,7 +519,12 @@ BEGIN
             AS DECIMAL(6,2)
         ),
         GruposActivos = COUNT(DISTINCT Grupo),
-        TecnicosActivos = COUNT(DISTINCT Tecnico),
+        -- Solo personas: una cuenta de sistema no es un tecnico activo.
+        TecnicosActivos = COUNT(DISTINCT CASE WHEN EsPersona = 1 THEN Tecnico END),
+        /* Lo que resolvieron las cuentas que no son personas. Se ensena para
+           que sacarlas del ranking no las esconda: si la automatizacion cierra
+           cuatro de cada diez tickets, eso es informacion, no ruido. */
+        TicketsAutomatizados = SUM(CASE WHEN EsPersona = 0 THEN 1 ELSE 0 END),
         HorasResolucionPromedio = CAST(AVG(HorasResolucion) AS DECIMAL(18,2)),
         -- Subconsultas escalares y no un JOIN: si ningun ticket del rango
         -- tiene horas, pct no devuelve filas y un CROSS JOIN dejaria el
@@ -463,6 +549,41 @@ BEGIN
         ReasignacionesPromedio = CAST(AVG(CAST(ReasignacionesGrupo AS DECIMAL(18,2))) AS DECIMAL(18,2)),
         TicketsAltaPrioridad = SUM(CASE WHEN Prioridad IN (N'Alta', N'Crítica', N'Critica', N'Urgente') THEN 1 ELSE 0 END)
     FROM base;
+END;
+GO
+
+/* =====================================================================================
+   3b) Catalogo del Call Center: los grupos que atienden telefono y su gente
+
+      Estaba como consulta de texto en App_Code/DashboardQueries.cs. Pasa a
+      procedimiento para que ese archivo se pueda borrar entero y la logica del
+      tablero deje de vivir en dos lugares.
+
+      Sin filtro de fechas, igual que usp_Dash_Catalogos: la lista de un filtro
+      no puede encogerse por el rango que el usuario tenga puesto, o el tecnico
+      que eligio desapareceria al mover una fecha.
+
+      Los grupos salen leidos de la vista y no de la lista del parametro, para
+      que aparezcan con la grafia exacta con que estan grabados y para que uno
+      que no exista en los datos no llegue al desplegable.
+   ===================================================================================== */
+CREATE OR ALTER PROCEDURE dbo.usp_Dash_CatalogosCallCenter
+    @Grupos NVARCHAR(MAX) = N'Service Desk,End User'
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT DISTINCT Grupo
+    FROM dbo.vw_Dash_ProductividadBase
+    WHERE Grupo IN (SELECT Valor FROM dbo.fn_Dash_SplitList(@Grupos))
+    ORDER BY Grupo;
+
+    SELECT DISTINCT Tecnico
+    FROM dbo.vw_Dash_ProductividadBase
+    WHERE Tecnico IS NOT NULL
+      AND LTRIM(RTRIM(Tecnico)) <> N''
+      AND Grupo IN (SELECT Valor FROM dbo.fn_Dash_SplitList(@Grupos))
+    ORDER BY Tecnico;
 END;
 GO
 
@@ -571,6 +692,9 @@ BEGIN
       AND b.FechaFirmaSolucion < DATEADD(DAY, 1, @FechaFin)
       -- Rechazar no es resolver. Ver EsRechazado en la vista.
       AND b.EsRechazado = 0
+      -- Solo personas. Las cuentas de sistema no compiten en un ranking de
+      -- gente; lo que resuelven se ensena en su propia tarjeta. Ver 0c).
+      AND b.EsPersona = 1
       AND (NULLIF(LTRIM(RTRIM(@Grupos)), N'') IS NULL OR b.Grupo IN (SELECT Valor FROM dbo.fn_Dash_SplitList(@Grupos)))
       AND (NULLIF(LTRIM(RTRIM(@Tecnicos)), N'') IS NULL OR b.Tecnico IN (SELECT Valor FROM dbo.fn_Dash_SplitListPipe(@Tecnicos)))
     GROUP BY Tecnico
