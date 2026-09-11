@@ -23,7 +23,7 @@
    - dbo.vw_Dash_ProductividadBase  (CREATE OR ALTER, misma definicion que el script base)
    - dbo.usp_Dash_Catalogos         (catalogos de Grupo y Tecnico para poblar filtros)
    - dbo.usp_Dash_KpisMulti         (tarjetas KPI: total, cerrados, SLA, horas, etc.)
-   - dbo.usp_Dash_TendenciaMulti    (serie diaria: creados / cerrados / vencidos SLA)
+   - dbo.usp_Dash_TendenciaMulti    (serie diaria: creados por registro vs resueltos por solucion)
    - dbo.usp_Dash_ProductividadTecnicoMulti (tickets por tecnico, para grafico de barras)
    - dbo.usp_Dash_DistribucionMulti (Prioridad y vencidos por grupo, para las graficas)
    - dbo.usp_Dash_DetalleMulti      (tabla de detalle, top N)
@@ -31,7 +31,9 @@
    Notas:
    - Script idempotente. Compatible con SQL Server 2016+ (usa STRING_SPLIT).
    - @Grupos / @Tecnicos = NULL o cadena vacia significa "sin filtro" (todos).
-   - Rango de fechas inclusive: @FechaInicio <= FechaRegistro < @FechaFin + 1 dia.
+   - Rango inclusive. La pestaña mide LO RESUELTO, asi que filtra por
+     FechaFirmaSolucion. La excepcion son las series de "creados", que van por
+     FechaRegistro: un ticket entra y se resuelve en momentos distintos.
    ===================================================================================== */
 
 USE [Tickets_Proactivanet];
@@ -305,8 +307,8 @@ BEGIN
     (
         SELECT *
         FROM dbo.vw_Dash_ProductividadBase b
-        WHERE b.FechaRegistro >= @FechaInicio
-          AND b.FechaRegistro < DATEADD(DAY, 1, @FechaFin)
+        WHERE b.FechaFirmaSolucion >= @FechaInicio
+          AND b.FechaFirmaSolucion < DATEADD(DAY, 1, @FechaFin)
           AND (NULLIF(LTRIM(RTRIM(@Grupos)), N'') IS NULL OR b.Grupo IN (SELECT Valor FROM dbo.fn_Dash_SplitList(@Grupos)))
           AND (NULLIF(LTRIM(RTRIM(@Tecnicos)), N'') IS NULL OR b.Tecnico IN (SELECT Valor FROM dbo.fn_Dash_SplitListPipe(@Tecnicos)))
     ),
@@ -333,9 +335,21 @@ BEGIN
     SELECT
         FechaInicio = @FechaInicio,
         FechaFin = @FechaFin,
-        TicketsTotales = COUNT_BIG(*),
-        TicketsCerrados = SUM(CASE WHEN EstaCerrado = 1 THEN 1 ELSE 0 END),
-        TicketsAbiertos = SUM(CASE WHEN EstaAbierto = 1 THEN 1 ELSE 0 END),
+        -- Lo que el equipo despacho en el periodo. Antes era TicketsTotales y
+        -- contaba la camada CREADA en el rango, que no es lo mismo.
+        TicketsResueltos = COUNT_BIG(*),
+        -- Lo que entro en el mismo periodo, contado por SU fecha. Es el
+        -- balance: si entraron mas de los que salieron, el backlog crecio.
+        -- Unica cifra de la pestaña medida por fecha de registro, y por eso va
+        -- como subconsulta con su propio predicado.
+        TicketsCreados = (
+            SELECT COUNT_BIG(*)
+            FROM dbo.vw_Dash_ProductividadBase b2
+            WHERE b2.FechaRegistro >= @FechaInicio
+              AND b2.FechaRegistro < DATEADD(DAY, 1, @FechaFin)
+              AND (NULLIF(LTRIM(RTRIM(@Grupos)), N'') IS NULL OR b2.Grupo IN (SELECT Valor FROM dbo.fn_Dash_SplitList(@Grupos)))
+              AND (NULLIF(LTRIM(RTRIM(@Tecnicos)), N'') IS NULL OR b2.Tecnico IN (SELECT Valor FROM dbo.fn_Dash_SplitListPipe(@Tecnicos)))
+        ),
         TicketsSlaEvaluable = SUM(CASE WHEN SlaEvaluable = 1 THEN 1 ELSE 0 END),
         TicketsSlaVencidos = SUM(CASE WHEN SlaVencido = 1 THEN 1 ELSE 0 END),
         TicketsDentroSla = SUM(CASE WHEN DentroSla = 1 THEN 1 ELSE 0 END),
@@ -360,7 +374,21 @@ END;
 GO
 
 /* =====================================================================================
-   4) Tendencia diaria (grafico de linea: creados / cerrados / vencidos SLA)
+   4) Entra vs sale, por dia
+
+      CADA SERIE SE CUENTA POR SU PROPIA FECHA, y por eso son dos consultas
+      unidas con FULL OUTER JOIN en vez de un GROUP BY.
+
+      Antes las dos salian del mismo GROUP BY por fecha de registro, asi que
+      "Cerrados" no era cuantos se cerraron ese dia: era, de los creados ese
+      dia, cuantos ya estan cerrados hoy. Por construccion esa linea NO podia
+      superar a la de creados, y los ultimos dias siempre se veian mal porque
+      aun no daba tiempo de resolverlos. La caida del final no era una caida,
+      era el calendario, y llevaba a conclusiones al reves.
+
+      El FULL OUTER es a proposito: hay dias en que solo entraron tickets y
+      dias en que solo se resolvieron. Con un INNER se perderian justo los dias
+      que explican el desbalance.
    ===================================================================================== */
 CREATE OR ALTER PROCEDURE dbo.usp_Dash_TendenciaMulti
     @FechaInicio DATE,
@@ -371,24 +399,42 @@ AS
 BEGIN
     SET NOCOUNT ON;
 
+    ;WITH cre AS (
+        SELECT Fecha = b.FechaRegistroDia, TicketsCreados = COUNT_BIG(*)
+        FROM dbo.vw_Dash_ProductividadBase b
+        WHERE b.FechaRegistro >= @FechaInicio
+          AND b.FechaRegistro < DATEADD(DAY, 1, @FechaFin)
+          AND (NULLIF(LTRIM(RTRIM(@Grupos)), N'') IS NULL OR b.Grupo IN (SELECT Valor FROM dbo.fn_Dash_SplitList(@Grupos)))
+          AND (NULLIF(LTRIM(RTRIM(@Tecnicos)), N'') IS NULL OR b.Tecnico IN (SELECT Valor FROM dbo.fn_Dash_SplitListPipe(@Tecnicos)))
+        GROUP BY b.FechaRegistroDia
+    ),
+    res AS (
+        SELECT Fecha = CONVERT(DATE, b.FechaFirmaSolucion),
+               TicketsResueltos = COUNT_BIG(*),
+               TicketsSlaVencidos = SUM(CASE WHEN b.SlaVencido = 1 THEN 1 ELSE 0 END),
+               -- Numerador y denominador del cumplimiento, no el porcentaje: el
+               -- tablero agrupa por dia, mes o SLOT segun el rango, y un
+               -- porcentaje diario no se puede promediar para sacar el del mes
+               -- -un dia con 2 tickets pesaria igual que uno con 200-.
+               TicketsSlaEvaluable = SUM(CASE WHEN b.SlaEvaluable = 1 THEN 1 ELSE 0 END),
+               TicketsDentroSla    = SUM(CASE WHEN b.SlaEvaluable = 1 AND b.DentroSla = 1 THEN 1 ELSE 0 END)
+        FROM dbo.vw_Dash_ProductividadBase b
+        WHERE b.FechaFirmaSolucion >= @FechaInicio
+          AND b.FechaFirmaSolucion < DATEADD(DAY, 1, @FechaFin)
+          AND (NULLIF(LTRIM(RTRIM(@Grupos)), N'') IS NULL OR b.Grupo IN (SELECT Valor FROM dbo.fn_Dash_SplitList(@Grupos)))
+          AND (NULLIF(LTRIM(RTRIM(@Tecnicos)), N'') IS NULL OR b.Tecnico IN (SELECT Valor FROM dbo.fn_Dash_SplitListPipe(@Tecnicos)))
+        GROUP BY CONVERT(DATE, b.FechaFirmaSolucion)
+    )
     SELECT
-        Fecha = FechaRegistroDia,
-        TicketsCreados = COUNT_BIG(*),
-        TicketsCerrados = SUM(CASE WHEN EstaCerrado = 1 THEN 1 ELSE 0 END),
-        TicketsSlaVencidos = SUM(CASE WHEN SlaVencido = 1 THEN 1 ELSE 0 END),
-        -- Para la grafica de cumplimiento en el tiempo. Se mandan los dos
-        -- conteos y no el porcentaje: el tablero agrupa por dia, mes o SLOT
-        -- segun el rango, y un porcentaje diario no se puede promediar para
-        -- sacar el del mes -un dia con 2 tickets pesaria igual que uno con 200-.
-        TicketsSlaEvaluable = SUM(CASE WHEN SlaEvaluable = 1 THEN 1 ELSE 0 END),
-        TicketsDentroSla    = SUM(CASE WHEN SlaEvaluable = 1 AND DentroSla = 1 THEN 1 ELSE 0 END)
-    FROM dbo.vw_Dash_ProductividadBase b
-    WHERE b.FechaRegistro >= @FechaInicio
-      AND b.FechaRegistro < DATEADD(DAY, 1, @FechaFin)
-      AND (NULLIF(LTRIM(RTRIM(@Grupos)), N'') IS NULL OR b.Grupo IN (SELECT Valor FROM dbo.fn_Dash_SplitList(@Grupos)))
-      AND (NULLIF(LTRIM(RTRIM(@Tecnicos)), N'') IS NULL OR b.Tecnico IN (SELECT Valor FROM dbo.fn_Dash_SplitListPipe(@Tecnicos)))
-    GROUP BY FechaRegistroDia
-    ORDER BY FechaRegistroDia;
+        Fecha               = COALESCE(c.Fecha, r.Fecha),
+        TicketsCreados      = ISNULL(c.TicketsCreados, 0),
+        TicketsResueltos    = ISNULL(r.TicketsResueltos, 0),
+        TicketsSlaVencidos  = ISNULL(r.TicketsSlaVencidos, 0),
+        TicketsSlaEvaluable = ISNULL(r.TicketsSlaEvaluable, 0),
+        TicketsDentroSla    = ISNULL(r.TicketsDentroSla, 0)
+    FROM cre AS c
+    FULL OUTER JOIN res AS r ON r.Fecha = c.Fecha
+    ORDER BY COALESCE(c.Fecha, r.Fecha);
 END;
 GO
 
@@ -406,10 +452,12 @@ BEGIN
 
     SELECT
         Tecnico,
+        /* Ya no salen TicketsTotales, TicketsCerrados ni TicketsAbiertos: con
+           el rango filtrando por fecha de solucion los tres colapsan -todo lo
+           que entra esta resuelto-, asi que totales y cerrados serian el mismo
+           numero y abiertos cero en todas las filas. */
         Grupo = MAX(Grupo),
-        TicketsTotales = COUNT_BIG(*),
-        TicketsCerrados = SUM(CASE WHEN EstaCerrado = 1 THEN 1 ELSE 0 END),
-        TicketsAbiertos = SUM(CASE WHEN EstaAbierto = 1 THEN 1 ELSE 0 END),
+        TicketsResueltos = COUNT_BIG(*),
         TicketsSlaVencidos = SUM(CASE WHEN SlaVencido = 1 THEN 1 ELSE 0 END),
         CumplimientoSlaPct = CAST(
             100.0 * SUM(CASE WHEN SlaEvaluable = 1 AND DentroSla = 1 THEN 1 ELSE 0 END)
@@ -418,12 +466,12 @@ BEGIN
         ),
         HorasResolucionPromedio = CAST(AVG(HorasResolucion) AS DECIMAL(18,2))
     FROM dbo.vw_Dash_ProductividadBase b
-    WHERE b.FechaRegistro >= @FechaInicio
-      AND b.FechaRegistro < DATEADD(DAY, 1, @FechaFin)
+    WHERE b.FechaFirmaSolucion >= @FechaInicio
+      AND b.FechaFirmaSolucion < DATEADD(DAY, 1, @FechaFin)
       AND (NULLIF(LTRIM(RTRIM(@Grupos)), N'') IS NULL OR b.Grupo IN (SELECT Valor FROM dbo.fn_Dash_SplitList(@Grupos)))
       AND (NULLIF(LTRIM(RTRIM(@Tecnicos)), N'') IS NULL OR b.Tecnico IN (SELECT Valor FROM dbo.fn_Dash_SplitListPipe(@Tecnicos)))
     GROUP BY Tecnico
-    ORDER BY TicketsTotales DESC, Tecnico;
+    ORDER BY TicketsResueltos DESC, Tecnico;
 END;
 GO
 
@@ -460,8 +508,8 @@ BEGIN
         DentroSla
     INTO #DistribucionBase
     FROM dbo.vw_Dash_ProductividadBase b
-    WHERE b.FechaRegistro >= @FechaInicio
-      AND b.FechaRegistro < DATEADD(DAY, 1, @FechaFin)
+    WHERE b.FechaFirmaSolucion >= @FechaInicio
+      AND b.FechaFirmaSolucion < DATEADD(DAY, 1, @FechaFin)
       AND (NULLIF(LTRIM(RTRIM(@Grupos)), N'') IS NULL OR b.Grupo IN (SELECT Valor FROM dbo.fn_Dash_SplitList(@Grupos)))
       AND (NULLIF(LTRIM(RTRIM(@Tecnicos)), N'') IS NULL OR b.Tecnico IN (SELECT Valor FROM dbo.fn_Dash_SplitListPipe(@Tecnicos)));
 
@@ -513,6 +561,9 @@ BEGIN
     SELECT TOP (@TopSeguro)
         CodigoTicket,
         FechaRegistro,
+        -- Es la fecha por la que ahora se filtra el rango, asi que tiene que
+        -- viajar: el cross-filter reagrupa la tendencia con ella.
+        FechaFirmaSolucion,
         Grupo,
         Tecnico,
         -- Se mandan los dos: cuando difieren, el detalle es el unico lugar
@@ -537,11 +588,13 @@ BEGIN
         ReasignacionesGrupo,
         Tienda
     FROM dbo.vw_Dash_ProductividadBase b
-    WHERE b.FechaRegistro >= @FechaInicio
-      AND b.FechaRegistro < DATEADD(DAY, 1, @FechaFin)
+    WHERE b.FechaFirmaSolucion >= @FechaInicio
+      AND b.FechaFirmaSolucion < DATEADD(DAY, 1, @FechaFin)
       AND (NULLIF(LTRIM(RTRIM(@Grupos)), N'') IS NULL OR b.Grupo IN (SELECT Valor FROM dbo.fn_Dash_SplitList(@Grupos)))
       AND (NULLIF(LTRIM(RTRIM(@Tecnicos)), N'') IS NULL OR b.Tecnico IN (SELECT Valor FROM dbo.fn_Dash_SplitListPipe(@Tecnicos)))
-    ORDER BY FechaRegistro DESC;
+    -- Por fecha de solucion, que es por la que se filtra: ordenar por
+    -- registro dejaria arriba los mas nuevos y no los recien resueltos.
+    ORDER BY FechaFirmaSolucion DESC;
 END;
 GO
 

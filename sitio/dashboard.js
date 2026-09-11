@@ -1336,10 +1336,22 @@ const TableroSla = (function () {
   }
 
   // ---------------------------------------------------------------------- KPIs
+  /* Pie de la tarjeta de "Creados": el balance del periodo en una frase.
+     Entraron mas de los que salieron -> el backlog crecio, y de cuanto. Es la
+     lectura que nadie hace sola mirando dos numeros pegados. */
+  function balanceTexto(creados, resueltos) {
+    const d = resueltos - creados;
+    if (!creados && !resueltos) return 'sin movimiento en el periodo';
+    if (d === 0) return 'entraron y salieron los mismos';
+    return d > 0
+      ? `se resolvieron ${FMT(d)} mas de los que entraron`
+      : `entraron ${FMT(-d)} mas de los que se resolvieron`;
+  }
+
   function renderKpis() {
     const cont = document.getElementById('kpis');
     const k = datos.kpis || {};
-    const totalRango = k.TicketsTotales ?? 0;
+    const totalRango = k.TicketsResueltos ?? 0;
 
     let tarjetas;
     if (!hayFiltro()) {
@@ -1348,14 +1360,16 @@ const TableroSla = (function () {
       const evaluables = k.TicketsSlaEvaluable ?? 0;
       const vencidos = k.TicketsSlaVencidos ?? 0;
       tarjetas = [
-        /* La tarjeta "Abiertos" se quito: lo pendiente es la pregunta del
-           Backlog, y aqui ademas se contaba sobre otro recorte, asi que las
-           dos pestañas daban numeros distintos para lo mismo. Lo abierto de
-           esta camada sigue visible en el pie de "Tickets totales", que es
-           donde no compite con el KPI de la otra pestaña. */
-        { l: 'Tickets totales', v: FMT(totalRango),
-          f: `${FMT(k.TicketsAbiertos ?? 0)} abiertos · ${FMT(k.TicketsCerrados ?? 0)} cerrados` },
-        { l: 'Cerrados', v: FMT(k.TicketsCerrados ?? 0), f: `${PCT(k.TicketsCerrados ?? 0, totalRango)} del total` },
+        /* Resueltos y creados, cada uno por SU fecha. Juntos son el balance
+           del periodo: si entraron mas de los que salieron, el backlog crecio.
+           Ya no hay tarjeta de "abiertos" ni de "cerrados": lo pendiente es la
+           pregunta del Backlog, y con el rango filtrando por fecha de solucion
+           todo lo que cuenta esta pestaña esta resuelto, asi que "cerrados"
+           seria el total otra vez. */
+        { l: 'Resueltos', v: FMT(totalRango),
+          f: `lo que el equipo despacho` },
+        { l: 'Creados', v: FMT(k.TicketsCreados ?? 0),
+          f: balanceTexto(k.TicketsCreados ?? 0, totalRango) },
         { l: 'Cumplimiento SLA', v: cumpl !== null ? `${cumpl}%` : 'N/D',
           f: evaluables ? `${FMT(k.TicketsDentroSla ?? 0)} de ${FMT(evaluables)} evaluables` : 'sin SLA evaluable',
           s: cumpl !== null ? SEM(cumpl) : '' },
@@ -1368,7 +1382,7 @@ const TableroSla = (function () {
            promedio sigue en el pie, para quien lo tenga que cuadrar contra un
            reporte viejo. */
         { l: 'Horas resolucion (mediana)', v: k.HorasResolucionMediana ?? 'N/D',
-          f: k.HorasResolucionPromedio ? `promedio ${k.HorasResolucionPromedio} h` : 'solo tickets cerrados' },
+          f: k.HorasResolucionPromedio ? `promedio ${k.HorasResolucionPromedio} h` : 'de registro a solucion' },
         { l: 'Horas resolucion (p90)', v: k.HorasResolucionP90 ?? 'N/D',
           f: '9 de cada 10 tardaron menos' },
         { l: 'Tecnicos activos', v: FMT(k.TecnicosActivos ?? 0), f: `${FMT(k.GruposActivos ?? 0)} grupos activos` },
@@ -1380,7 +1394,6 @@ const TableroSla = (function () {
       const f = filas(null);
       const n = f.length;
       const cargadas = (datos.detalle || []).length;
-      const abiertos = f.filter(r => !r.FechaFirmaCierre).length;
       const vencidos = f.filter(r => r.SlaVencido === true || r.SlaVencido === 1).length;
       const dentro = f.filter(r => r.DentroSla === true || r.DentroSla === 1).length;
       const evaluables = vencidos + dentro;
@@ -1401,14 +1414,13 @@ const TableroSla = (function () {
       const deN = `filtrado: ${FMT(n)} de ${FMT(cargadas)} cargados`;
 
       tarjetas = [
-        { l: 'Tickets filtrados', v: FMT(n), f: `${deN} · ${FMT(abiertos)} abiertos` },
-        { l: 'Cerrados', v: FMT(n - abiertos), f: `${PCT(n - abiertos, n)} de lo filtrado` },
+        { l: 'Resueltos (filtrado)', v: FMT(n), f: deN },
         { l: 'Cumplimiento SLA', v: cumpl !== null ? `${cumpl}%` : 'N/D',
           f: evaluables ? `${FMT(dentro)} de ${FMT(evaluables)} evaluables` : 'sin SLA evaluable',
           s: cumpl !== null ? SEM(cumpl) : '' },
         { l: 'Vencidos SLA', v: FMT(vencidos), f: `${PCT(vencidos, n)} de lo filtrado`, s: vencidos > 0 ? 'sr' : 'sv' },
         { l: 'Horas resolucion (mediana)', v: mediana ?? 'N/D',
-          f: `${FMT(horas.length)} tickets cerrados${promedio !== null ? ` · promedio ${promedio} h` : ''}` },
+          f: `${FMT(horas.length)} tickets resueltos${promedio !== null ? ` · promedio ${promedio} h` : ''}` },
         { l: 'Tecnicos', v: FMT(new Set(f.map(r => r.Tecnico).filter(Boolean)).size), f: 'en lo filtrado' },
         { l: 'Grupos', v: FMT(new Set(f.map(r => r.Grupo).filter(Boolean)).size), f: 'en lo filtrado' },
       ];
@@ -1441,22 +1453,29 @@ const TableroSla = (function () {
       // igual que en la rama filtrada de abajo.
       etiquetas = f.map(x => String(x.Fecha ?? '').slice(0, 10));
       creados = f.map(x => x.TicketsCreados);
-      cerrados = f.map(x => x.TicketsCerrados);
+      cerrados = f.map(x => x.TicketsResueltos);
       vencidos = f.map(x => x.TicketsSlaVencidos);
       dentro = f.map(x => x.TicketsDentroSla ?? 0);
       evaluables = f.map(x => x.TicketsSlaEvaluable ?? 0);
-      hint.textContent = 'creados vs cerrados vs vencidos';
+      hint.textContent = 'creados (por registro) vs resueltos (por solucion)';
     } else {
       // Recalculada sobre las filas filtradas, agrupando por dia de registro.
+      /* Agrupa por fecha de SOLUCION, igual que el servidor. Antes agrupaba
+         por fecha de registro; ahora que el rango filtra por solucion, esas
+         fechas se van meses hacia atras y el eje X se estiraria fuera del
+         periodo que el usuario eligio.
+
+         Aqui "creados" no se puede recalcular -el detalle solo trae lo
+         resuelto en el rango-, asi que esa serie se queda en cero mientras el
+         cross-filter este activo y el pie de la grafica lo dice. */
       const f = filas(null);
       const porDia = new Map();
       for (const r of f) {
-        const d = String(r.FechaRegistro ?? '').slice(0, 10);
+        const d = String(r.FechaFirmaSolucion ?? '').slice(0, 10);
         if (!d) continue;
         if (!porDia.has(d)) porDia.set(d, { c: 0, cer: 0, ven: 0, den: 0, num: 0 });
         const a = porDia.get(d);
-        a.c++;
-        if (r.FechaFirmaCierre) a.cer++;
+        a.cer++;
         const ven = (r.SlaVencido === true || r.SlaVencido === 1);
         const den = (r.DentroSla === true || r.DentroSla === 1);
         if (ven) a.ven++;
@@ -1467,12 +1486,12 @@ const TableroSla = (function () {
       }
       const dias = [...porDia.keys()].sort();
       etiquetas = dias;
-      creados = dias.map(d => porDia.get(d).c);
+      creados = dias.map(() => 0);
       cerrados = dias.map(d => porDia.get(d).cer);
       vencidos = dias.map(d => porDia.get(d).ven);
       dentro = dias.map(d => porDia.get(d).num);
       evaluables = dias.map(d => porDia.get(d).den);
-      hint.textContent = 'recalculada sobre lo filtrado';
+      hint.textContent = 'resueltos, recalculado sobre lo filtrado (creados no aplica)';
     }
 
     /* Granularidad del eje. Es lo unico que decide este bloque: las series de
@@ -1570,7 +1589,7 @@ const TableroSla = (function () {
           labels: etiquetas,
           datasets: [
             serie('Creados', creados, AZUL, true),
-            serie('Cerrados', cerrados, VERDE_S),
+            serie('Resueltos', cerrados, VERDE_S),
             serie('Vencidos SLA', vencidos, ROJO),
           ]
         },
@@ -1636,35 +1655,42 @@ const TableroSla = (function () {
       });
   }
 
+  /* Resueltos y, de esos, cuantos se pasaron del SLA.
+
+     Antes eran "Totales" y "Cerrados" sobre la camada creada en el rango. Con
+     el rango filtrando por fecha de solucion las dos series colapsan -todo lo
+     que entra aqui esta resuelto-, asi que la segunda pasa a ser los vencidos:
+     quien resuelve mucho y quien ademas resuelve a tiempo son dos preguntas
+     distintas, y esta grafica ahora contesta las dos. */
   function renderProductividad() {
     let etiquetas, totales, cerrados;
 
     if (!hayFiltro()) {
       const top = (datos.productividad || []).slice(0, 15);
       etiquetas = top.map(x => x.Tecnico);
-      totales = top.map(x => x.TicketsTotales);
-      cerrados = top.map(x => x.TicketsCerrados);
+      totales = top.map(x => x.TicketsResueltos);
+      cerrados = top.map(x => x.TicketsSlaVencidos);
     } else {
       const f = filas(null);
       const m = new Map();
       for (const r of f) {
         const t = r.Tecnico || '(sin tecnico)';
-        if (!m.has(t)) m.set(t, { tot: 0, cer: 0 });
+        if (!m.has(t)) m.set(t, { tot: 0, ven: 0 });
         const a = m.get(t);
         a.tot++;
-        if (r.FechaFirmaCierre) a.cer++;
+        if (r.SlaVencido === true || r.SlaVencido === 1) a.ven++;
       }
       const top = [...m.entries()].sort((a, b) => b[1].tot - a[1].tot).slice(0, 15);
       etiquetas = top.map(e => e[0]);
       totales = top.map(e => e[1].tot);
-      cerrados = top.map(e => e[1].cer);
+      cerrados = top.map(e => e[1].ven);
     }
 
     if (!etiquetas.length) {
       destruir('productividad');
       return renderEmptyChart('chart-productividad', hayFiltro()
         ? 'Ningun tecnico tiene tickets con los filtros activos.'
-        : 'Sin tickets asignados en el rango de fechas.');
+        : 'Nadie resolvio tickets en el rango de fechas.');
     }
 
     dibujarGrafico(graficos, 'productividad', 'chart-productividad',
@@ -1679,8 +1705,8 @@ const TableroSla = (function () {
         data: {
           labels: etiquetas,
           datasets: [
-            { ...Barras.GRUESA, label: 'Totales', data: totales, backgroundColor: BARRA_A, borderRadius: 6 },
-            { ...Barras.GRUESA, label: 'Cerrados', data: cerrados, backgroundColor: BARRA_B, borderRadius: 6 },
+            { ...Barras.GRUESA, label: 'Resueltos', data: totales, backgroundColor: BARRA_A, borderRadius: 6 },
+            { ...Barras.GRUESA, label: 'Vencidos SLA', data: cerrados, backgroundColor: ROJO, borderRadius: 6 },
           ]
         },
         options: {
@@ -1910,10 +1936,10 @@ const TableroSla = (function () {
     const g = seleccionados('f-grupos');
     const txt = g.length ? `Grupos: ${escapeHtml(g.join(' · '))}` : 'todos los grupos';
     const per = `<span class="suave">${escapeHtml(periodoRanking())}</span><br>`;
-    if (!personas) return `${per}0 tickets cerrados <span class="suave">· ${txt}</span>`;
+    if (!personas) return `${per}0 tickets resueltos <span class="suave">· ${txt}</span>`;
     const corte = mostradas < personas
       ? ` · top ${mostradas} de ${FMT(personas)} personas` : '';
-    return `${per}${FMT(totalCerrados)} tickets cerrados <span class="suave">· ${txt}${corte}</span>`;
+    return `${per}${FMT(totalCerrados)} tickets resueltos <span class="suave">· ${txt}${corte}</span>`;
   }
 
   function renderTopCerrados() {
@@ -1923,14 +1949,14 @@ const TableroSla = (function () {
       .map(x => ({
         tecnico: x.Tecnico || '(sin tecnico)',
         grupo: x.Grupo || '',
-        cerrados: Number(x.TicketsCerrados) || 0,
-        totales: Number(x.TicketsTotales) || 0,
+        cerrados: Number(x.TicketsResueltos) || 0,
+        totales: Number(x.TicketsResueltos) || 0,
       }))
       .filter(x => x.cerrados > 0)
       .sort((a, b) => b.cerrados - a.cerrados);
 
     if (!ranking.length) {
-      cont.innerHTML = `<div class="vacio">Sin tickets cerrados en ${
+      cont.innerHTML = `<div class="vacio">Sin tickets resueltos en ${
         enModoSlot() ? 'los SLOT seleccionados' : `los ultimos ${DIAS_RANKING} dias completos`
       } para estos grupos.</div>`;
       cap.innerHTML = descripcionTopCerrados(0, 0, 0);

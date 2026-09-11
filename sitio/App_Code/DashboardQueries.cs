@@ -95,19 +95,41 @@ public static class DashboardQueries
         return salida;
     }
 
-    // Predicado WHERE compartido por las cinco consultas. Devuelve el texto y
-    // deja los parametros cargados en el comando. Una lista vacia = sin
-    // filtro, igual que el NULL que recibian los procedimientos.
-    private static string Where(SqlCommand cmd, Filtros f)
+    /* Los dos predicados WHERE que usan las consultas. Devuelve los textos y
+       deja los parametros cargados en el comando. Una lista vacia = sin
+       filtro, igual que el NULL que recibian los procedimientos.
+
+       SON DOS PORQUE LA PESTAÑA MIDE DOS COSAS CON DOS FECHAS DISTINTAS.
+
+       {0}, por FECHA DE SOLUCION, es el predicado principal: "septiembre"
+       significa lo que el equipo resolvio en septiembre, sin importar cuando
+       entro el ticket. Antes todo se filtraba por fecha de registro, o sea por
+       la camada que NACIO en el rango, y por eso el ranking de productividad
+       no medía lo que la gente hizo: incluia un ticket creado el dia 2 que se
+       resolveria en noviembre y dejaba fuera uno de julio resuelto el dia 3.
+
+       {1}, por FECHA DE REGISTRO, solo lo usan las series de "creados". Un
+       ticket se crea y se resuelve en momentos distintos, asi que cada serie
+       tiene que contarse por su propia fecha; si las dos se filtraran igual,
+       una de las dos mentiria.
+
+       Los IN de grupo y tecnico se arman UNA sola vez y se reusan en los dos:
+       llamar dos veces a EnLista agregaria @g0/@t0 repetidos y SqlCommand
+       truena con "parameter has already been declared". */
+    private static void Predicados(SqlCommand cmd, Filtros f,
+                                   out string porSolucion, out string porRegistro)
     {
         cmd.Parameters.Add("@FechaInicio", SqlDbType.Date).Value = f.FechaInicio;
         cmd.Parameters.Add("@FechaFin", SqlDbType.Date).Value = f.FechaFin;
 
-        var sb = new StringBuilder();
-        sb.Append("b.FechaRegistro >= @FechaInicio AND b.FechaRegistro < DATEADD(DAY, 1, @FechaFin)");
-        sb.Append(EnLista(cmd, "b.Grupo", "g", f.Grupos));
-        sb.Append(EnLista(cmd, "b.Tecnico", "t", f.Tecnicos));
-        return sb.ToString();
+        var comunes = new StringBuilder();
+        comunes.Append(EnLista(cmd, "b.Grupo", "g", f.Grupos));
+        comunes.Append(EnLista(cmd, "b.Tecnico", "t", f.Tecnicos));
+
+        porSolucion = "b.FechaFirmaSolucion >= @FechaInicio"
+                    + " AND b.FechaFirmaSolucion < DATEADD(DAY, 1, @FechaFin)" + comunes;
+        porRegistro = "b.FechaRegistro >= @FechaInicio"
+                    + " AND b.FechaRegistro < DATEADD(DAY, 1, @FechaFin)" + comunes;
     }
 
     // "AND columna IN (@t0, @t1, ...)" con un parametro por valor: los nombres
@@ -146,7 +168,11 @@ public static class DashboardQueries
         {
             cmd.Connection = cn;
             cmd.CommandType = CommandType.Text;
-            cmd.CommandText = string.Format(sql, Where(cmd, f));
+            // {0} = por fecha de solucion, {1} = por fecha de registro. Una
+            // consulta que solo use {0} ignora el segundo sin problema.
+            string porSolucion, porRegistro;
+            Predicados(cmd, f, out porSolucion, out porRegistro);
+            cmd.CommandText = string.Format(sql, porSolucion, porRegistro);
             if (extra != null) extra(cmd);
 
             cn.Open();
@@ -218,9 +244,14 @@ pct AS
 SELECT
     FechaInicio = @FechaInicio,
     FechaFin = @FechaFin,
-    TicketsTotales = COUNT_BIG(*),
-    TicketsCerrados = SUM(CASE WHEN EstaCerrado = 1 THEN 1 ELSE 0 END),
-    TicketsAbiertos = SUM(CASE WHEN EstaAbierto = 1 THEN 1 ELSE 0 END),
+    /* Lo que el equipo despacho en el periodo. Antes era TicketsTotales y
+       contaba la camada creada en el rango, que no es lo mismo ni se parece. */
+    TicketsResueltos = COUNT_BIG(*),
+    /* Lo que entro en el mismo periodo, contado por SU fecha. Sirve de balance:
+       si entraron mas de los que salieron, el backlog crecio esa semana. Es la
+       unica cifra de la pestaña que se mide por fecha de registro, y por eso
+       va como subconsulta con su propio predicado en vez de salir del FROM. */
+    TicketsCreados = (SELECT COUNT_BIG(*) FROM dbo.vw_Dash_ProductividadBase b WHERE {1}),
     TicketsSlaEvaluable = SUM(CASE WHEN SlaEvaluable = 1 THEN 1 ELSE 0 END),
     TicketsSlaVencidos = SUM(CASE WHEN SlaVencido = 1 THEN 1 ELSE 0 END),
     TicketsDentroSla = SUM(CASE WHEN DentroSla = 1 THEN 1 ELSE 0 END),
@@ -257,27 +288,54 @@ FROM base;";
         return filas.Count > 0 ? filas[0] : new Dictionary<string, object>();
     }
 
-    // Cuerpo de dbo.usp_Dash_TendenciaMulti.
+    /* Cuerpo de dbo.usp_Dash_TendenciaMulti.
+
+       CADA SERIE SE CUENTA POR SU PROPIA FECHA, y por eso son dos consultas
+       unidas con FULL OUTER JOIN en vez de un GROUP BY.
+
+       Antes las dos salian del mismo GROUP BY por fecha de registro, asi que
+       "Cerrados" no era cuantos se cerraron ese dia: era, de los creados ese
+       dia, cuantos ya estan cerrados hoy. Por construccion esa linea NO podia
+       superar a la de creados, y los ultimos dias siempre se veian mal porque
+       aun no daba tiempo de resolverlos. La caida del final no era una caida,
+       era el calendario, y llevaba a conclusiones al reves.
+
+       El FULL OUTER es a proposito: hay dias en que solo entraron tickets y
+       dias en que solo se resolvieron. Con un INNER se perderian justo los
+       dias que explican el desbalance. */
     public static List<Dictionary<string, object>> Tendencia(Filtros f)
     {
         const string sql = @"
+;WITH cre AS (
+    SELECT Fecha = FechaRegistroDia, TicketsCreados = COUNT_BIG(*)
+    FROM dbo.vw_Dash_ProductividadBase b
+    WHERE {1}
+    GROUP BY FechaRegistroDia
+),
+res AS (
+    SELECT Fecha = CONVERT(DATE, b.FechaFirmaSolucion),
+           TicketsResueltos = COUNT_BIG(*),
+           TicketsSlaVencidos = SUM(CASE WHEN SlaVencido = 1 THEN 1 ELSE 0 END),
+           /* Numerador y denominador del cumplimiento, no el porcentaje ya
+              calculado: el tablero agrupa por dia, por mes o por SLOT segun el
+              rango, y un porcentaje diario NO se puede promediar para obtener
+              el del mes -un dia con 2 tickets pesaria igual que uno con 200-. */
+           TicketsSlaEvaluable = SUM(CASE WHEN SlaEvaluable = 1 THEN 1 ELSE 0 END),
+           TicketsDentroSla    = SUM(CASE WHEN SlaEvaluable = 1 AND DentroSla = 1 THEN 1 ELSE 0 END)
+    FROM dbo.vw_Dash_ProductividadBase b
+    WHERE {0}
+    GROUP BY CONVERT(DATE, b.FechaFirmaSolucion)
+)
 SELECT
-    Fecha = FechaRegistroDia,
-    TicketsCreados = COUNT_BIG(*),
-    TicketsCerrados = SUM(CASE WHEN EstaCerrado = 1 THEN 1 ELSE 0 END),
-    TicketsSlaVencidos = SUM(CASE WHEN SlaVencido = 1 THEN 1 ELSE 0 END),
-    /* Para la grafica de cumplimiento en el tiempo. Se mandan los dos conteos
-       y no el porcentaje ya calculado: el tablero agrupa la tendencia por dia,
-       por mes o por SLOT segun el rango, y un porcentaje diario NO se puede
-       promediar para obtener el del mes -un dia con 2 tickets pesaria igual
-       que uno con 200-. Con numerador y denominador, cada bucket suma y
-       divide, que es lo correcto. */
-    TicketsSlaEvaluable = SUM(CASE WHEN SlaEvaluable = 1 THEN 1 ELSE 0 END),
-    TicketsDentroSla    = SUM(CASE WHEN SlaEvaluable = 1 AND DentroSla = 1 THEN 1 ELSE 0 END)
-FROM dbo.vw_Dash_ProductividadBase b
-WHERE {0}
-GROUP BY FechaRegistroDia
-ORDER BY FechaRegistroDia;";
+    Fecha               = COALESCE(c.Fecha, r.Fecha),
+    TicketsCreados      = ISNULL(c.TicketsCreados, 0),
+    TicketsResueltos    = ISNULL(r.TicketsResueltos, 0),
+    TicketsSlaVencidos  = ISNULL(r.TicketsSlaVencidos, 0),
+    TicketsSlaEvaluable = ISNULL(r.TicketsSlaEvaluable, 0),
+    TicketsDentroSla    = ISNULL(r.TicketsDentroSla, 0)
+FROM cre AS c
+FULL OUTER JOIN res AS r ON r.Fecha = c.Fecha
+ORDER BY COALESCE(c.Fecha, r.Fecha);";
 
         return Unico(sql, f, null);
     }
@@ -286,12 +344,14 @@ ORDER BY FechaRegistroDia;";
     public static List<Dictionary<string, object>> Productividad(Filtros f)
     {
         const string sql = @"
+/* Ya no salen TicketsTotales, TicketsCerrados ni TicketsAbiertos. Con el
+   rango filtrando por fecha de solucion, los tres colapsaban: todo lo que
+   entra a esta consulta esta resuelto, asi que totales y cerrados serian el
+   mismo numero y abiertos seria cero en todas las filas. */
 SELECT
     Tecnico,
     Grupo = MAX(Grupo),
-    TicketsTotales = COUNT_BIG(*),
-    TicketsCerrados = SUM(CASE WHEN EstaCerrado = 1 THEN 1 ELSE 0 END),
-    TicketsAbiertos = SUM(CASE WHEN EstaAbierto = 1 THEN 1 ELSE 0 END),
+    TicketsResueltos = COUNT_BIG(*),
     TicketsSlaVencidos = SUM(CASE WHEN SlaVencido = 1 THEN 1 ELSE 0 END),
     CumplimientoSlaPct = CAST(
         100.0 * SUM(CASE WHEN SlaEvaluable = 1 AND DentroSla = 1 THEN 1 ELSE 0 END)
@@ -302,7 +362,7 @@ SELECT
 FROM dbo.vw_Dash_ProductividadBase b
 WHERE {0}
 GROUP BY Tecnico
-ORDER BY TicketsTotales DESC, Tecnico;";
+ORDER BY TicketsResueltos DESC, Tecnico;";
 
         return Unico(sql, f, null);
     }
@@ -372,8 +432,12 @@ DROP TABLE #DistribucionBase;";
 SELECT TOP (@TopSeguro)
     CodigoTicket,
     FechaRegistro,
+    -- Es la fecha por la que ahora se filtra el rango, asi que tiene que
+    -- viajar: el cross-filter reagrupa la tendencia con ella.
+    FechaFirmaSolucion,
     Grupo,
     Tecnico,
+    TecnicoAsignado,
     Estado,
     Subestado,
     Prioridad,
@@ -393,7 +457,9 @@ SELECT TOP (@TopSeguro)
     Tienda
 FROM dbo.vw_Dash_ProductividadBase b
 WHERE {0}
-ORDER BY FechaRegistro DESC;";
+-- Por fecha de solucion, que es por la que se filtra: ordenar por registro
+-- dejaria arriba los tickets mas nuevos del rango y no los recien resueltos.
+ORDER BY FechaFirmaSolucion DESC;";
 
         int topSeguro = (top <= 0) ? 500 : (top > 5000 ? 5000 : top);
         return Unico(sql, f, delegate(SqlCommand cmd)

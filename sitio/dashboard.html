@@ -39,6 +39,11 @@
     <header class="top">
       <div>
         <h1>Tickets Proactivanet — SLA y productividad</h1>
+        <!-- El rango de fechas de esta pestaña filtra por FECHA DE SOLUCION.
+             Decirlo aqui evita la pregunta que se repetia cada vez que alguien
+             comparaba un numero de aqui con uno del Backlog. -->
+        <div class="sub">El rango mide <b>lo que se resolvio</b> en el periodo.
+          Lo que sigue pendiente vive en la pestaña de Backlog.</div>
       </div>
       <div class="acciones-top">
         <div class="estado" id="estado-carga"></div>
@@ -102,11 +107,11 @@
 
     <section class="grid2">
       <div class="card">
-        <h3>Tendencia diaria<span class="hint" id="hint-tendencia"></span></h3>
+        <h3>Entra vs sale<span class="hint" id="hint-tendencia"></span></h3>
         <div class="lienzo alta"><canvas id="chart-tendencia"></canvas></div>
       </div>
       <div class="card">
-        <h3>Productividad por tecnico</h3>
+        <h3>Resueltos por tecnico<span class="hint">top 15</span></h3>
         <div class="lienzo alta"><canvas id="chart-productividad"></canvas></div>
       </div>
     </section>
@@ -134,7 +139,7 @@
     </section>
 
     <section class="card">
-      <h3>Personas con mas tickets cerrados<span class="hint">top 10</span></h3>
+      <h3>Personas con mas tickets resueltos<span class="hint">top 10</span></h3>
       <div class="nota">Este ranking depende <b>solo</b> del rango de fechas y del filtro de
         <b>Grupos</b>: no lo mueven el filtro de Tecnicos ni los filtros por clic del tablero.</div>
       <div class="cap" id="cap-top-cerrados"></div>
