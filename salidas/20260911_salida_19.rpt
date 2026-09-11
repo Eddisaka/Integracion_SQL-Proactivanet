@@ -98,5 +98,24 @@ Bloque                Mes     Resueltos   Reabiertos  ReabiertosPct
 5) Reabiertos por mes 2026-08 27960       1634        5.84
 5) Reabiertos por mes 2026-09 9039        576         6.37
 
+Bloque            Tickets     ValeCeroEnHoras EmpiezaCon0h Discrepan
+----------------- ----------- --------------- ------------ -----------
+6) Horas enteras? 443238      306410          306401       9
 
-Hora de finalización: 2026-09-11T11:12:45.0756123-06:00
+Bloque                                       Tickets     EmpatanElPatron NoEmpatanElPatron ConCaracteresRaros MinLargo    MaxLargo    ValoresDistintos
+-------------------------------------------- ----------- --------------- ----------------- ------------------ ----------- ----------- ----------------
+7) Formato de TiempoPrimeraRespuestaHorasMin 443238      443238          0                 0                  6           9           14996
+
+Bloque                               Valor                                                                                                Tickets
+------------------------------------ ---------------------------------------------------------------------------------------------------- -----------
+
+Bloque                      Estado                                                                                               Subestado                                                                                            Tipo                                                                                                 Tickets
+--------------------------- ---------------------------------------------------------------------------------------------------- ---------------------------------------------------------------------------------------------------- ---------------------------------------------------------------------------------------------------- -----------
+8) Resueltos con 0 intentos Rechazada                                                                                            NULL                                                                                                 Petición de Servicio                                                                                 10273
+8) Resueltos con 0 intentos Rechazada                                                                                            NULL                                                                                                 Incidencia                                                                                           4532
+8) Resueltos con 0 intentos Rechazada                                                                                            NULL                                                                                                 SorIA Peticiones                                                                                     239
+8) Resueltos con 0 intentos Rechazada                                                                                            NULL                                                                                                 SorIA Incidentes                                                                                     106
+8) Resueltos con 0 intentos Cerrada                                                                                              NULL                                                                                                 SorIA Peticiones                                                                                     1
+
+
+Hora de finalización: 2026-09-11T11:46:53.4884235-06:00
