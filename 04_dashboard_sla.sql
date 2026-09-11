@@ -53,6 +53,36 @@ RETURN
 GO
 
 /* =====================================================================================
+   0b) La misma funcion, pero partiendo por '|'. SOLO para la lista de tecnicos.
+
+      Los nombres de tecnico vienen como "Apellidos, Nombre", asi que SIEMPRE
+      traen una coma. Partiendo por coma, 'Lugo Solis, David' se rompe en
+      'Lugo Solis' y 'David' -ninguno de los dos existe-, los cinco
+      procedimientos devuelven cero filas y el tablero entero se queda en cero
+      en cuanto alguien elige un tecnico en el filtro.
+
+      Esto lo detecto y lo arreglo el otro desarrollador en
+      fix_tecnicos_separador_pipe.sql, un script aparte. Ese archivo advertia
+      que volver a correr 04_dashboard_sla.sql lo deshacia, y es exactamente lo
+      que paso. Por eso el arreglo vive AQUI ahora: el script suelto ya no hace
+      falta y no hay forma de perderlo por correr este.
+
+      @Grupos sigue viajando separado por coma -ningun nombre de grupo lleva
+      comas- y el tablero de Backlog tiene su propia funcion, asi que ninguno
+      de los dos se ve afectado.
+   ===================================================================================== */
+CREATE OR ALTER FUNCTION dbo.fn_Dash_SplitListPipe (@Lista NVARCHAR(MAX))
+RETURNS TABLE
+AS
+RETURN
+(
+    SELECT LTRIM(RTRIM(value)) AS Valor
+    FROM STRING_SPLIT(ISNULL(@Lista, N''), N'|')
+    WHERE LTRIM(RTRIM(value)) <> N''
+);
+GO
+
+/* =====================================================================================
    1) Vista base (igual que en el script de productividad; CREATE OR ALTER es idempotente)
    ===================================================================================== */
 CREATE OR ALTER VIEW dbo.vw_Dash_ProductividadBase
@@ -235,7 +265,7 @@ BEGIN
         WHERE b.FechaRegistro >= @FechaInicio
           AND b.FechaRegistro < DATEADD(DAY, 1, @FechaFin)
           AND (NULLIF(LTRIM(RTRIM(@Grupos)), N'') IS NULL OR b.Grupo IN (SELECT Valor FROM dbo.fn_Dash_SplitList(@Grupos)))
-          AND (NULLIF(LTRIM(RTRIM(@Tecnicos)), N'') IS NULL OR b.Tecnico IN (SELECT Valor FROM dbo.fn_Dash_SplitList(@Tecnicos)))
+          AND (NULLIF(LTRIM(RTRIM(@Tecnicos)), N'') IS NULL OR b.Tecnico IN (SELECT Valor FROM dbo.fn_Dash_SplitListPipe(@Tecnicos)))
     )
     SELECT
         FechaInicio = @FechaInicio,
@@ -282,7 +312,7 @@ BEGIN
     WHERE b.FechaRegistro >= @FechaInicio
       AND b.FechaRegistro < DATEADD(DAY, 1, @FechaFin)
       AND (NULLIF(LTRIM(RTRIM(@Grupos)), N'') IS NULL OR b.Grupo IN (SELECT Valor FROM dbo.fn_Dash_SplitList(@Grupos)))
-      AND (NULLIF(LTRIM(RTRIM(@Tecnicos)), N'') IS NULL OR b.Tecnico IN (SELECT Valor FROM dbo.fn_Dash_SplitList(@Tecnicos)))
+      AND (NULLIF(LTRIM(RTRIM(@Tecnicos)), N'') IS NULL OR b.Tecnico IN (SELECT Valor FROM dbo.fn_Dash_SplitListPipe(@Tecnicos)))
     GROUP BY FechaRegistroDia
     ORDER BY FechaRegistroDia;
 END;
@@ -317,7 +347,7 @@ BEGIN
     WHERE b.FechaRegistro >= @FechaInicio
       AND b.FechaRegistro < DATEADD(DAY, 1, @FechaFin)
       AND (NULLIF(LTRIM(RTRIM(@Grupos)), N'') IS NULL OR b.Grupo IN (SELECT Valor FROM dbo.fn_Dash_SplitList(@Grupos)))
-      AND (NULLIF(LTRIM(RTRIM(@Tecnicos)), N'') IS NULL OR b.Tecnico IN (SELECT Valor FROM dbo.fn_Dash_SplitList(@Tecnicos)))
+      AND (NULLIF(LTRIM(RTRIM(@Tecnicos)), N'') IS NULL OR b.Tecnico IN (SELECT Valor FROM dbo.fn_Dash_SplitListPipe(@Tecnicos)))
     GROUP BY Tecnico
     ORDER BY TicketsTotales DESC, Tecnico;
 END;
@@ -347,7 +377,7 @@ BEGIN
     WHERE b.FechaRegistro >= @FechaInicio
       AND b.FechaRegistro < DATEADD(DAY, 1, @FechaFin)
       AND (NULLIF(LTRIM(RTRIM(@Grupos)), N'') IS NULL OR b.Grupo IN (SELECT Valor FROM dbo.fn_Dash_SplitList(@Grupos)))
-      AND (NULLIF(LTRIM(RTRIM(@Tecnicos)), N'') IS NULL OR b.Tecnico IN (SELECT Valor FROM dbo.fn_Dash_SplitList(@Tecnicos)));
+      AND (NULLIF(LTRIM(RTRIM(@Tecnicos)), N'') IS NULL OR b.Tecnico IN (SELECT Valor FROM dbo.fn_Dash_SplitListPipe(@Tecnicos)));
 
     SELECT
         Valor = ISNULL(NULLIF(LTRIM(RTRIM(Estado)), N''), N'Sin estado'),
@@ -427,7 +457,7 @@ BEGIN
     WHERE b.FechaRegistro >= @FechaInicio
       AND b.FechaRegistro < DATEADD(DAY, 1, @FechaFin)
       AND (NULLIF(LTRIM(RTRIM(@Grupos)), N'') IS NULL OR b.Grupo IN (SELECT Valor FROM dbo.fn_Dash_SplitList(@Grupos)))
-      AND (NULLIF(LTRIM(RTRIM(@Tecnicos)), N'') IS NULL OR b.Tecnico IN (SELECT Valor FROM dbo.fn_Dash_SplitList(@Tecnicos)))
+      AND (NULLIF(LTRIM(RTRIM(@Tecnicos)), N'') IS NULL OR b.Tecnico IN (SELECT Valor FROM dbo.fn_Dash_SplitListPipe(@Tecnicos)))
     ORDER BY FechaRegistro DESC;
 END;
 GO
