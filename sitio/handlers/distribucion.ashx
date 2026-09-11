@@ -21,6 +21,7 @@ public class Distribucion : IHttpHandler
             {
                 { "prioridad", resultados.Count > 0 ? resultados[0] : new List<Dictionary<string, object>>() },
                 { "vencidosGrupo", resultados.Count > 1 ? resultados[1] : new List<Dictionary<string, object>>() },
+                { "reabiertosGrupo", resultados.Count > 2 ? resultados[2] : new List<Dictionary<string, object>>() },
             };
         });
     }

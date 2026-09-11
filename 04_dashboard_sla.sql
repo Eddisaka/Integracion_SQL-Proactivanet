@@ -25,7 +25,7 @@
    - dbo.usp_Dash_KpisMulti         (tarjetas KPI: total, cerrados, SLA, horas, etc.)
    - dbo.usp_Dash_TendenciaMulti    (serie diaria: creados por registro vs resueltos por solucion)
    - dbo.usp_Dash_ProductividadTecnicoMulti (tickets por tecnico, para grafico de barras)
-   - dbo.usp_Dash_DistribucionMulti (Prioridad y vencidos por grupo, para las graficas)
+   - dbo.usp_Dash_DistribucionMulti (Prioridad, vencidos por grupo y reabiertos por grupo)
    - dbo.usp_Dash_DetalleMulti      (tabla de detalle, top N)
 
    Notas:
@@ -157,6 +157,25 @@ SELECT
 
     EstaCerrado = CASE WHEN t.FechaFirmaCierre IS NOT NULL THEN CONVERT(bit, 1) ELSE CONVERT(bit, 0) END,
     EstaAbierto = CASE WHEN t.FechaFirmaCierre IS NULL THEN CONVERT(bit, 1) ELSE CONVERT(bit, 0) END,
+
+    /* El ticket se dio por resuelto y volvio. Es el contrapeso de la
+       productividad: un ranking que solo premia cerrar, premia cerrar mal.
+
+       Medido el 11 de septiembre de 2026 sobre 437,500 tickets resueltos, el
+       campo IntentosSolucion viene lleno en el 100%.
+
+       OJO CON EL PROMEDIO GLOBAL. Sale 3.88%, y ese numero no describe a
+       nadie: esta diluido por los grupos automatizados. SorIA sola aporta
+       179,666 resueltos con casi cero reabiertos. Entre los grupos que atiende
+       gente es uno de cada diez -Service Desk 11.05%, End User 10.41%-. Por
+       eso el tablero lo ensena por grupo y no solo como un numero.
+
+       Los 15,151 tickets resueltos con IntentosSolucion = 0 -el 3.46%- se
+       quedan en el denominador por ahora: no son reabiertos, y hasta saber que
+       son (ver el bloque 8 de 19_diagnostico_reabiertos_respuesta.sql) sacarlos
+       seria decidir a ciegas. Si resultan ser cancelaciones o duplicados, hay
+       que excluirlos y el porcentaje sube de 3.88% a 4.02%. */
+    EsReabierto = CASE WHEN t.IntentosSolucion > 1 THEN CONVERT(bit, 1) ELSE CONVERT(bit, 0) END,
 
     /* EL VEREDICTO DE SLA SE DA CONTRA LA FIRMA DE SOLUCION, NO CONTRA LA DE
        CIERRE. Es el cambio que mas mueve los numeros de todo el tablero.
@@ -353,6 +372,12 @@ BEGIN
         TicketsSlaEvaluable = SUM(CASE WHEN SlaEvaluable = 1 THEN 1 ELSE 0 END),
         TicketsSlaVencidos = SUM(CASE WHEN SlaVencido = 1 THEN 1 ELSE 0 END),
         TicketsDentroSla = SUM(CASE WHEN DentroSla = 1 THEN 1 ELSE 0 END),
+        -- Reabiertos: se dieron por resueltos y volvieron. El porcentaje sale
+        -- calculado aqui para que el tablero no tenga que dividir a mano.
+        TicketsReabiertos = SUM(CASE WHEN EsReabierto = 1 THEN 1 ELSE 0 END),
+        ReabiertosPct = CAST(
+            100.0 * SUM(CASE WHEN EsReabierto = 1 THEN 1 ELSE 0 END)
+            / NULLIF(COUNT_BIG(*), 0) AS DECIMAL(6,2)),
         CumplimientoSlaPct = CAST(
             100.0 * SUM(CASE WHEN SlaEvaluable = 1 AND DentroSla = 1 THEN 1 ELSE 0 END)
             / NULLIF(SUM(CASE WHEN SlaEvaluable = 1 THEN 1 ELSE 0 END), 0)
@@ -459,6 +484,7 @@ BEGIN
         Grupo = MAX(Grupo),
         TicketsResueltos = COUNT_BIG(*),
         TicketsSlaVencidos = SUM(CASE WHEN SlaVencido = 1 THEN 1 ELSE 0 END),
+        TicketsReabiertos  = SUM(CASE WHEN EsReabierto = 1 THEN 1 ELSE 0 END),
         CumplimientoSlaPct = CAST(
             100.0 * SUM(CASE WHEN SlaEvaluable = 1 AND DentroSla = 1 THEN 1 ELSE 0 END)
             / NULLIF(SUM(CASE WHEN SlaEvaluable = 1 THEN 1 ELSE 0 END), 0)
@@ -505,7 +531,8 @@ BEGIN
         Prioridad,
         SlaVencido,
         SlaEvaluable,
-        DentroSla
+        DentroSla,
+        EsReabierto
     INTO #DistribucionBase
     FROM dbo.vw_Dash_ProductividadBase b
     WHERE b.FechaFirmaSolucion >= @FechaInicio
@@ -538,6 +565,24 @@ BEGIN
     GROUP BY ISNULL(NULLIF(LTRIM(RTRIM(Grupo)), N''), N'Sin grupo')
     HAVING SUM(CASE WHEN SlaVencido = 1 THEN 1 ELSE 0 END) > 0
     ORDER BY Vencidos DESC;
+
+    /* Tercer result set: reabiertos por grupo.
+
+       El corte de 50 resueltos es a proposito. Sin el, un grupo con 3 tickets
+       y 1 reabierto sale en 33% encabezando la lista y no significa nada; el
+       porcentaje de una muestra chica es ruido, no senal. */
+    SELECT TOP (12)
+        Valor      = ISNULL(NULLIF(LTRIM(RTRIM(Grupo)), N''), N'Sin grupo'),
+        Resueltos  = COUNT_BIG(*),
+        Reabiertos = SUM(CASE WHEN EsReabierto = 1 THEN 1 ELSE 0 END),
+        ReabiertosPct = CAST(
+            100.0 * SUM(CASE WHEN EsReabierto = 1 THEN 1 ELSE 0 END)
+            / NULLIF(COUNT_BIG(*), 0) AS DECIMAL(6,2))
+    FROM #DistribucionBase
+    GROUP BY ISNULL(NULLIF(LTRIM(RTRIM(Grupo)), N''), N'Sin grupo')
+    HAVING COUNT_BIG(*) >= 50
+       AND SUM(CASE WHEN EsReabierto = 1 THEN 1 ELSE 0 END) > 0
+    ORDER BY ReabiertosPct DESC;
 
     DROP TABLE #DistribucionBase;
 END;
@@ -586,6 +631,8 @@ BEGIN
         HorasAbierto = CAST(HorasAbierto AS DECIMAL(18,2)),
         AgingBucket,
         ReasignacionesGrupo,
+        -- El cross-filter recalcula los reabiertos con esta columna.
+        IntentosSolucion,
         Tienda
     FROM dbo.vw_Dash_ProductividadBase b
     WHERE b.FechaFirmaSolucion >= @FechaInicio
