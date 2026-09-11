@@ -1,0 +1,101 @@
+/* =========================================================================
+   assets/css/tablero-legacy.css
+
+   Capa de color para el documento legacy assets/Tablero_Experiencia.html, que
+   se ve en la pestaña "Tablero" (Observabilidad y Orquestacion).
+
+   Ese archivo lo regenera TableroExperiencia_v3.7.exe y cualquier edicion suya
+   se pierde, asi que su hoja no se toca: dashboard.js enlaza esta desde fuera
+   -mismo origen, igual que hace con desplegable.css- y como entra al final del
+   <head> gana por orden a las reglas de su <style>.
+
+   Solo presentacion. El documento traia su propia paleta -cabecera azul
+   marino, franja de KPI azul y "bien" en verde esmeralda-, que no es la del
+   tablero. Aqui se le pone la misma que usa dashboard.css: cabecera con el
+   degradado de marca y semaforo de KPI lima / ambar / rojo. Ni un valor, ni
+   un estado, ni un dato cambia.
+   ========================================================================= */
+
+:root {
+  /* Paleta de marca, copiada de dashboard.css. Va con valores literales
+     porque el marco es otro documento: no hereda las variables del tablero. */
+  --g-400: #9dd323;   /* lima */
+  --g-600: #65bb2b;
+  --g-700: #56a333;
+  --g-800: #478b3c;   /* verde profundo */
+  --g-900: #3a7431;
+
+  --kpi-ok: var(--g-400);   /* lima:  bien */
+  --kpi-ambar: #d97706;     /* ambar: aviso */
+  --kpi-rojo: #982a18;      /* rojo:  mal */
+  --kpi-line: #eef1ea;      /* perimetro, el --line-soft del tablero */
+
+  --tl-ink: #191919;
+  --tl-ink-2: #393939;
+  --tl-line: #e3e7de;
+  --tl-grad-header: linear-gradient(135deg, #478B3C 0%, #65BB2B 45%, #9DD323 100%);
+  --tl-grad-btn: linear-gradient(160deg, var(--g-400) 0%, var(--g-600) 55%, var(--g-700) 100%);
+  --tl-grad-btn-hover: linear-gradient(160deg, #81c727 0%, var(--g-700) 55%, var(--g-800) 100%);
+}
+
+/* ---------- Cabecera ----------
+   Pasa de azul marino a la banda de marca. Sobre lima el texto blanco no
+   llega a 4.5:1, asi que el titulo y sus etiquetas pasan a tinta oscura,
+   igual que en header.top de dashboard.css. */
+header.top {
+  background: var(--tl-grad-header);
+  color: var(--tl-ink);
+}
+header.top .sub { color: var(--tl-ink-2); }
+header.top .selrow label { color: var(--tl-ink-2); }
+
+/* Los <select> nativos venian en azul oscuro para leerse sobre la cabecera
+   azul. Desplegable.montar() los sustituye por el control del tablero, pero
+   la regla se queda por si algun <select> se queda sin montar. */
+header.top .selrow select {
+  background: #fff;
+  color: var(--tl-ink);
+  border: 1px solid var(--tl-line);
+}
+
+header.top .selrow button {
+  background: var(--tl-grad-btn);
+  color: var(--tl-ink);
+  border: 1px solid var(--g-700);
+  font-weight: 700;
+}
+header.top .selrow button:hover { background: var(--tl-grad-btn-hover); }
+
+/* "Consulta el Detalle" lleva su color en un atributo style= del HTML
+   generado, y un atributo solo lo pisa !important. Es la unica declaracion
+   de la hoja que lo necesita. Se queda en verde profundo con texto blanco:
+   asi sigue siendo el boton primario de la cabecera y no compite con el
+   ambar, que en el tablero significa "aviso". */
+header.top a[id^="ligaHeader"] {
+  background: var(--g-800) !important;
+  color: #fff !important;
+}
+header.top a[id^="ligaHeader"]:hover { background: var(--g-900) !important; }
+
+/* La fila de "candidato" de Orquestacion tambien venia pintada para fondo
+   oscuro -texto claro sobre un velo blanco al 8%- y sus colores estan en
+   atributos style= del HTML generado, asi que van con !important igual que
+   la liga. Sobre lima el chip pasa a fondo blanco y tinta oscura. */
+header.top #filtroCand > span { color: var(--tl-ink-2) !important; }
+header.top #filtroCand label {
+  color: var(--tl-ink) !important;
+  background: rgba(255, 255, 255, .75) !important;
+}
+
+/* ---------- KPIs ----------
+   Su forma -tarjeta blanca, radio 14px- ya coincide; solo se les agregan el
+   borde perimetral fino y la sombra de dos capas de dashboard.css, y la
+   franja izquierda pasa al semaforo del tablero. */
+.kpi {
+  border: 1px solid var(--kpi-line);
+  border-left: 5px solid var(--kpi-ok);
+  box-shadow: 0 1px 2px rgba(25, 25, 25, .05), 0 1px 3px rgba(25, 25, 25, .06);
+}
+.kpi.sv { border-left-color: var(--kpi-ok); }
+.kpi.sa { border-left-color: var(--kpi-ambar); }
+.kpi.sr { border-left-color: var(--kpi-rojo); }

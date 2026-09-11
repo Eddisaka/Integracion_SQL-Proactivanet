@@ -1,0 +1,400 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tickets Proactivanet — Tableros de SLA y Backlog</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<!-- Paleta categorica compartida. Va antes de dashboard.js y antes de los
+     modulos embebidos (Experiencia, QA), que pierden sus <script> al montarse
+     aqui y usan esta copia. -->
+<script src="assets/js/paleta.js"></script>
+<script src="assets/js/barras.js"></script>
+<script src="assets/js/grafica.js"></script>
+<!-- Desplegable propio, uno solo para todo el tablero. Se carga aqui, en la
+     pagina anfitriona, asi que los modulos embebidos (Experiencia, QA) -que
+     pierden sus <script> y sus <link> al montarse- lo encuentran ya puesto. -->
+<script src="assets/js/desplegable.js"></script>
+<link rel="stylesheet" href="assets/css/desplegable.css">
+<!-- El medidor `.mini` de las tablas, tambien uno solo para todo el tablero
+     y aqui por lo mismo: Experiencia lo pinta y al embeberse pierde sus
+     <link>. -->
+<link rel="stylesheet" href="assets/css/barra-mini.css">
+<link rel="stylesheet" href="dashboard.css">
+</head>
+<body>
+<div class="wrap">
+
+  <nav class="maintabs">
+    <button class="mtab active" data-tab="sla" type="button">SLA y productividad</button>
+    <button class="mtab" data-tab="backlog" type="button">Backlog</button>
+    <button class="mtab" data-tab="experiencia" type="button">Experiencia</button>
+    <button class="mtab" data-tab="qa" type="button">QA</button>
+    <button class="mtab" data-tab="call" type="button">Call Center</button>
+    <button class="mtab" data-tab="tablero" type="button">Tablero</button>
+  </nav>
+
+  <!-- ==================================================== Tablero de SLA -->
+  <div id="tab-sla" class="maintab-content active">
+    <header class="top">
+      <div>
+        <h1>Tickets Proactivanet — SLA y productividad</h1>
+      </div>
+      <div class="acciones-top">
+        <div class="estado" id="estado-carga"></div>
+      </div>
+    </header>
+
+    <section class="filtros" id="filtros-sla">
+      <div class="campo">
+        <label for="f-inicio">Fecha inicio</label>
+        <input type="date" id="f-inicio">
+      </div>
+      <div class="campo">
+        <label for="f-fin">Fecha fin</label>
+        <input type="date" id="f-fin">
+      </div>
+      <div class="campo">
+        <label>Rango rapido</label>
+        <!-- "7 dias" es de las dos pestañas. El segundo boton no: SLA mira el
+             año en curso y el Call Center el mes en curso, asi que los dos
+             estan aqui y adoptarControlesSla() (dashboard.js) ensena el que
+             toca al mover esta misma barra a la pestaña visible. No se
+             duplica el marcado ni se cablea ningun listener aparte: los tres
+             pasan por el mismo `#filtros-sla [data-rango]`. -->
+        <div class="rango-rapido">
+          <button class="btn linea chico" type="button" data-rango="7d">7 dias</button>
+          <button class="btn linea chico" type="button" data-rango="anio">Año</button>
+          <button class="btn linea chico" type="button" data-rango="mes" hidden>Mes</button>
+        </div>
+      </div>
+      <!-- campo-slot: el resumen de abajo no cuenta para la altura del campo,
+           asi el stepper queda a la misma altura que las barras vecinas. -->
+      <div class="campo campo-slot">
+        <label for="slot-n">Ultimos SLOTs</label>
+        <div class="slotstep" id="slot-step">
+          <button class="btn linea chico" type="button" id="slot-menos" aria-label="Un SLOT menos">−</button>
+          <output class="slotn" id="slot-n" for="slot-menos slot-mas">1</output>
+          <button class="btn linea chico" type="button" id="slot-mas" aria-label="Un SLOT mas">+</button>
+        </div>
+        <span class="slotsum" id="slot-sum"></span>
+      </div>
+      <div class="campo">
+        <label for="f-grupos">Grupos</label>
+        <select id="f-grupos" multiple></select>
+      </div>
+      <div class="campo">
+        <label for="f-tecnicos">Tecnicos</label>
+        <select id="f-tecnicos" multiple></select>
+      </div>
+      <!-- Campanas del Call Center. Solo la lee llamadas.ashx: los demas
+           handlers de esta pestana ignoran el parametro `campanas`. -->
+      <div class="campo">
+        <label for="f-campanas">Campañas</label>
+        <select id="f-campanas" multiple></select>
+      </div>
+      <div class="campo acciones">
+        <button class="btn gris" id="btn-limpiar" type="button">Limpiar</button>
+      </div>
+    </section>
+
+    <section class="kpis" id="kpis"></section>
+
+    <section class="grid2">
+      <div class="card">
+        <h3>Tendencia diaria<span class="hint" id="hint-tendencia"></span></h3>
+        <div class="lienzo alta"><canvas id="chart-tendencia"></canvas></div>
+      </div>
+      <div class="card">
+        <h3>Productividad por tecnico</h3>
+        <div class="lienzo alta"><canvas id="chart-productividad"></canvas></div>
+      </div>
+    </section>
+
+    <section class="grid3">
+      <div class="card">
+        <h3>Estado</h3>
+        <div class="lienzo"><canvas id="chart-estado"></canvas></div>
+        <div class="legend" id="legend-estado"></div>
+      </div>
+      <div class="card">
+        <h3>Prioridad</h3>
+        <div class="lienzo"><canvas id="chart-prioridad"></canvas></div>
+      </div>
+      <div class="card">
+        <h3>Antiguedad</h3>
+        <div class="lienzo"><canvas id="chart-aging"></canvas></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h3>Personas con mas tickets cerrados<span class="hint">top 10</span></h3>
+      <div class="nota">Este ranking depende <b>solo</b> del rango de fechas y del filtro de
+        <b>Grupos</b>: no lo mueven el filtro de Tecnicos ni los filtros por clic del tablero.</div>
+      <div class="cap" id="cap-top-cerrados"></div>
+      <div class="scroll-x" id="tabla-top-cerrados"></div>
+    </section>
+
+    <footer>
+      Semaforo de cumplimiento SLA: <span class="badge bv">&ge;90%</span>
+      <span class="badge ba">75-89%</span> <span class="badge br">&lt;75%</span>
+      · Los tickets sin SLA evaluable quedan fuera del calculo.
+    </footer>
+  </div>
+
+  <!-- ================================================ Tablero de Backlog -->
+  <div id="tab-backlog" class="maintab-content">
+    <header class="top">
+      <div>
+        <h1>Tickets Proactivanet — Backlog</h1>
+      </div>
+      <div class="acciones-top">
+        <div class="estado" id="estado-carga-bl"></div>
+      </div>
+    </header>
+
+    <section class="filtros">
+      <div class="campo">
+        <label for="f-corte-bl">Fecha de corte</label>
+        <!-- Mismo control de calendario que Fecha inicio / Fecha fin del
+             tablero de SLA. Sigue siendo UNA sola fecha; los cortes que
+             existen de verdad acotan el min/max desde backlog_catalogos. -->
+        <input type="date" id="f-corte-bl">
+      </div>
+      <div class="campo">
+        <label for="f-dias-bl">Ventana de tendencia</label>
+        <select id="f-dias-bl">
+          <option value="15">Ultimos 15 dias</option>
+          <option value="30" selected>Ultimos 30 dias</option>
+          <option value="90">Ultimos 90 dias</option>
+          <option value="365">Ultimo año</option>
+        </select>
+      </div>
+      <div class="campo">
+        <label for="f-granularidad-bl">Agrupar tendencia por</label>
+        <select id="f-granularidad-bl">
+          <option value="Dia" selected>Dia</option>
+          <option value="Semana">Semana</option>
+          <option value="Mes">Mes</option>
+        </select>
+      </div>
+      <div class="campo">
+        <label for="f-c1-bl">Servicio / C1 (elige varios)</label>
+        <select id="f-c1-bl" multiple></select>
+      </div>
+      <div class="campo">
+        <label for="f-grupos-bl">Grupos (elige varios)</label>
+        <select id="f-grupos-bl" multiple></select>
+      </div>
+      <div class="campo">
+        <label for="f-lideres-bl">Lideres (elige varios)</label>
+        <select id="f-lideres-bl" multiple></select>
+      </div>
+      <div class="campo acciones">
+        <button class="btn gris" id="btn-limpiar-bl" type="button">Limpiar</button>
+      </div>
+    </section>
+
+    <div id="aviso-historico-bl"></div>
+    <p class="tendencia-linea" id="tendencia-linea-bl"></p>
+
+    <section class="kpis" id="kpis-bl"></section>
+
+    <section class="grid2">
+      <div class="card">
+        <h3>Tendencia del backlog<span class="hint" id="hint-tendencia-bl"></span></h3>
+        <div class="lienzo alta"><canvas id="chart-tendencia-bl"></canvas></div>
+      </div>
+      <div class="card">
+        <h3>Tendencia por lider<span class="hint" id="hint-tendencia-lider-bl">avance de cada torre</span></h3>
+        <div class="lienzo alta"><canvas id="chart-tendencia-lider-bl"></canvas></div>
+      </div>
+    </section>
+
+    <section class="grid3">
+      <div class="card">
+        <h3>Backlog por lider</h3>
+        <div class="lienzo"><canvas id="chart-lider-bl"></canvas></div>
+      </div>
+      <div class="card">
+        <h3>Por prioridad</h3>
+        <div class="lienzo"><canvas id="chart-prioridad-bl"></canvas></div>
+      </div>
+      <div class="card">
+        <h3>Por antiguedad</h3>
+        <div class="lienzo"><canvas id="chart-aging-bl"></canvas></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="tabs">
+        <div class="tab active" data-panel="p-lideres-bl">Lideres (drill-down)</div>
+        <div class="tab" data-panel="p-aging-bl">Resumen por antiguedad</div>
+        <div class="tab" data-panel="p-antiguos-bl">Tickets mas antiguos</div>
+      </div>
+
+      <div class="panel active" id="p-lideres-bl">
+        <div class="nota">Clic en la flecha para desplegar los grupos del lider; clic en el nombre
+          para filtrar todo el tablero.</div>
+        <div class="cap" id="cap-lideres-bl"></div>
+        <div class="scroll-x" id="tabla-lideres-bl"></div>
+      </div>
+
+      <div class="panel" id="p-aging-bl">
+        <div class="cap" id="cap-aging-bl"></div>
+        <div class="scroll-x" id="tabla-aging-bl"></div>
+      </div>
+
+      <div class="panel" id="p-antiguos-bl">
+        <div class="cap" id="cap-antiguos-bl"></div>
+        <div class="scroll-x" id="tabla-antiguos-bl"></div>
+      </div>
+    </section>
+
+    <footer>
+      Fuente: cortes diarios guardados en <b>dbo.CorreoBacklogSnapshot</b> ·
+      El color de cada lider es el mismo que usa el correo diario.
+    </footer>
+  </div>
+
+  <!-- =============================================== Tablero (externo) -->
+  <!-- Experiencia al Usuario, Observabilidad y Orquestacion ya no viven aqui:
+       son el documento independiente Tablero_Experiencia.html, que genera
+       TableroExperiencia_v3.7.exe, con su propia navegacion interna. Basta
+       con reemplazar ese archivo en la carpeta del proyecto y recargar; ni
+       dashboard.html ni dashboard.js necesitan cambios. El src real lo pone
+       activarTab() la primera vez que se abre la pestana (ver data-src). -->
+  <!-- ================================================ Tablero de Experiencia
+       Contenedor vacio a proposito. TableroExperiencia (dashboard.js) trae
+       experiencia/experiencia.html, experiencia.css y experiencia.js la
+       primera vez que se abre la pestaña. El modulo sigue viviendo en
+       experiencia/ y su pagina suelta sigue funcionando igual. -->
+  <div id="tab-experiencia" class="maintab-content"></div>
+
+  <!-- ======================================================= Tablero de QA
+       Contenedor vacio a proposito, igual que Experiencia. TableroQa
+       (dashboard.js) trae qa/qa.html, qa.css y qa.js la primera vez que se
+       abre la pestaña: dashboard.html no pide nada a qa.ashx al cargar. El
+       modulo vive en qa/ y su pagina suelta sigue funcionando igual. -->
+  <div id="tab-qa" class="maintab-content"></div>
+
+  <!-- ================================================ Call Center de Servicios TI
+       Pestana propia. El bloque es el MISMO de siempre -mismos ids, mismas
+       graficas- y lo siguen cargando y pintando las funciones de TableroSla:
+       llamadas.ashx viaja en su misma peticion. Lo unico que cambia es donde
+       se ve. La barra de filtros y el sello de estado no se duplican: son los
+       nodos de SLA, que dashboard.js mueve a la pestana que este visible. -->
+  <div id="tab-call" class="maintab-content">
+    <header class="top">
+      <div>
+        <h1>Tickets Proactivanet — Call Center</h1>
+      </div>
+      <div class="acciones-top"></div>
+    </header>
+
+    <!-- Llamadas y tickets son la misma atencion vista por dos lados, y por eso
+         comparten el rango de fechas de la barra de arriba: con el mismo rango
+         puesto se ve de un vistazo si el dia que se dispararon los tickets
+         tambien se dispararon las llamadas.
+
+         Los filtros por clic de las graficas de SLA (cross-filter) NO alcanzan
+         a este bloque: una llamada no comparte ninguna dimension con un ticket
+         -no tiene estado, prioridad ni antiguedad-. Solo lo mueven el rango de
+         fechas y su propio filtro de campanas. -->
+    <section class="card">
+      <h3>Call Center de Servicios TI<span class="hint" id="hint-llamadas"></span></h3>
+      <div class="nota">Llamadas recibidas en el rango de fechas de arriba. Los filtros de
+        <b>Grupos</b> y <b>Tecnicos</b> no aplican: una llamada no tiene grupo resolutor.
+        El filtro de <b>Campañas</b> mueve <b>solo</b> este bloque.</div>
+      <div class="kpis" id="kpis-llamadas"></div>
+    </section>
+
+    <section class="grid2">
+      <div class="card">
+        <h3>Llamadas por dia<span class="hint">recibidas vs contestadas vs abandonadas</span></h3>
+        <div class="lienzo alta"><canvas id="chart-llamadas-dia"></canvas></div>
+      </div>
+      <div class="card">
+        <h3>Atencion por agente<span class="hint">top 15</span></h3>
+        <div class="lienzo alta"><canvas id="chart-llamadas-agente"></canvas></div>
+      </div>
+    </section>
+
+    <section class="grid2">
+      <div class="card">
+        <h3>Abandono por campaña<span class="hint">volumen y % de abandono</span></h3>
+        <div class="lienzo"><canvas id="chart-llamadas-campana"></canvas></div>
+      </div>
+      <div class="card">
+        <h3>Llamadas por hora del dia</h3>
+        <div class="lienzo"><canvas id="chart-llamadas-hora"></canvas></div>
+      </div>
+    </section>
+
+    <!-- ------------------------------------------------- Carga combinada
+         Unico bloque donde llamadas y tickets caen en la MISMA fila, y
+         contesta lo que las graficas de arriba dejan abierto: quien cierra
+         pocos tickets porque se le fue el dia en el telefono. Solo sale la
+         gente que esta en dbo.CatAgenteTecnico -la que hace las dos cosas-.
+
+         Se pide a carga_combinada.ashx en una peticion APARTE del resto del
+         Call Center: depende de dbo.usp_Dash_CargaCombinada, que puede no
+         estar en un servidor viejo. Si falla, este bloque pinta su estado
+         vacio y las tarjetas y graficas de arriba siguen igual. -->
+    <section class="card">
+      <h3>Carga combinada: tickets y llamadas por tecnico<span class="hint" id="hint-carga"></span></h3>
+      <div class="nota">Solo los tecnicos con extension telefonica registrada en el catalogo.
+        Los tickets se cuentan por fecha de firma de solucion y las llamadas solo si fueron
+        contestadas. El filtro de <b>Grupos</b> si aplica aqui, pero contra el grupo donde el
+        tecnico tiene mas tickets, no contra el grupo del ticket.</div>
+      <div id="estado-carga-combinada"></div>
+    </section>
+
+    <section class="grid2" id="graficos-carga">
+      <div class="card">
+        <h3>Tickets vs llamadas por tecnico<span class="hint">top 15</span></h3>
+        <div class="lienzo alta"><canvas id="chart-carga-tecnico"></canvas></div>
+      </div>
+      <div class="card">
+        <h3>Del equipo, por dia<span class="hint">tickets cerrados vs llamadas atendidas</span></h3>
+        <div class="lienzo alta"><canvas id="chart-carga-dia"></canvas></div>
+      </div>
+    </section>
+
+    <section class="card" id="card-tabla-carga">
+      <h3>Detalle por tecnico</h3>
+      <div class="nota">Atenciones = tickets + llamadas. No mide esfuerzo: mide cuantas cosas
+        despacho la persona.</div>
+      <div class="scroll-x" id="tabla-carga"></div>
+    </section>
+  </div>
+
+  <div id="tab-tablero" class="maintab-content">
+    <iframe id="iframe-tablero"
+            class="tablero-externo"
+            data-src="assets/Tablero_Experiencia.html"
+            title="Tablero"
+            loading="lazy"></iframe>
+  </div>
+</div>
+
+
+<!-- Datos simulados (MOCK_DATA). Se carga antes que dashboard.js. -->
+<script src="assets/js/mock-data.js"></script>
+
+<!-- Todo el tablero vive en dashboard.js. -->
+<script src="dashboard.js"></script>
+
+<!-- Arranque en un bloque aparte, a proposito: si dashboard.js falla al
+     parsear o ejecutar, esta parte sigue corriendo y deja la pestana
+     inicial visible en vez de una pagina en blanco. -->
+<script>
+try {
+  activarTab(location.hash.slice(1) || 'sla');
+} catch (e) {
+  console.error('Fallo al activar la pestaña inicial:', e);
+  try { activarTab('sla'); } catch (e2) { console.error(e2); }
+}
+</script>
+</body>
+</html>

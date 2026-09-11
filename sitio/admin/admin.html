@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Administracion — Consola de operaciones</title>
+
+<!--
+  Pagina oculta de administracion.
+
+  No esta enlazada desde dashboard.html ni desde ninguna pestana: se llega
+  unicamente escribiendo la URL /admin/admin.html. No se agrego ninguna entrada a
+  la navegacion principal (SLA / Backlog / Tablero) a proposito.
+
+  ESTADO ACTUAL:
+    - Las TRES tarjetas de correo ejecutan de verdad al pulsar ENVIAR:
+      POST a handlers/admin_correos.ashx -> powershell.exe -> el .ps1
+      correspondiente, lanzado desde su propia carpeta (Web.config).
+      Eso incluye SQL, generacion de reportes y envio de correo, porque es
+      lo que hacen los scripts; la pagina no replica nada de esa logica.
+    - No hay ningun paso previo de "obtener datos": los scripts ya
+      consultan SQL, generan los reportes, arman el correo y lo mandan.
+      La pantalla solo valida (semaforo automatico) y deja revisar antes
+      de ENVIAR; ni el semaforo ni la revision ejecutan nada.
+    - Las TRES tarjetas dejan elegir los destinatarios: la distribucion
+      configurada de cada flujo, o unas direcciones sueltas solo para ese
+      envio. Lo segundo no toca la configuracion de verdad: el handler
+      escribe una copia temporal, se la pasa al script con -RutaCorreo y la
+      borra al terminar.
+    - Las tarjetas de Herramientas siguen siendo solo visuales.
+    - No se muestran las direcciones de la distribucion configurada; las
+      personalizadas las escribe quien usa la pagina y no se guardan.
+
+  Reusa dashboard.css unicamente para heredar variables, tipografia y las
+  clases base (.wrap, .card, .btn, .badge, .pill). dashboard.css NO se
+  modifico; lo especifico de esta pagina vive en admin.css.
+-->
+
+<link rel="stylesheet" href="../dashboard.css">
+<link rel="stylesheet" href="admin.css">
+</head>
+<body class="admin-body">
+<div class="wrap">
+
+  <header class="top">
+    <div>
+      <h1>Administracion</h1>
+      <div class="sub">Consola interna de operaciones · entorno de trabajo</div>
+    </div>
+    <div class="acciones-top">
+      <div class="estado">ENVIAR ejecuta el script real</div>
+    </div>
+  </header>
+
+  <div class="admin-aviso" role="note">
+    <b>Atencion.</b> En las tres tarjetas de correo, el boton <b>ENVIAR</b>
+    ejecuta el script de PowerShell correspondiente en el servidor y, por
+    tanto, envia el correo de verdad. La pantalla de revision no ejecuta
+    nada. Las tarjetas de <i>Herramientas</i> siguen sin estar conectadas.
+  </div>
+
+  <style>
+    /* Bloques nuevos de las tarjetas de correo (resultado de la ejecucion y
+       aviso de configuracion). Aparte, para no tocar admin.css. */
+    .job-ejecucion {
+      margin: 10px 0 0; padding: 8px 10px; border-radius: 8px;
+      background: rgba(127, 127, 127, .12); font-size: 13px;
+    }
+    .job-ejecucion.ok    { color: #1a7f37; }
+    .job-ejecucion.fallo { color: #b42318; }
+    .job-ejecucion-tit   { font-weight: 600; }
+    .job-ejecucion-salida {
+      margin: 8px 0 0; max-height: 200px; overflow: auto;
+      white-space: pre-wrap; word-break: break-word; color: inherit;
+      font: 12px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace;
+    }
+    .job-nota-fallo { color: #b42318; }
+  </style>
+
+  <!-- ============================================ Correos programados -->
+  <section class="admin-seccion">
+    <div class="admin-seccion-cab">
+      <h2>Correos y reportes</h2>
+      <span class="admin-seccion-hint">3 flujos</span>
+    </div>
+    <!-- Las tarjetas las genera admin.js a partir de TRABAJOS_CORREO:
+         Correo QA y Correo Backlog compactas, Servicios a lo ancho. -->
+    <div class="admin-grid correos" id="grid-correos"></div>
+  </section>
+
+  <!-- ==================================================== Herramientas -->
+  <section class="admin-seccion">
+    <div class="admin-seccion-cab">
+      <h2>Herramientas</h2>
+      <span class="admin-seccion-hint">acciones administrativas</span>
+    </div>
+    <div class="admin-grid herramientas" id="grid-herramientas"></div>
+  </section>
+
+  <footer>
+    Pagina interna sin enlace en la navegacion. Sin autenticacion todavia:
+    no publicar esta ruta fuera de la red interna.
+  </footer>
+</div>
+
+<!-- Dialogo unico y reutilizable para las herramientas. -->
+<div class="admin-modal-fondo" id="modal-fondo" hidden>
+  <div class="admin-modal" role="dialog" aria-modal="true" aria-labelledby="modal-titulo">
+    <h3 id="modal-titulo">Accion no disponible</h3>
+    <p id="modal-texto"></p>
+    <div class="admin-modal-pie">
+      <button class="btn gris" type="button" id="modal-cerrar">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<script src="admin.js"></script>
+</body>
+</html>

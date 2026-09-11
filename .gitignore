@@ -25,3 +25,16 @@ correo_backlog_direccion_temp/
 CONCENTRADO_LLAMADAS*.xls*
 hiperpbx*.xls*
 Bases_de_Datos*Experiencia*.xls*
+
+# ---------------------------------------------------------------------
+# Datos del sitio (sitio/). NO se versionan: traen nombres y apellidos de
+# directores, product owners y service owners, y este repositorio es
+# publico. Son respaldos para desarrollar sin base de datos; el sitio lee
+# de Tickets_Proactivanet en cuanto los handlers responden.
+# ---------------------------------------------------------------------
+sitio/experiencia/data/*.mock.json
+sitio/observabilidad/data/*.mock.json
+sitio/orquestacion/data/*.mock.json
+# Documento generado por TableroExperiencia_v*.exe. Trae los mismos datos
+# embebidos y ademas pesa 3 MB: se copia al servidor, no se versiona.
+sitio/assets/Tablero_Experiencia.html
