@@ -505,6 +505,10 @@ BEGIN
         SELECT Fecha = CONVERT(DATE, b.FechaFirmaSolucion),
                TicketsResueltos = COUNT_BIG(*),
                TicketsSlaVencidos = SUM(CASE WHEN b.SlaVencido = 1 THEN 1 ELSE 0 END),
+               -- Numerador de los reabiertos en el tiempo. El denominador es
+               -- TicketsResueltos, aqui arriba: el porcentaje se calcula por
+               -- bloque en el tablero, no aqui, por lo mismo que el de SLA.
+               TicketsReabiertos = SUM(CASE WHEN b.EsReabierto = 1 THEN 1 ELSE 0 END),
                -- Numerador y denominador del cumplimiento, no el porcentaje: el
                -- tablero agrupa por dia, mes o SLOT segun el rango, y un
                -- porcentaje diario no se puede promediar para sacar el del mes
@@ -526,7 +530,8 @@ BEGIN
         TicketsResueltos    = ISNULL(r.TicketsResueltos, 0),
         TicketsSlaVencidos  = ISNULL(r.TicketsSlaVencidos, 0),
         TicketsSlaEvaluable = ISNULL(r.TicketsSlaEvaluable, 0),
-        TicketsDentroSla    = ISNULL(r.TicketsDentroSla, 0)
+        TicketsDentroSla    = ISNULL(r.TicketsDentroSla, 0),
+        TicketsReabiertos   = ISNULL(r.TicketsReabiertos, 0)
     FROM cre AS c
     FULL OUTER JOIN res AS r ON r.Fecha = c.Fecha
     ORDER BY COALESCE(c.Fecha, r.Fecha);

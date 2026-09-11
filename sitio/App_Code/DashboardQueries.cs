@@ -362,6 +362,9 @@ res AS (
     SELECT Fecha = CONVERT(DATE, b.FechaFirmaSolucion),
            TicketsResueltos = COUNT_BIG(*),
            TicketsSlaVencidos = SUM(CASE WHEN SlaVencido = 1 THEN 1 ELSE 0 END),
+           -- Numerador de los reabiertos en el tiempo; el denominador es
+           -- TicketsResueltos, aqui arriba.
+           TicketsReabiertos = SUM(CASE WHEN EsReabierto = 1 THEN 1 ELSE 0 END),
            /* Numerador y denominador del cumplimiento, no el porcentaje ya
               calculado: el tablero agrupa por dia, por mes o por SLOT segun el
               rango, y un porcentaje diario NO se puede promediar para obtener
@@ -378,7 +381,8 @@ SELECT
     TicketsResueltos    = ISNULL(r.TicketsResueltos, 0),
     TicketsSlaVencidos  = ISNULL(r.TicketsSlaVencidos, 0),
     TicketsSlaEvaluable = ISNULL(r.TicketsSlaEvaluable, 0),
-    TicketsDentroSla    = ISNULL(r.TicketsDentroSla, 0)
+    TicketsDentroSla    = ISNULL(r.TicketsDentroSla, 0),
+    TicketsReabiertos   = ISNULL(r.TicketsReabiertos, 0)
 FROM cre AS c
 FULL OUTER JOIN res AS r ON r.Fecha = c.Fecha
 ORDER BY COALESCE(c.Fecha, r.Fecha);";

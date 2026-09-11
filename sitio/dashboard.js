@@ -1471,7 +1471,7 @@ const TableroSla = (function () {
        agrupar por dia, por mes o por SLOT, y hecha una sola vez. Si cada una
        decidiera por su lado, dos graficas pegadas mostrarian periodos
        distintos el dia que una cruce el tope y la otra no. */
-    let etiquetas, creados, cerrados, vencidos, dentro, evaluables;
+    let etiquetas, creados, cerrados, vencidos, dentro, evaluables, reabiertosDia;
 
     if (!hayFiltro()) {
       // Serie exacta del SP sobre todo el rango.
@@ -1486,6 +1486,7 @@ const TableroSla = (function () {
       vencidos = f.map(x => x.TicketsSlaVencidos);
       dentro = f.map(x => x.TicketsDentroSla ?? 0);
       evaluables = f.map(x => x.TicketsSlaEvaluable ?? 0);
+      reabiertosDia = f.map(x => x.TicketsReabiertos ?? 0);
       hint.textContent = 'creados (por registro) vs resueltos (por solucion)';
     } else {
       // Recalculada sobre las filas filtradas, agrupando por dia de registro.
@@ -1502,7 +1503,7 @@ const TableroSla = (function () {
       for (const r of f) {
         const d = String(r.FechaFirmaSolucion ?? '').slice(0, 10);
         if (!d) continue;
-        if (!porDia.has(d)) porDia.set(d, { c: 0, cer: 0, ven: 0, den: 0, num: 0 });
+        if (!porDia.has(d)) porDia.set(d, { c: 0, cer: 0, ven: 0, den: 0, num: 0, reab: 0 });
         const a = porDia.get(d);
         a.cer++;
         const ven = (r.SlaVencido === true || r.SlaVencido === 1);
@@ -1512,6 +1513,7 @@ const TableroSla = (function () {
         // un ticket con veredicto es exactamente eso.
         if (ven || den) a.den++;
         if (den) a.num++;
+        if (Number(r.IntentosSolucion) > 1) a.reab++;
       }
       const dias = [...porDia.keys()].sort();
       etiquetas = dias;
@@ -1520,6 +1522,7 @@ const TableroSla = (function () {
       vencidos = dias.map(d => porDia.get(d).ven);
       dentro = dias.map(d => porDia.get(d).num);
       evaluables = dias.map(d => porDia.get(d).den);
+      reabiertosDia = dias.map(d => porDia.get(d).reab);
       hint.textContent = 'resueltos, recalculado sobre lo filtrado (creados no aplica)';
     }
 
@@ -1538,23 +1541,23 @@ const TableroSla = (function () {
     if (enModoSlot()) {
       const unico = slotsAplicados === 1;
       const g = unico
-        ? subdividirSlot(etiquetas, [creados, cerrados, vencidos, dentro, evaluables])
-        : agruparPorSlot(etiquetas, [creados, cerrados, vencidos, dentro, evaluables], slotsAplicados);
+        ? subdividirSlot(etiquetas, [creados, cerrados, vencidos, dentro, evaluables, reabiertosDia])
+        : agruparPorSlot(etiquetas, [creados, cerrados, vencidos, dentro, evaluables, reabiertosDia], slotsAplicados);
       etiquetas = g.etiquetas;
       rangosBucket = g.rangos;
       ticksBucket = g.ticks || null;
-      [creados, cerrados, vencidos, dentro, evaluables] = g.series;
+      [creados, cerrados, vencidos, dentro, evaluables, reabiertosDia] = g.series;
       hint.textContent = `${resumenSlots(slotsAplicados)} · ${unico
         ? `en tramos de ${DIAS_TRAMO} dias`
         : 'agrupado por SLOT'}`;
     } else if (etiquetas.length > TOPE_DIARIO) {
-      const g = agruparPorMes(etiquetas, [creados, cerrados, vencidos, dentro, evaluables]);
+      const g = agruparPorMes(etiquetas, [creados, cerrados, vencidos, dentro, evaluables, reabiertosDia]);
       // Un solo mes agrupado seria un unico punto en lugar de sus dias: el
       // agrupado solo compensa si hay varios bloques que comparar.
       if (g.etiquetas.length > 1) {
         etiquetas = g.etiquetas;
         rangosBucket = g.rangos;
-        [creados, cerrados, vencidos, dentro, evaluables] = g.series;
+        [creados, cerrados, vencidos, dentro, evaluables, reabiertosDia] = g.series;
         hint.textContent += ' · agrupado por mes';
       }
     }
@@ -1570,6 +1573,7 @@ const TableroSla = (function () {
        de cumplimiento tambien muestre su propio mensaje en vez de quedarse
        con el dibujo del rango anterior. */
     renderSlaTiempo(etiquetas, dentro || [], evaluables || []);
+    renderReabiertosTiempo(etiquetas, reabiertosDia || [], cerrados || []);
 
     // Cuantas observaciones llegaron. Es el dato que distingue "el endpoint no
     // trajo nada" de "trajo un solo dia y se ve poco", que desde el navegador
@@ -1835,6 +1839,76 @@ const TableroSla = (function () {
         gr.data.datasets[0].backgroundColor = color;
         gr.data.datasets[1].data = etiquetas.map(() => META_SLA);
         gr.data.datasets[1].label = `Meta ${META_SLA}%`;
+      });
+  }
+
+  /* Reabiertos a lo largo del periodo.
+
+     Comparte el eje X con la grafica de cumplimiento: misma agrupacion por
+     dia, mes o SLOT, resuelta una sola vez en renderTendencia. El porcentaje
+     se calcula por bloque dividiendo las sumas -reabiertos entre resueltos- y
+     no promediando porcentajes diarios, por lo mismo que alla: un dia con dos
+     tickets pesaria igual que uno con doscientos.
+
+     Es la vista que le falta al numero suelto. Entre diciembre y septiembre el
+     porcentaje paso de 3.21% a 6.37%; la tarjeta sola nunca lo hubiera
+     ensenado, y un indicador que se duplica en nueve meses es otra
+     conversacion que uno que esta alto y estable. */
+  function renderReabiertosTiempo(etiquetas, reabiertos, resueltos) {
+    const hint = document.getElementById('hint-reabiertos-tiempo');
+    const totalNum = (reabiertos || []).reduce((a, b) => a + (Number(b) || 0), 0);
+    const totalDen = (resueltos  || []).reduce((a, b) => a + (Number(b) || 0), 0);
+
+    if (!etiquetas.length || !totalDen) {
+      destruir('reabiertosTiempo');
+      hint.textContent = '';
+      return renderEmptyChart('chart-reabiertos-tiempo', hayFiltro()
+        ? 'Ningun ticket resuelto pasa los filtros activos.'
+        : 'Sin tickets resueltos en el rango de fechas.');
+    }
+
+    // null y no cero cuando el bloque no resolvio nada: un cero se leeria
+    // como "ese dia no reabrio nadie", que no es lo mismo que no haber medido.
+    const pct = etiquetas.map((_, i) => {
+      const den = Number(resueltos[i]) || 0;
+      if (!den) return null;
+      return Math.round(1000 * (Number(reabiertos[i]) || 0) / den) / 10;
+    });
+
+    const global = Math.round(1000 * totalNum / totalDen) / 10;
+    hint.textContent = `${global}% en el periodo`;
+    const color = COLOR_SEM[SEM_REABIERTOS(global)] || NEUTRO_SEM;
+
+    dibujarGrafico(graficos, 'reabiertosTiempo', 'chart-reabiertos-tiempo',
+      () => ({
+        type: 'line',
+        data: { labels: etiquetas, datasets: [
+          { label: 'Reabiertos', data: pct, borderColor: color, backgroundColor: color,
+            tension: .3, borderWidth: 2, pointRadius: 3, pointHoverRadius: 6, spanGaps: false },
+        ] },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: {
+              label: c => {
+                if (c.raw === null) return 'Sin tickets resueltos';
+                const i = c.dataIndex;
+                return `${c.raw}% · ${FMT(reabiertos[i])} de ${FMT(resueltos[i])} resueltos`;
+              }
+            } },
+          },
+          // Sin max fijo: el rango real ronda el 3-7% y forzar 0-100 dejaria la
+          // linea pegada al suelo, justo donde no se ve que se esta duplicando.
+          scales: { y: { beginAtZero: true, ticks: { callback: v => `${v}%` } } }
+        }
+      }),
+      gr => {
+        gr.data.labels = etiquetas;
+        gr.data.datasets[0].data = pct;
+        gr.data.datasets[0].borderColor = color;
+        gr.data.datasets[0].backgroundColor = color;
       });
   }
 
