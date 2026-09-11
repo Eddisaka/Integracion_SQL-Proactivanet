@@ -177,6 +177,48 @@ SELECT
        que excluirlos y el porcentaje sube de 3.88% a 4.02%. */
     EsReabierto = CASE WHEN t.IntentosSolucion > 1 THEN CONVERT(bit, 1) ELSE CONVERT(bit, 0) END,
 
+    /* RECHAZAR NO ES RESOLVER, y hasta hoy el tablero los contaba igual.
+
+       Medido el 11 de septiembre de 2026: de los 437,500 tickets con fecha de
+       firma de solucion, 15,151 -el 3.46%- tienen IntentosSolucion = 0, y
+       15,150 de esos estan en estado 'Rechazada'. Traen fecha de firma, por
+       eso entraban en todo, pero nadie intento resolverlos.
+
+       Estaban inflando el KPI de resueltos, el denominador del cumplimiento de
+       SLA, el ranking de productividad -a alguien se le acreditaba haber
+       rechazado- y la linea de resueltos de entra vs sale.
+
+       El correo de Backlog ya trataba 'Rechazada' como estado terminal
+       distinto de 'Cerrada' desde antes; el tablero no. Aqui se marca, y las
+       consultas de la pestaña lo excluyen de lo resuelto. De "creados" NO se
+       excluye: el ticket si entro, y al darlo de alta nadie sabia que se iba a
+       rechazar. Esa diferencia es la que explica el hueco entre las dos lineas
+       y por eso el tablero la ensena como tarjeta aparte. */
+    EsRechazado = CASE WHEN t.Estado = N'Rechazada' THEN CONVERT(bit, 1) ELSE CONVERT(bit, 0) END,
+
+    /* Minutos hasta la primera respuesta, sacados del texto 'Nh NNm'.
+
+       Se parsea el campo detallado y no TiempoPrimeraRespuesta, que viene en
+       HORAS ENTERAS: ahi 306,410 de 443,238 tickets valen '0' y el indicador
+       seria una constante. Con este, esos mismos tickets se reparten entre
+       '0h 00m' y '0h 59m', que es donde esta toda la informacion.
+
+       El formato se verifico sobre los 443,238 valores: los 443,238 empatan
+       'Nh NNm', cero excepciones y cero caracteres raros, con largos de 6 a 9.
+       Aun asi va con TRY_CONVERT y con las dos guardas de CHARINDEX: el dia
+       que Proactivanet cambie el formato, esto tiene que dar NULL y no un
+       numero equivocado que nadie note. */
+    MinutosPrimeraRespuesta = CASE
+        WHEN CHARINDEX(N'h', t.TiempoPrimeraRespuestaHorasMin) > 1
+         AND CHARINDEX(N'm', t.TiempoPrimeraRespuestaHorasMin)
+           > CHARINDEX(N'h', t.TiempoPrimeraRespuestaHorasMin)
+        THEN TRY_CONVERT(INT, LEFT(t.TiempoPrimeraRespuestaHorasMin,
+                                   CHARINDEX(N'h', t.TiempoPrimeraRespuestaHorasMin) - 1)) * 60
+           + TRY_CONVERT(INT, SUBSTRING(t.TiempoPrimeraRespuestaHorasMin,
+                                        CHARINDEX(N'h', t.TiempoPrimeraRespuestaHorasMin) + 2, 2))
+        ELSE NULL
+    END,
+
     /* EL VEREDICTO DE SLA SE DA CONTRA LA FIRMA DE SOLUCION, NO CONTRA LA DE
        CIERRE. Es el cambio que mas mueve los numeros de todo el tablero.
 
@@ -328,6 +370,8 @@ BEGIN
         FROM dbo.vw_Dash_ProductividadBase b
         WHERE b.FechaFirmaSolucion >= @FechaInicio
           AND b.FechaFirmaSolucion < DATEADD(DAY, 1, @FechaFin)
+          -- Rechazar no es resolver. Ver EsRechazado en la vista.
+          AND b.EsRechazado = 0
           AND (NULLIF(LTRIM(RTRIM(@Grupos)), N'') IS NULL OR b.Grupo IN (SELECT Valor FROM dbo.fn_Dash_SplitList(@Grupos)))
           AND (NULLIF(LTRIM(RTRIM(@Tecnicos)), N'') IS NULL OR b.Tecnico IN (SELECT Valor FROM dbo.fn_Dash_SplitListPipe(@Tecnicos)))
     ),
@@ -343,6 +387,16 @@ BEGIN
 
        TOP (1) porque PERCENTILE_CONT es funcion de ventana: devuelve el mismo
        valor repetido en cada fila de entrada, no una sola. */
+    /* Percentiles de la primera respuesta. Mediana y p90 por lo mismo que en
+       las horas de resolucion: el promedio lo decide la cola. */
+    pr AS
+    (
+        SELECT TOP (1)
+            Mediana = PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY MinutosPrimeraRespuesta) OVER (),
+            P90     = PERCENTILE_CONT(0.9) WITHIN GROUP (ORDER BY MinutosPrimeraRespuesta) OVER ()
+        FROM base
+        WHERE MinutosPrimeraRespuesta IS NOT NULL
+    ),
     pct AS
     (
         SELECT TOP (1)
@@ -391,6 +445,20 @@ BEGIN
         -- resultado entero vacio, o sea el tablero sin KPIs.
         HorasResolucionMediana = (SELECT TOP (1) CAST(Mediana AS DECIMAL(18,2)) FROM pct),
         HorasResolucionP90     = (SELECT TOP (1) CAST(P90     AS DECIMAL(18,2)) FROM pct),
+        MinutosPrimeraRespuestaMediana = (SELECT TOP (1) CAST(Mediana AS DECIMAL(18,2)) FROM pr),
+        MinutosPrimeraRespuestaP90     = (SELECT TOP (1) CAST(P90     AS DECIMAL(18,2)) FROM pr),
+        /* Los rechazados del mismo periodo. No entran en TicketsResueltos -su
+           predicado los excluye- pero si en TicketsCreados, asi que sin esta
+           tarjeta el hueco entre las dos cifras no se explicaria. */
+        TicketsRechazados = (
+            SELECT COUNT_BIG(*)
+            FROM dbo.vw_Dash_ProductividadBase b3
+            WHERE b3.FechaFirmaSolucion >= @FechaInicio
+              AND b3.FechaFirmaSolucion < DATEADD(DAY, 1, @FechaFin)
+              AND b3.EsRechazado = 1
+              AND (NULLIF(LTRIM(RTRIM(@Grupos)), N'') IS NULL OR b3.Grupo IN (SELECT Valor FROM dbo.fn_Dash_SplitList(@Grupos)))
+              AND (NULLIF(LTRIM(RTRIM(@Tecnicos)), N'') IS NULL OR b3.Tecnico IN (SELECT Valor FROM dbo.fn_Dash_SplitListPipe(@Tecnicos)))
+        ),
         HorasCicloPromedio = CAST(AVG(HorasCiclo) AS DECIMAL(18,2)),
         ReasignacionesPromedio = CAST(AVG(CAST(ReasignacionesGrupo AS DECIMAL(18,2))) AS DECIMAL(18,2)),
         TicketsAltaPrioridad = SUM(CASE WHEN Prioridad IN (N'Alta', N'Crítica', N'Critica', N'Urgente') THEN 1 ELSE 0 END)
@@ -446,6 +514,8 @@ BEGIN
         FROM dbo.vw_Dash_ProductividadBase b
         WHERE b.FechaFirmaSolucion >= @FechaInicio
           AND b.FechaFirmaSolucion < DATEADD(DAY, 1, @FechaFin)
+          -- Rechazar no es resolver. Ver EsRechazado en la vista.
+          AND b.EsRechazado = 0
           AND (NULLIF(LTRIM(RTRIM(@Grupos)), N'') IS NULL OR b.Grupo IN (SELECT Valor FROM dbo.fn_Dash_SplitList(@Grupos)))
           AND (NULLIF(LTRIM(RTRIM(@Tecnicos)), N'') IS NULL OR b.Tecnico IN (SELECT Valor FROM dbo.fn_Dash_SplitListPipe(@Tecnicos)))
         GROUP BY CONVERT(DATE, b.FechaFirmaSolucion)
@@ -494,6 +564,8 @@ BEGIN
     FROM dbo.vw_Dash_ProductividadBase b
     WHERE b.FechaFirmaSolucion >= @FechaInicio
       AND b.FechaFirmaSolucion < DATEADD(DAY, 1, @FechaFin)
+      -- Rechazar no es resolver. Ver EsRechazado en la vista.
+      AND b.EsRechazado = 0
       AND (NULLIF(LTRIM(RTRIM(@Grupos)), N'') IS NULL OR b.Grupo IN (SELECT Valor FROM dbo.fn_Dash_SplitList(@Grupos)))
       AND (NULLIF(LTRIM(RTRIM(@Tecnicos)), N'') IS NULL OR b.Tecnico IN (SELECT Valor FROM dbo.fn_Dash_SplitListPipe(@Tecnicos)))
     GROUP BY Tecnico
@@ -537,6 +609,8 @@ BEGIN
     FROM dbo.vw_Dash_ProductividadBase b
     WHERE b.FechaFirmaSolucion >= @FechaInicio
       AND b.FechaFirmaSolucion < DATEADD(DAY, 1, @FechaFin)
+      -- Rechazar no es resolver. Ver EsRechazado en la vista.
+      AND b.EsRechazado = 0
       AND (NULLIF(LTRIM(RTRIM(@Grupos)), N'') IS NULL OR b.Grupo IN (SELECT Valor FROM dbo.fn_Dash_SplitList(@Grupos)))
       AND (NULLIF(LTRIM(RTRIM(@Tecnicos)), N'') IS NULL OR b.Tecnico IN (SELECT Valor FROM dbo.fn_Dash_SplitListPipe(@Tecnicos)));
 
@@ -631,12 +705,15 @@ BEGIN
         HorasAbierto = CAST(HorasAbierto AS DECIMAL(18,2)),
         AgingBucket,
         ReasignacionesGrupo,
-        -- El cross-filter recalcula los reabiertos con esta columna.
+        -- El cross-filter recalcula reabiertos y primera respuesta con estas.
         IntentosSolucion,
+        MinutosPrimeraRespuesta,
         Tienda
     FROM dbo.vw_Dash_ProductividadBase b
     WHERE b.FechaFirmaSolucion >= @FechaInicio
       AND b.FechaFirmaSolucion < DATEADD(DAY, 1, @FechaFin)
+      -- Rechazar no es resolver. Ver EsRechazado en la vista.
+      AND b.EsRechazado = 0
       AND (NULLIF(LTRIM(RTRIM(@Grupos)), N'') IS NULL OR b.Grupo IN (SELECT Valor FROM dbo.fn_Dash_SplitList(@Grupos)))
       AND (NULLIF(LTRIM(RTRIM(@Tecnicos)), N'') IS NULL OR b.Tecnico IN (SELECT Valor FROM dbo.fn_Dash_SplitListPipe(@Tecnicos)))
     -- Por fecha de solucion, que es por la que se filtra: ordenar por

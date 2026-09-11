@@ -1339,13 +1339,17 @@ const TableroSla = (function () {
   /* Pie de la tarjeta de "Creados": el balance del periodo en una frase.
      Entraron mas de los que salieron -> el backlog crecio, y de cuanto. Es la
      lectura que nadie hace sola mirando dos numeros pegados. */
-  function balanceTexto(creados, resueltos) {
+  function balanceTexto(creados, resueltos, rechazados) {
     const d = resueltos - creados;
+    /* Los rechazados salieron del backlog sin resolverse, asi que parte del
+       hueco entre las dos cifras es eso y no trabajo pendiente. Sin decirlo,
+       el balance se lee como si el equipo se estuviera quedando atras. */
+    const nota = rechazados ? ` · ${FMT(rechazados)} rechazados aparte` : '';
     if (!creados && !resueltos) return 'sin movimiento en el periodo';
-    if (d === 0) return 'entraron y salieron los mismos';
-    return d > 0
+    if (d === 0) return `entraron y salieron los mismos${nota}`;
+    return (d > 0
       ? `se resolvieron ${FMT(d)} mas de los que entraron`
-      : `entraron ${FMT(-d)} mas de los que se resolvieron`;
+      : `entraron ${FMT(-d)} mas de los que se resolvieron`) + nota;
   }
 
   function renderKpis() {
@@ -1369,7 +1373,12 @@ const TableroSla = (function () {
         { l: 'Resueltos', v: FMT(totalRango),
           f: `lo que el equipo despacho` },
         { l: 'Creados', v: FMT(k.TicketsCreados ?? 0),
-          f: balanceTexto(k.TicketsCreados ?? 0, totalRango) },
+          f: balanceTexto(k.TicketsCreados ?? 0, totalRango, k.TicketsRechazados ?? 0) },
+        /* Primera respuesta. Sale del texto 'Nh NNm' de Proactivanet, no del
+           campo de horas enteras: ahi 7 de cada 10 tickets valen 0 y el
+           indicador seria una constante. */
+        { l: '1a respuesta (mediana)', v: minutosLegibles(k.MinutosPrimeraRespuestaMediana),
+          f: `p90 ${minutosLegibles(k.MinutosPrimeraRespuestaP90)}` },
         { l: 'Cumplimiento SLA', v: cumpl !== null ? `${cumpl}%` : 'N/D',
           f: evaluables ? `${FMT(k.TicketsDentroSla ?? 0)} de ${FMT(evaluables)} evaluables` : 'sin SLA evaluable',
           s: cumpl !== null ? SEM(cumpl) : '' },
@@ -1403,6 +1412,14 @@ const TableroSla = (function () {
       const vencidos = f.filter(r => r.SlaVencido === true || r.SlaVencido === 1).length;
       // Mismo criterio que la vista: IntentosSolucion > 1.
       const reabiertos = f.filter(r => Number(r.IntentosSolucion) > 1).length;
+      // Misma mediana interpolada que PERCENTILE_CONT, sobre lo filtrado.
+      const respuestas = f.map(r => r.MinutosPrimeraRespuesta)
+                          .filter(x => x !== null && x !== undefined).map(Number).sort((a, b) => a - b);
+      const medianaRespuesta = respuestas.length
+        ? (respuestas.length % 2
+            ? respuestas[(respuestas.length - 1) / 2]
+            : (respuestas[respuestas.length / 2 - 1] + respuestas[respuestas.length / 2]) / 2)
+        : null;
       const dentro = f.filter(r => r.DentroSla === true || r.DentroSla === 1).length;
       const evaluables = vencidos + dentro;
       const cumpl = evaluables > 0 ? Math.round(1000 * dentro / evaluables) / 10 : null;
@@ -1429,6 +1446,7 @@ const TableroSla = (function () {
         { l: 'Vencidos SLA', v: FMT(vencidos), f: `${PCT(vencidos, n)} de lo filtrado`, s: vencidos > 0 ? 'sr' : 'sv' },
         { l: 'Horas resolucion (mediana)', v: mediana ?? 'N/D',
           f: `${FMT(horas.length)} tickets resueltos${promedio !== null ? ` · promedio ${promedio} h` : ''}` },
+        { l: '1a respuesta (mediana)', v: minutosLegibles(medianaRespuesta), f: `${FMT(respuestas.length)} con dato` },
         { l: 'Reabiertos', v: n ? `${Math.round(1000 * reabiertos / n) / 10}%` : 'N/D',
           f: `${FMT(reabiertos)} de lo filtrado`,
           s: n ? SEM_REABIERTOS(100 * reabiertos / n) : '' },
@@ -1980,6 +1998,18 @@ const TableroSla = (function () {
      End User -10.4%- salen en rojo, que es justo lo que hay que mirar. */
   const SEM_REABIERTOS = pct =>
     (pct === null || pct === undefined) ? '' : (pct <= 5 ? 'sv' : (pct <= 10 ? 'sa' : 'sr'));
+
+  /* Minutos -> '45 min' o '3h 20m'. La primera respuesta de la mesa se mide
+     casi toda en minutos -la mediana ronda los pocos minutos-, pero la cola se
+     va a horas, y '212 min' no se lee de un vistazo. */
+  function minutosLegibles(v) {
+    if (v === null || v === undefined) return 'N/D';
+    const m = Math.round(Number(v));
+    if (!isFinite(m)) return 'N/D';
+    if (m < 60) return `${m} min`;
+    const h = Math.floor(m / 60), r = m % 60;
+    return r ? `${h}h ${String(r).padStart(2, '0')}m` : `${h}h`;
+  }
 
   const TOPE_CERRADOS = 10;
 

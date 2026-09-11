@@ -106,11 +106,11 @@ public static class DashboardQueries
         return salida;
     }
 
-    /* Los dos predicados WHERE que usan las consultas. Devuelve los textos y
+    /* Los TRES predicados WHERE que usan las consultas. Devuelve los textos y
        deja los parametros cargados en el comando. Una lista vacia = sin
        filtro, igual que el NULL que recibian los procedimientos.
 
-       SON DOS PORQUE LA PESTAÑA MIDE DOS COSAS CON DOS FECHAS DISTINTAS.
+       SON TRES PORQUE LA PESTAÑA MIDE COSAS DISTINTAS CON FECHAS DISTINTAS.
 
        {0}, por FECHA DE SOLUCION, es el predicado principal: "septiembre"
        significa lo que el equipo resolvio en septiembre, sin importar cuando
@@ -128,7 +128,8 @@ public static class DashboardQueries
        llamar dos veces a EnLista agregaria @g0/@t0 repetidos y SqlCommand
        truena con "parameter has already been declared". */
     private static void Predicados(SqlCommand cmd, Filtros f,
-                                   out string porSolucion, out string porRegistro)
+                                   out string porSolucion, out string porRegistro,
+                                   out string rechazados)
     {
         cmd.Parameters.Add("@FechaInicio", SqlDbType.Date).Value = f.FechaInicio;
         cmd.Parameters.Add("@FechaFin", SqlDbType.Date).Value = f.FechaFin;
@@ -137,10 +138,22 @@ public static class DashboardQueries
         comunes.Append(EnLista(cmd, "b.Grupo", "g", f.Grupos));
         comunes.Append(EnLista(cmd, "b.Tecnico", "t", f.Tecnicos));
 
-        porSolucion = "b.FechaFirmaSolucion >= @FechaInicio"
+        var enRango = "b.FechaFirmaSolucion >= @FechaInicio"
                     + " AND b.FechaFirmaSolucion < DATEADD(DAY, 1, @FechaFin)" + comunes;
+
+        /* La exclusion de rechazados vive AQUI y no en cada consulta, para que
+           no se pueda olvidar en una. Rechazar no es resolver: son 15,151
+           tickets -el 3.46% de lo que el tablero contaba como resuelto- que
+           traen fecha de firma pero que nadie intento resolver. Estaban
+           inflando el KPI de resueltos, el denominador del SLA y el ranking de
+           productividad. El detalle, en la vista (EsRechazado). */
+        porSolucion = enRango + " AND b.EsRechazado = 0";
         porRegistro = "b.FechaRegistro >= @FechaInicio"
                     + " AND b.FechaRegistro < DATEADD(DAY, 1, @FechaFin)" + comunes;
+        // {2}: los rechazados del periodo. Se cuentan aparte porque no entran
+        // en lo resuelto pero si en lo creado, y sin esa cifra el hueco entre
+        // las dos no se explicaria.
+        rechazados = enRango + " AND b.EsRechazado = 1";
     }
 
     // "AND columna IN (@t0, @t1, ...)" con un parametro por valor: los nombres
@@ -179,11 +192,11 @@ public static class DashboardQueries
         {
             cmd.Connection = cn;
             cmd.CommandType = CommandType.Text;
-            // {0} = por fecha de solucion, {1} = por fecha de registro. Una
-            // consulta que solo use {0} ignora el segundo sin problema.
-            string porSolucion, porRegistro;
-            Predicados(cmd, f, out porSolucion, out porRegistro);
-            cmd.CommandText = string.Format(sql, porSolucion, porRegistro);
+            // {0} = resuelto (excluye rechazados), {1} = creado por registro,
+            // {2} = rechazado. Una consulta que solo use {0} ignora los otros.
+            string porSolucion, porRegistro, rechazados;
+            Predicados(cmd, f, out porSolucion, out porRegistro, out rechazados);
+            cmd.CommandText = string.Format(sql, porSolucion, porRegistro, rechazados);
             if (extra != null) extra(cmd);
 
             cn.Open();
@@ -244,6 +257,16 @@ public static class DashboardQueries
 
    TOP (1) porque PERCENTILE_CONT es funcion de ventana: devuelve el mismo
    valor repetido en cada fila de entrada, no una sola. */
+/* Percentiles de la primera respuesta. Mediana y p90 por lo mismo que en las
+   horas de resolucion: el promedio lo decide la cola. */
+pr AS
+(
+    SELECT TOP (1)
+        Mediana = PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY MinutosPrimeraRespuesta) OVER (),
+        P90     = PERCENTILE_CONT(0.9) WITHIN GROUP (ORDER BY MinutosPrimeraRespuesta) OVER ()
+    FROM base
+    WHERE MinutosPrimeraRespuesta IS NOT NULL
+),
 pct AS
 (
     SELECT TOP (1)
@@ -289,6 +312,9 @@ SELECT
        esos dos campos salen NULL y lo demas sigue. */
     HorasResolucionMediana = (SELECT TOP (1) CAST(Mediana AS DECIMAL(18,2)) FROM pct),
     HorasResolucionP90     = (SELECT TOP (1) CAST(P90     AS DECIMAL(18,2)) FROM pct),
+    MinutosPrimeraRespuestaMediana = (SELECT TOP (1) CAST(Mediana AS DECIMAL(18,2)) FROM pr),
+    MinutosPrimeraRespuestaP90     = (SELECT TOP (1) CAST(P90     AS DECIMAL(18,2)) FROM pr),
+    TicketsRechazados = (SELECT COUNT_BIG(*) FROM dbo.vw_Dash_ProductividadBase b WHERE {2}),
     HorasCicloPromedio = CAST(AVG(HorasCiclo) AS DECIMAL(18,2)),
     ReasignacionesPromedio = CAST(AVG(CAST(ReasignacionesGrupo AS DECIMAL(18,2))) AS DECIMAL(18,2)),
     TicketsAltaPrioridad = SUM(CASE WHEN Prioridad IN (N'Alta', N'Crítica', N'Critica', N'Urgente') THEN 1 ELSE 0 END),
@@ -494,8 +520,9 @@ SELECT TOP (@TopSeguro)
     HorasAbierto = CAST(HorasAbierto AS DECIMAL(18,2)),
     AgingBucket,
     ReasignacionesGrupo,
-    -- El cross-filter recalcula los reabiertos con esta columna.
+    -- El cross-filter recalcula reabiertos y primera respuesta con estas.
     IntentosSolucion,
+    MinutosPrimeraRespuesta,
     Tienda
 FROM dbo.vw_Dash_ProductividadBase b
 WHERE {0}
