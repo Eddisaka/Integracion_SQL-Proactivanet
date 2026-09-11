@@ -1385,6 +1385,12 @@ const TableroSla = (function () {
           f: k.HorasResolucionPromedio ? `promedio ${k.HorasResolucionPromedio} h` : 'de registro a solucion' },
         { l: 'Horas resolucion (p90)', v: k.HorasResolucionP90 ?? 'N/D',
           f: '9 de cada 10 tardaron menos' },
+        /* Reabiertos. El semaforo va al reves que el de SLA -aqui menos es
+           mejor- y los cortes son 5% y 10% porque el promedio global ronda el
+           4%: con los umbrales del SLA todo saldria en verde siempre. */
+        { l: 'Reabiertos', v: k.ReabiertosPct !== null && k.ReabiertosPct !== undefined ? `${k.ReabiertosPct}%` : 'N/D',
+          f: `${FMT(k.TicketsReabiertos ?? 0)} volvieron despues de darse por resueltos`,
+          s: SEM_REABIERTOS(k.ReabiertosPct) },
         { l: 'Tecnicos activos', v: FMT(k.TecnicosActivos ?? 0), f: `${FMT(k.GruposActivos ?? 0)} grupos activos` },
         { l: 'Reasignaciones promedio', v: k.ReasignacionesPromedio ?? 'N/D', f: 'cambios de grupo por ticket' },
       ];
@@ -1395,6 +1401,8 @@ const TableroSla = (function () {
       const n = f.length;
       const cargadas = (datos.detalle || []).length;
       const vencidos = f.filter(r => r.SlaVencido === true || r.SlaVencido === 1).length;
+      // Mismo criterio que la vista: IntentosSolucion > 1.
+      const reabiertos = f.filter(r => Number(r.IntentosSolucion) > 1).length;
       const dentro = f.filter(r => r.DentroSla === true || r.DentroSla === 1).length;
       const evaluables = vencidos + dentro;
       const cumpl = evaluables > 0 ? Math.round(1000 * dentro / evaluables) / 10 : null;
@@ -1421,6 +1429,9 @@ const TableroSla = (function () {
         { l: 'Vencidos SLA', v: FMT(vencidos), f: `${PCT(vencidos, n)} de lo filtrado`, s: vencidos > 0 ? 'sr' : 'sv' },
         { l: 'Horas resolucion (mediana)', v: mediana ?? 'N/D',
           f: `${FMT(horas.length)} tickets resueltos${promedio !== null ? ` · promedio ${promedio} h` : ''}` },
+        { l: 'Reabiertos', v: n ? `${Math.round(1000 * reabiertos / n) / 10}%` : 'N/D',
+          f: `${FMT(reabiertos)} de lo filtrado`,
+          s: n ? SEM_REABIERTOS(100 * reabiertos / n) : '' },
         { l: 'Tecnicos', v: FMT(new Set(f.map(r => r.Tecnico).filter(Boolean)).size), f: 'en lo filtrado' },
         { l: 'Grupos', v: FMT(new Set(f.map(r => r.Grupo).filter(Boolean)).size), f: 'en lo filtrado' },
       ];
@@ -1864,6 +1875,61 @@ const TableroSla = (function () {
       });
   }
 
+  /* Reabiertos por grupo. Barras horizontales del PORCENTAJE, no del volumen.
+
+     El volumen aqui enganaria: Service Desk tiene 3,677 reabiertos y seria
+     siempre la barra mas larga por ser el grupo mas grande, mientras que un
+     proveedor con 94 reabiertos de 537 tickets -uno de cada seis- quedaria
+     invisible. Lo que se quiere ver es quien reabre en proporcion; el conteo
+     va en el tooltip para no perderlo.
+
+     El servidor ya deja fuera a los grupos con menos de 50 resueltos: con tres
+     tickets y un reabierto, un grupo saldria en 33% encabezando la lista. */
+  function renderReabiertosGrupo() {
+    const hint = document.getElementById('hint-reabiertos');
+    const filas = (datos && datos.distribucion && datos.distribucion.reabiertosGrupo) || [];
+
+    if (!filas.length) {
+      destruir('reabiertosGrupo');
+      hint.textContent = '';
+      // Que nadie reabra es buena noticia, no un tablero roto.
+      return renderEmptyChart('chart-reabiertos-grupo', hayFiltro()
+        ? 'Ningun reabierto pasa los filtros activos.'
+        : 'Ningun grupo con 50 o mas resueltos tiene reabiertos en el rango.');
+    }
+
+    hint.textContent = 'minimo 50 resueltos';
+    const etiquetas = filas.map(x => String(x.Valor ?? ''));
+    const valores = filas.map(x => Number(x.ReabiertosPct) || 0);
+    const colores = filas.map(x => COLOR_SEM[SEM_REABIERTOS(Number(x.ReabiertosPct))] || NEUTRO_SEM);
+
+    dibujarGrafico(graficos, 'reabiertosGrupo', 'chart-reabiertos-grupo',
+      () => ({
+        type: 'bar',
+        data: { labels: etiquetas, datasets: [{ data: valores, backgroundColor: colores, borderRadius: 4 }] },
+        options: {
+          indexAxis: 'y',
+          responsive: true, maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: {
+              label: c => `${c.raw}% reabiertos`,
+              afterLabel: c => {
+                const x = filas[c.dataIndex];
+                return `${FMT(x.Reabiertos)} de ${FMT(x.Resueltos)} resueltos`;
+              }
+            } },
+          },
+          scales: { x: { beginAtZero: true, ticks: { callback: v => `${v}%` } } }
+        }
+      }),
+      gr => {
+        gr.data.labels = etiquetas;
+        gr.data.datasets[0].data = valores;
+        gr.data.datasets[0].backgroundColor = colores;
+      });
+  }
+
   function renderBarraDim(idCanvas, idGrafico, dim, orden, colorFn, mensajeVacio) {
     const ent = entradasDim(dim, orden);
     const etiquetas = ent.map(e => e[0]);
@@ -1907,6 +1973,14 @@ const TableroSla = (function () {
   // Ranking independiente del cross-filter: se pide aparte a productividad.ashx
   // con el rango de fechas y SOLO el filtro de Grupos, asi que ni el filtro de
   // Tecnicos ni los filtros por clic del tablero lo mueven.
+  /* Semaforo de reabiertos: al reves que el de SLA, porque aqui menos es
+     mejor. Los cortes son 5% y 10% y no 90/75 como el de cumplimiento: el
+     promedio global ronda el 4%, asi que con los umbrales del SLA todo saldria
+     verde siempre y el semaforo no diria nada. Con estos, Service Desk -11%- y
+     End User -10.4%- salen en rojo, que es justo lo que hay que mirar. */
+  const SEM_REABIERTOS = pct =>
+    (pct === null || pct === undefined) ? '' : (pct <= 5 ? 'sv' : (pct <= 10 ? 'sa' : 'sr'));
+
   const TOPE_CERRADOS = 10;
 
   // 'YYYY-MM-DD' -> 'DD/MM/YYYY' (solo para mostrar; no se reinterpreta como
@@ -2444,6 +2518,7 @@ const TableroSla = (function () {
        pregunta del Backlog. Con ellas se fueron sus dos dimensiones de
        cross-filter; quedan Prioridad y SLA. */
     renderVencidosGrupo();
+    renderReabiertosGrupo();
     renderBarraDim('chart-prioridad', 'prioridad', 'prioridad',
       null, l => COLOR_PRIORIDAD[l] ?? GRIS, 'Ningun ticket pasa los filtros activos.');
     if (motivo !== 'filtro') {
@@ -2460,7 +2535,7 @@ const TableroSla = (function () {
      estos casos como "sin datos" y pinta el estado vacio de siempre. */
   const DATASET_VACIO = {
     kpis: {}, tendencia: [], productividad: [],
-    distribucion: { prioridad: [], vencidosGrupo: [] },
+    distribucion: { prioridad: [], vencidosGrupo: [], reabiertosGrupo: [] },
     detalle: [], topCerrados: [],
     // Call Center: si llamadas.ashx falla, el bloque pinta sus estados vacios
     // y el resto del tablero de SLA sigue igual que siempre.

@@ -123,7 +123,7 @@
          distinto al de esa pestaña para lo que la gente lee como lo mismo.
          Prioridad si se queda: la prioridad de lo que se resolvio dice en que
          se fue el esfuerzo del periodo. -->
-    <section class="grid3">
+    <section class="grid-auto">
       <div class="card">
         <h3>Cumplimiento de SLA en el tiempo<span class="hint" id="hint-sla-tiempo"></span></h3>
         <div class="lienzo"><canvas id="chart-sla-tiempo"></canvas></div>
@@ -135,6 +135,14 @@
       <div class="card">
         <h3>Prioridad de lo resuelto</h3>
         <div class="lienzo"><canvas id="chart-prioridad"></canvas></div>
+      </div>
+      <!-- Reabiertos: el contrapeso del ranking de productividad. Va por grupo
+           y no como un solo numero porque el global esta diluido por los grupos
+           automatizados: sale 3.88%, y entre los que atiende gente es uno de
+           cada diez. -->
+      <div class="card">
+        <h3>Reabiertos por grupo<span class="hint" id="hint-reabiertos"></span></h3>
+        <div class="lienzo"><canvas id="chart-reabiertos-grupo"></canvas></div>
       </div>
     </section>
 

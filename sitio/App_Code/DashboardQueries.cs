@@ -21,9 +21,20 @@
 //
 // OJO: mientras esto este activo, la logica de las consultas vive en dos
 // sitios (estos textos y los procedimientos usp_Dash_*Multi). Si alguien
-// cambia los procedimientos, el tablero no se entera. Si algun dia se ejecuta
-// fix_tecnicos_separador_pipe.sql en la base, los handlers pueden volver a
-// llamar a los procedimientos y este archivo se borra.
+// cambia los procedimientos, el tablero no se entera.
+//
+// LA CONDICION PARA BORRAR ESTE ARCHIVO YA SE CUMPLE.
+// Decia: "si algun dia se ejecuta fix_tecnicos_separador_pipe.sql en la base,
+// los handlers pueden volver a llamar a los procedimientos y este archivo se
+// borra". El 10 de septiembre de 2026 ese arreglo se metio DENTRO de
+// 04_dashboard_sla.sql -dbo.fn_Dash_SplitListPipe y su uso en las cinco
+// consultas-, asi que los procedimientos ya parten la lista de tecnicos por
+// '|' y hacen exactamente lo mismo que estos textos.
+//
+// Falta decidirlo y hacerlo. Mientras no se haga, CADA CAMBIO HAY QUE
+// APLICARLO EN LOS DOS LADOS: aqui y en 04_dashboard_sla.sql. El dia que se
+// olvide uno, el tablero va a mostrar un numero viejo sin fallar, que es la
+// peor forma de equivocarse.
 //
 // Las consultas son copia literal del cuerpo de los procedimientos: mismo
 // campo (b.Tecnico), mismos filtros de fecha, mismo tope de filas y mismos
@@ -255,6 +266,15 @@ SELECT
     TicketsSlaEvaluable = SUM(CASE WHEN SlaEvaluable = 1 THEN 1 ELSE 0 END),
     TicketsSlaVencidos = SUM(CASE WHEN SlaVencido = 1 THEN 1 ELSE 0 END),
     TicketsDentroSla = SUM(CASE WHEN DentroSla = 1 THEN 1 ELSE 0 END),
+    /* Reabiertos: se dieron por resueltos y volvieron.
+
+       El porcentaje global no describe a nadie -sale 3.88% y esta diluido por
+       los grupos automatizados; entre los que atiende gente es uno de cada
+       diez-, por eso ademas de la tarjeta hay un desglose por grupo. */
+    TicketsReabiertos = SUM(CASE WHEN EsReabierto = 1 THEN 1 ELSE 0 END),
+    ReabiertosPct = CAST(
+        100.0 * SUM(CASE WHEN EsReabierto = 1 THEN 1 ELSE 0 END)
+        / NULLIF(COUNT_BIG(*), 0) AS DECIMAL(6,2)),
     CumplimientoSlaPct = CAST(
         100.0 * SUM(CASE WHEN SlaEvaluable = 1 AND DentroSla = 1 THEN 1 ELSE 0 END)
         / NULLIF(SUM(CASE WHEN SlaEvaluable = 1 THEN 1 ELSE 0 END), 0)
@@ -353,6 +373,7 @@ SELECT
     Grupo = MAX(Grupo),
     TicketsResueltos = COUNT_BIG(*),
     TicketsSlaVencidos = SUM(CASE WHEN SlaVencido = 1 THEN 1 ELSE 0 END),
+    TicketsReabiertos  = SUM(CASE WHEN EsReabierto = 1 THEN 1 ELSE 0 END),
     CumplimientoSlaPct = CAST(
         100.0 * SUM(CASE WHEN SlaEvaluable = 1 AND DentroSla = 1 THEN 1 ELSE 0 END)
         / NULLIF(SUM(CASE WHEN SlaEvaluable = 1 THEN 1 ELSE 0 END), 0)
@@ -367,8 +388,8 @@ ORDER BY TicketsResueltos DESC, Tecnico;";
         return Unico(sql, f, null);
     }
 
-    /* Dos result sets -prioridad y vencidos por grupo- sobre el mismo
-       subconjunto materializado una vez.
+    /* Tres result sets -prioridad, vencidos por grupo y reabiertos por grupo-
+       sobre el mismo subconjunto materializado una vez.
 
        ERAN TRES: estado, prioridad y aging. Estado y aging se fueron con sus
        graficas: describian la situacion actual de los tickets, que es lo que
@@ -387,7 +408,8 @@ SELECT
     Prioridad,
     SlaVencido,
     SlaEvaluable,
-    DentroSla
+    DentroSla,
+    EsReabierto
 INTO #DistribucionBase
 FROM dbo.vw_Dash_ProductividadBase b
 WHERE {0};
@@ -418,10 +440,28 @@ GROUP BY ISNULL(NULLIF(LTRIM(RTRIM(Grupo)), N''), N'Sin grupo')
 HAVING SUM(CASE WHEN SlaVencido = 1 THEN 1 ELSE 0 END) > 0
 ORDER BY Vencidos DESC;
 
+/* Tercer result set: reabiertos por grupo.
+
+   El corte de 50 resueltos es a proposito. Sin el, un grupo con 3 tickets y 1
+   reabierto sale en 33% encabezando la lista y no significa nada: el
+   porcentaje de una muestra chica es ruido, no senal. */
+SELECT TOP (12)
+    Valor      = ISNULL(NULLIF(LTRIM(RTRIM(Grupo)), N''), N'Sin grupo'),
+    Resueltos  = COUNT_BIG(*),
+    Reabiertos = SUM(CASE WHEN EsReabierto = 1 THEN 1 ELSE 0 END),
+    ReabiertosPct = CAST(
+        100.0 * SUM(CASE WHEN EsReabierto = 1 THEN 1 ELSE 0 END)
+        / NULLIF(COUNT_BIG(*), 0) AS DECIMAL(6,2))
+FROM #DistribucionBase
+GROUP BY ISNULL(NULLIF(LTRIM(RTRIM(Grupo)), N''), N'Sin grupo')
+HAVING COUNT_BIG(*) >= 50
+   AND SUM(CASE WHEN EsReabierto = 1 THEN 1 ELSE 0 END) > 0
+ORDER BY ReabiertosPct DESC;
+
 DROP TABLE #DistribucionBase;";
 
-        // SELECT ... INTO no abre result set en el reader, asi que los dos que
-        // salen son directamente prioridad y vencidos por grupo.
+        // SELECT ... INTO no abre result set en el reader, asi que los tres que
+        // salen son prioridad, vencidos por grupo y reabiertos por grupo.
         return Ejecutar(sql, f, null);
     }
 
@@ -454,6 +494,8 @@ SELECT TOP (@TopSeguro)
     HorasAbierto = CAST(HorasAbierto AS DECIMAL(18,2)),
     AgingBucket,
     ReasignacionesGrupo,
+    -- El cross-filter recalcula los reabiertos con esta columna.
+    IntentosSolucion,
     Tienda
 FROM dbo.vw_Dash_ProductividadBase b
 WHERE {0}

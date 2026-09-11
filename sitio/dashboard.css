@@ -600,6 +600,10 @@
   .lienzo.alta { height: 320px; }
   .grid2 { display: grid; grid-template-columns: 1.6fr 1fr; gap: 16px; margin-bottom: 16px; }
   .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 16px; }
+  /* Rejilla que se acomoda sola. A diferencia de .grid3, no hay que tocarla
+     al agregar o quitar una tarjeta: con cuatro da 2x2 y con tres da 3x1, sin
+     dejar una tarjeta suelta a un tercio de ancho en una fila propia. */
+  .grid-auto { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; margin-bottom: 16px; }
 
   /* ---- Sub-pestañas ---- */
   .tabs {
