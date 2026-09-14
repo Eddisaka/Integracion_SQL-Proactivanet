@@ -253,9 +253,33 @@ function currentCats(){
 // tickets. Sumando por C2 (mas los C1 sin hijos, para no perder los que
 // no tienen ninguna subcategoria) el total sigue sin duplicar y ademas
 // no depende de que el dueño del C1 y de sus hijos coincida.
+// Primer segmento de una ruta "/A/B/C", RECORTADO.
+//
+// El recorte no es cosmetico: es lo que hace que un C1&C2 encuentre a su
+// padre. La llave de un C1 viene de fn_CategoriaC1 (replicada en
+// ExperienciaQueries.C1DeTsql), que recorta; la de un C1&C2 viene de
+// fn_CategoriaC1C2 (C1C2De), que NO recorta y conserva la ruta tal cual esta
+// en Proactivanet. Con una categoria sucia como "/Monitoreo Activación
+// Continua /Job Control M" eso da
+//
+//     C1    = "Monitoreo Activación Continua"     (recortado)
+//     C1&C2 = "/Monitoreo Activación Continua /Job Control M"
+//
+// y un split('/')[1] a secas devuelve "Monitoreo Activación Continua " -con
+// el espacio-, que no es igual al C1. El padre parecia no tener hijos, se
+// sumaba TAMBIEN de los suyos, y sus tickets se contaban dos veces: eran los
+// 63 que le sobraban al "Volumen actual" contra la base. Se recorta aqui, en
+// el tablero, y no en C1C2De, porque esa llave tiene que seguir cruzando
+// caracter por caracter con la que emite T-SQL (el catalogo de dueños, entre
+// otras).
+function c1DeRuta(ruta){
+  const s = (ruta||'').split('/')[1];
+  return s===undefined ? s : s.trim();
+}
+
 function aggCats(){
   const cats = currentCats();
-  const c1conHijos = new Set(cats.filter(c=>c.nivel==='C2').map(c=>c.categoria.split('/')[1]));
+  const c1conHijos = new Set(cats.filter(c=>c.nivel==='C2').map(c=>c1DeRuta(c.categoria)));
   return cats.filter(c=>c.nivel==='C2' || !c1conHijos.has(c.categoria));
 }
 
@@ -264,7 +288,7 @@ function renderKPIs(cats, det){
   det = det || cats;
   const vol=cats.reduce((s,c)=>s+volActualDe(c),0);       // volumen: solo C1 (sin duplicar)
   // --- fuente de detalle real: subcategorias C2 + C1 que no tienen hijos C2 ---
-  const c1conHijos=new Set(det.filter(c=>c.nivel==='C2').map(c=>c.categoria.split('/')[1]));
+  const c1conHijos=new Set(det.filter(c=>c.nivel==='C2').map(c=>c1DeRuta(c.categoria)));
   const detReal=det.filter(c=>c.nivel==='C2' || !c1conHijos.has(c.categoria));
   // Cobertura y retraso: sumar los agregados ini_total/ret de las categorias del
   // detalle real (C2 + C1 sin hijos). Se usa el ini_total del motor (que ya suma
@@ -549,7 +573,10 @@ function renderSin(cats){
   const grupos={};   // c1 -> { c1c2 -> [hojas] }
   hojas.forEach(hj=>{
     const partes=hj.categoria.split('/');
-    const c1=partes[1];
+    // El C1 se recorta (ver c1DeRuta) para que byCat[c1] encuentre la fila
+    // del padre y salgan su PO y su Service Owner. El C1&C2 se deja tal
+    // cual: esa llave si tiene que cruzar literal con byCat[c1c2].
+    const c1=c1DeRuta(hj.categoria);
     const c1c2=partes.length>=3 ? ('/'+partes[1]+'/'+partes[2]) : hj.categoria;
     grupos[c1]=grupos[c1]||{};
     (grupos[c1][c1c2]=grupos[c1][c1c2]||[]).push(hj);
@@ -663,7 +690,7 @@ function bindVerCategoriasClicks(bodyId){
 // graficas de TAREA 3) de Vencidas/Activas -- se factoriza para
 // reutilizarse tanto en la tabla como en las 3 graficas del panel.
 function filasBaseVen(cats){
-  const c1conHijos=new Set(cats.filter(c=>c.nivel==='C2').map(c=>c.categoria.split('/')[1]));
+  const c1conHijos=new Set(cats.filter(c=>c.nivel==='C2').map(c=>c1DeRuta(c.categoria)));
   const fuente=cats.filter(c=>c.nivel==='C2' || !c1conHijos.has(c.categoria));
   const vistos=new Set(); const rows=[];
   fuente.forEach(c=>c.iniciativas.forEach(i=>{
@@ -675,7 +702,7 @@ function filasBaseVen(cats){
   return rows;
 }
 function filasBaseAct(cats){
-  const c1conHijos=new Set(cats.filter(c=>c.nivel==='C2').map(c=>c.categoria.split('/')[1]));
+  const c1conHijos=new Set(cats.filter(c=>c.nivel==='C2').map(c=>c1DeRuta(c.categoria)));
   const fuente=cats.filter(c=>c.nivel==='C2' || !c1conHijos.has(c.categoria));
   const vistos=new Set(); const rows=[];
   fuente.forEach(c=>c.iniciativas.forEach(i=>{
@@ -801,7 +828,9 @@ function construirGruposHist(){
   const grupos={};
   hojas.forEach(hj=>{
     const partes=hj.categoria.split('/');
-    const c1=partes[1];
+    // C1 recortado: si no, una categoria con espacios abre DOS renglones de
+    // primer nivel con el mismo nombre. El C1&C2 se deja literal.
+    const c1=c1DeRuta(hj.categoria);
     const c1c2=partes.length>=3 ? ('/'+partes[1]+'/'+partes[2]) : hj.categoria;
     grupos[c1]=grupos[c1]||{};
     (grupos[c1][c1c2]=grupos[c1][c1c2]||[]).push(hj);
@@ -919,7 +948,7 @@ function propagarHistDescendientes(nivel,categoria,marcar){
       hijos[c1c2].forEach(n=>claves.push([3,n.categoria]));
     });
   } else if(nivel===2){
-    const c1=categoria.split('/')[1];
+    const c1=c1DeRuta(categoria);
     const nodos=(grupos[c1] && grupos[c1][categoria])||[];
     nodos.forEach(n=>claves.push([3,n.categoria]));
   }
@@ -955,7 +984,7 @@ function graficarHist(){
       const val=sumaValores(...Object.values(grupos[categoria]).map(nodos=>sumaValores(...nodos.map(valoresPeriodos))));
       series.push({label:categoria, data:val});
     } else if(nivel===2){
-      const c1=categoria.split('/')[1];
+      const c1=c1DeRuta(categoria);
       const nodos=grupos[c1] && grupos[c1][categoria];
       if(!nodos) return;
       series.push({label:categoria, data:sumaValores(...nodos.map(valoresPeriodos))});
@@ -1364,7 +1393,7 @@ let chartEstados=null;
    suficientes para distinguirse (ΔL >= 0.06 entre vecinos). */
 const COLOR_ESTADO={'En Análisis':'#8cbf1e','En Solución':'#4f9528','En Monitoreo':'#256425'};
 function conteoIniciativasPorEstado(cats){
-  const c1conHijos=new Set(cats.filter(c=>c.nivel==='C2').map(c=>c.categoria.split('/')[1]));
+  const c1conHijos=new Set(cats.filter(c=>c.nivel==='C2').map(c=>c1DeRuta(c.categoria)));
   const fuente=cats.filter(c=>c.nivel==='C2' || !c1conHijos.has(c.categoria));
   const vistos=new Set(); const conteo={};
   ESTADOS_ACTIVOS.forEach(e=>conteo[e]=0);
