@@ -24,9 +24,14 @@
           StringComparer.OrdinalIgnoreCase = case-insensitive PERO
           sensible a acentos, espacios y barras)
 
-   C1  = hj.categoria.split('/')[1]          (experiencia.js:554)
+   C1  = c1DeRuta(hj.categoria), o sea split('/')[1] RECORTADO
+                                              (experiencia.js, renderSin)
    C1C2= partes.length>=3 ? '/'+partes[1]+'/'+partes[2] : categoria
-                                              (experiencia.js:555)
+                                              (experiencia.js, renderSin)
+       El C1 se recorta y el C1C2 no, a proposito: el C1 tiene que empatar
+       con la llave que emite fn_CategoriaC1 (que recorta) y el C1C2 con la
+       de fn_CategoriaC1C2 (que no). Si este script vuelve a cortar el path
+       a mano, el corte de C1 lleva LTRIM/RTRIM.
        *** OJO: renderSin NO usa ninguna columna C1/C1C2 del origen de
        datos. categorias_v2 ni siquiera trae esas llaves (ver el dict
        que arma ArmarCategoriasV2 :1005-1015). El C1 que agrupa la tabla
