@@ -50,12 +50,23 @@
        dbo.CatCategoriaDueno.CategoriaN2    PK
        dbo.CatServicioCategoria.PrefijoCategoria  PK + indice unico
 
+   Ninguna de esas cinco tiene por que existir: ProblemCategoria y
+   CatCategoriaDueno las crea el 13, CatServicioCategoria el 11. El bloque 1c
+   revisa cuales estan y se salta las que no, sin tumbar el script. El primer
+   resultado que sale dice exactamente cuales se revisaron y cuales no.
+
    COMO CORRER ESTO
 
-   Tal como esta, SOLO MIDE. Correlo asi primero, mira los bloques 1 y 2, y si
-   el bloque 2 sale vacio cambia a 1 el @Aplicar del BLOQUE 3 -es el unico que
-   hay, y esta justo arriba de las escrituras- y vuelve a correrlo. Las
-   escrituras van en una transaccion: o entran todas o no entra ninguna.
+   CORRELO COMPLETO, DE UNA PASADA, NO POR PEDAZOS. Los bloques se pasan
+   informacion entre si por tablas temporales (#RutaSucia, #Objetivo, #Choque),
+   que viven en la conexion: si ejecutas un bloque suelto no las va a
+   encontrar.
+
+   Tal como esta, SOLO MIDE. Correlo asi primero, mira los bloques 1, 1c y 2, y
+   si el bloque 2 sale vacio cambia a 1 el @Aplicar del BLOQUE 3 -es el unico
+   que hay, y esta justo arriba de las escrituras- y vuelve a correrlo entero.
+   Las escrituras van en una transaccion: o entran todas o no entra ninguna. Y
+   si el bloque 2 encontro choques, el 3 se niega a escribir aunque pongas 1.
 
    POR QUE NO SE COMPARA CON <>
 
@@ -185,38 +196,7 @@ SELECT Bloque = '1) Filas por limpiar', Tabla = 'dbo.Tickets (Categoria)', Filas
 FROM dbo.Tickets AS t
 WHERE EXISTS (SELECT 1 FROM #RutaSucia AS r
               WHERE r.Antes COLLATE Latin1_General_BIN2
-                    = t.Categoria COLLATE Latin1_General_BIN2)
-
-UNION ALL
-SELECT '1) Filas por limpiar', 'dbo.Categorias (RutaCompleta)', COUNT_BIG(*)
-FROM dbo.Categorias
-WHERE RutaCompleta IS NOT NULL
-  AND RutaCompleta COLLATE Latin1_General_BIN2
-      <> dbo.fn_LimpiaEspaciosRuta(RutaCompleta) COLLATE Latin1_General_BIN2
-
-UNION ALL
-SELECT '1) Filas por limpiar', 'dbo.CategoriaServiceOwner (C1C2)', COUNT_BIG(*)
-FROM dbo.CategoriaServiceOwner
-WHERE C1C2 COLLATE Latin1_General_BIN2
-      <> dbo.fn_LimpiaEspaciosRuta(C1C2) COLLATE Latin1_General_BIN2
-
-UNION ALL
-SELECT '1) Filas por limpiar', 'dbo.ProblemCategoria (Categoria)', COUNT_BIG(*)
-FROM dbo.ProblemCategoria
-WHERE Categoria COLLATE Latin1_General_BIN2
-      <> dbo.fn_LimpiaEspaciosRuta(Categoria) COLLATE Latin1_General_BIN2
-
-UNION ALL
-SELECT '1) Filas por limpiar', 'dbo.CatCategoriaDueno (CategoriaN2)', COUNT_BIG(*)
-FROM dbo.CatCategoriaDueno
-WHERE CategoriaN2 COLLATE Latin1_General_BIN2
-      <> dbo.fn_LimpiaEspaciosRuta(CategoriaN2) COLLATE Latin1_General_BIN2
-
-UNION ALL
-SELECT '1) Filas por limpiar', 'dbo.CatServicioCategoria (PrefijoCategoria)', COUNT_BIG(*)
-FROM dbo.CatServicioCategoria
-WHERE PrefijoCategoria COLLATE Latin1_General_BIN2
-      <> dbo.fn_LimpiaEspaciosRuta(PrefijoCategoria) COLLATE Latin1_General_BIN2;
+                    = t.Categoria COLLATE Latin1_General_BIN2);
 GO
 
 /* Y las rutas concretas de dbo.Tickets, con el antes y el despues, para
@@ -235,55 +215,155 @@ ORDER BY Tickets DESC;
 GO
 
 /* =====================================================================================
+   1c) Los catalogos, y 2) los choques de llave
+
+      LOS CATALOGOS VAN POR SQL DINAMICO, Y NO POR CAPRICHO
+
+      SQL Server resuelve los nombres de tabla al COMPILAR el batch, antes de
+      ejecutar una sola linea. Un "IF OBJECT_ID(...) IS NOT NULL SELECT ... FROM
+      dbo.LoQueSea" no protege de nada: si la tabla no existe, revienta el batch
+      entero con "Invalid object name" sin llegar nunca al IF. Y no todas estas
+      tablas tienen por que existir en toda base -ProblemCategoria y
+      CatCategoriaDueno las crea el 13, CatServicioCategoria el 11-, asi que un
+      script estatico se caeria en la primera que falte y no mediria ninguna.
+
+      Metiendo el texto en una variable y ejecutandolo con sp_executesql, cada
+      tabla se compila por separado y en su momento: las que faltan se saltan
+      con un aviso y las demas se miden igual.
+
+      Los valores -nombre de tabla, separador- van como PARAMETROS de
+      sp_executesql, no concatenados dentro del texto. Ademas de lo obvio,
+      evita el enredo de escapar comillas dentro de comillas.
+
+      La lista esta en #Objetivo. Si mañana aparece otro catalogo que guarde
+      rutas, se agrega un renglon ahi y los tres bloques lo recogen solos.
+
+      LlaveExtra dice si la ruta es llave, y contra que:
+          NULL  la columna no es llave -> no puede haber choque
+          ''    la ruta sola es la llave (o trae indice unico) -> choque global
+          'Col' la llave es (Col, ruta) -> solo choca dentro del mismo Col
+   ===================================================================================== */
+IF OBJECT_ID('tempdb..#Objetivo') IS NOT NULL DROP TABLE #Objetivo;
+
+CREATE TABLE #Objetivo
+(
+    Orden      INT           NOT NULL,
+    Tabla      NVARCHAR(200) NOT NULL,
+    Columna    NVARCHAR(128) NOT NULL,
+    LlaveExtra NVARCHAR(128) NULL,
+    Existe     BIT           NOT NULL CONSTRAINT DF_Obj_Existe DEFAULT (0)
+);
+
+INSERT INTO #Objetivo (Orden, Tabla, Columna, LlaveExtra) VALUES
+    (1, N'dbo.Categorias',            N'RutaCompleta',     NULL),
+    (2, N'dbo.CategoriaServiceOwner', N'C1C2',             N''),
+    (3, N'dbo.ProblemCategoria',      N'Categoria',        N'Codigo'),
+    (4, N'dbo.CatCategoriaDueno',     N'CategoriaN2',      N''),
+    (5, N'dbo.CatServicioCategoria',  N'PrefijoCategoria', N'');
+
+/* Tiene que existir la tabla Y la columna: una base a medio migrar puede traer
+   la tabla con la columna nombrada de otro modo, y eso tambien hay que saltarlo
+   en vez de reventar. */
+UPDATE o
+   SET Existe = CASE WHEN OBJECT_ID(o.Tabla, 'U') IS NOT NULL
+                      AND EXISTS (SELECT 1 FROM sys.columns AS c
+                                  WHERE c.object_id = OBJECT_ID(o.Tabla, 'U')
+                                    AND c.name = o.Columna)
+                     THEN 1 ELSE 0 END
+FROM #Objetivo AS o;
+
+SELECT Bloque = '1c) Catalogos encontrados',
+       Tabla  = Tabla + N' (' + Columna + N')',
+       Estado = CASE WHEN Existe = 1 THEN N'se revisa' ELSE N'NO EXISTE - se salta' END
+FROM #Objetivo
+ORDER BY Orden;
+GO
+
+/* ---- 1c) Cuantas filas hay que limpiar en cada catalogo ---- */
+DECLARE @tabla NVARCHAR(200), @col NVARCHAR(128);
+DECLARE @sql NVARCHAR(MAX), @filas BIGINT;
+
+IF OBJECT_ID('tempdb..#Conteo') IS NOT NULL DROP TABLE #Conteo;
+CREATE TABLE #Conteo (Tabla NVARCHAR(300), Filas BIGINT);
+
+DECLARE curConteo CURSOR LOCAL FAST_FORWARD FOR
+    SELECT Tabla, Columna FROM #Objetivo WHERE Existe = 1 ORDER BY Orden;
+OPEN curConteo;
+FETCH NEXT FROM curConteo INTO @tabla, @col;
+WHILE @@FETCH_STATUS = 0
+BEGIN
+    SET @sql = N'SELECT @f = COUNT_BIG(*) FROM ' + @tabla
+             + N' WHERE ' + QUOTENAME(@col) + N' IS NOT NULL'
+             + N'   AND ' + QUOTENAME(@col) + N' COLLATE Latin1_General_BIN2'
+             + N'    <> dbo.fn_LimpiaEspaciosRuta(' + QUOTENAME(@col) + N') COLLATE Latin1_General_BIN2;';
+
+    EXEC sp_executesql @sql, N'@f BIGINT OUTPUT', @f = @filas OUTPUT;
+    INSERT INTO #Conteo (Tabla, Filas) VALUES (@tabla + N' (' + @col + N')', @filas);
+
+    FETCH NEXT FROM curConteo INTO @tabla, @col;
+END
+CLOSE curConteo; DEALLOCATE curConteo;
+
+SELECT Bloque = '1c) Filas por limpiar', Tabla, Filas FROM #Conteo ORDER BY Tabla;
+GO
+
+/* =====================================================================================
    2) Choques de llave
 
-      Las cuatro tablas de catalogo tienen la ruta en la PK. Si la version
-      limpia de una fila ya existe como otra fila, el UPDATE reventaria por
-      llave duplicada. Aqui se ve ANTES.
+      Si la version limpia de una fila YA EXISTE como otra fila, el UPDATE
+      reventaria por llave duplicada y se caeria la transaccion completa.
 
       Si este bloque devuelve filas, NO pongas @Aplicar = 1 todavia: hay que
-      decidir cual de las dos filas se queda (normalmente la limpia, borrando
-      la sucia y reasignando lo que cuelgue de ella). Si sale vacio, adelante.
+      decidir cual de las dos se queda -normalmente la limpia, borrando la sucia
+      y reasignando lo que cuelgue de ella-. Si sale vacio, adelante.
    ===================================================================================== */
-SELECT Bloque = '2) Choques de llave', Tabla = 'dbo.CategoriaServiceOwner',
-       Llave = a.C1C2, LlaveLimpia = dbo.fn_LimpiaEspaciosRuta(a.C1C2)
-FROM dbo.CategoriaServiceOwner AS a
-WHERE a.C1C2 COLLATE Latin1_General_BIN2
-      <> dbo.fn_LimpiaEspaciosRuta(a.C1C2) COLLATE Latin1_General_BIN2
-  AND EXISTS (SELECT 1 FROM dbo.CategoriaServiceOwner AS b
-              WHERE b.C1C2 COLLATE Latin1_General_BIN2
-                    = dbo.fn_LimpiaEspaciosRuta(a.C1C2) COLLATE Latin1_General_BIN2)
+DECLARE @tabla NVARCHAR(200), @col NVARCHAR(128), @extra NVARCHAR(128);
+DECLARE @sql NVARCHAR(MAX);
 
-UNION ALL
-SELECT '2) Choques de llave', 'dbo.ProblemCategoria',
-       a.Codigo + N' | ' + a.Categoria, dbo.fn_LimpiaEspaciosRuta(a.Categoria)
-FROM dbo.ProblemCategoria AS a
-WHERE a.Categoria COLLATE Latin1_General_BIN2
-      <> dbo.fn_LimpiaEspaciosRuta(a.Categoria) COLLATE Latin1_General_BIN2
-  AND EXISTS (SELECT 1 FROM dbo.ProblemCategoria AS b
-              WHERE b.Codigo = a.Codigo
-                AND b.Categoria COLLATE Latin1_General_BIN2
-                    = dbo.fn_LimpiaEspaciosRuta(a.Categoria) COLLATE Latin1_General_BIN2)
+IF OBJECT_ID('tempdb..#Choque') IS NOT NULL DROP TABLE #Choque;
+CREATE TABLE #Choque (Tabla NVARCHAR(300), Llave NVARCHAR(1000), LlaveLimpia NVARCHAR(1000));
 
-UNION ALL
-SELECT '2) Choques de llave', 'dbo.CatCategoriaDueno',
-       a.CategoriaN2, dbo.fn_LimpiaEspaciosRuta(a.CategoriaN2)
-FROM dbo.CatCategoriaDueno AS a
-WHERE a.CategoriaN2 COLLATE Latin1_General_BIN2
-      <> dbo.fn_LimpiaEspaciosRuta(a.CategoriaN2) COLLATE Latin1_General_BIN2
-  AND EXISTS (SELECT 1 FROM dbo.CatCategoriaDueno AS b
-              WHERE b.CategoriaN2 COLLATE Latin1_General_BIN2
-                    = dbo.fn_LimpiaEspaciosRuta(a.CategoriaN2) COLLATE Latin1_General_BIN2)
+DECLARE curChoque CURSOR LOCAL FAST_FORWARD FOR
+    SELECT Tabla, Columna, LlaveExtra FROM #Objetivo
+    WHERE Existe = 1 AND LlaveExtra IS NOT NULL
+    ORDER BY Orden;
+OPEN curChoque;
+FETCH NEXT FROM curChoque INTO @tabla, @col, @extra;
+WHILE @@FETCH_STATUS = 0
+BEGIN
+    SET @sql =
+        N'INSERT INTO #Choque (Tabla, Llave, LlaveLimpia) SELECT @t, '
+      + CASE WHEN @extra = N'' THEN N'a.' + QUOTENAME(@col)
+             ELSE N'CONVERT(NVARCHAR(1000), a.' + QUOTENAME(@extra) + N') + @sep + a.' + QUOTENAME(@col)
+        END
+      + N', dbo.fn_LimpiaEspaciosRuta(a.' + QUOTENAME(@col) + N')'
+      + N' FROM ' + @tabla + N' AS a'
+      + N' WHERE a.' + QUOTENAME(@col) + N' COLLATE Latin1_General_BIN2'
+      + N'    <> dbo.fn_LimpiaEspaciosRuta(a.' + QUOTENAME(@col) + N') COLLATE Latin1_General_BIN2'
+      + N'   AND EXISTS (SELECT 1 FROM ' + @tabla + N' AS b WHERE '
+      + CASE WHEN @extra = N'' THEN N''
+             ELSE N'b.' + QUOTENAME(@extra) + N' = a.' + QUOTENAME(@extra) + N' AND '
+        END
+      + N'b.' + QUOTENAME(@col) + N' COLLATE Latin1_General_BIN2'
+      + N' = dbo.fn_LimpiaEspaciosRuta(a.' + QUOTENAME(@col) + N') COLLATE Latin1_General_BIN2);';
 
-UNION ALL
-SELECT '2) Choques de llave', 'dbo.CatServicioCategoria',
-       a.Servicio + N' | ' + a.PrefijoCategoria, dbo.fn_LimpiaEspaciosRuta(a.PrefijoCategoria)
-FROM dbo.CatServicioCategoria AS a
-WHERE a.PrefijoCategoria COLLATE Latin1_General_BIN2
-      <> dbo.fn_LimpiaEspaciosRuta(a.PrefijoCategoria) COLLATE Latin1_General_BIN2
-  AND EXISTS (SELECT 1 FROM dbo.CatServicioCategoria AS b
-              WHERE b.PrefijoCategoria COLLATE Latin1_General_BIN2
-                    = dbo.fn_LimpiaEspaciosRuta(a.PrefijoCategoria) COLLATE Latin1_General_BIN2);
+    EXEC sp_executesql @sql,
+         N'@t NVARCHAR(300), @sep NVARCHAR(10)',
+         @t = @tabla, @sep = N' | ';
+
+    FETCH NEXT FROM curChoque INTO @tabla, @col, @extra;
+END
+CLOSE curChoque; DEALLOCATE curChoque;
+
+SELECT Bloque = '2) Choques de llave', Tabla,
+       Llave = N'[' + Llave + N']', LlaveLimpia = N'[' + LlaveLimpia + N']'
+FROM #Choque
+ORDER BY Tabla, Llave;
+
+IF NOT EXISTS (SELECT 1 FROM #Choque)
+    PRINT N'Sin choques de llave: se puede aplicar.';
+ELSE
+    PRINT N'HAY CHOQUES DE LLAVE. No pongas @Aplicar = 1 hasta resolverlos.';
 GO
 
 /* =====================================================================================
@@ -293,36 +373,51 @@ GO
       truena, no queda nada a medias con los tickets limpios y los catalogos
       sucios, que seria peor que no haber hecho nada.
 
+      Los catalogos van por el mismo recorrido dinamico del bloque 1c, y por la
+      misma razon: los que no existan se saltan en vez de tumbar el batch. Si el
+      bloque 2 encontro choques de llave, aqui NO se escribe nada -reventaria a
+      media transaccion-, y se dice por que.
+
       NO se recalcula HashFila ni se tocan FechaUltimaModificacion /
       FechaUltimaCargaDW. Lo primero, porque replicar aqui el CONCAT_WS de 48
-      campos del ETL es una fuente de errores mucho mas cara que el sintoma:
-      si un solo campo quedara distinto, el proximo ETL marcaria como
-      cambiadas TODAS las filas. Lo segundo, porque el watermark del ETL sale
-      de MAX(FechaUltimaModificacion) y moverlo le haria saltarse dias.
+      campos del ETL es una fuente de errores mucho mas cara que el sintoma: si
+      un solo campo quedara distinto, el proximo ETL marcaria como cambiadas
+      TODAS las filas. Lo segundo, porque el watermark del ETL sale de
+      MAX(FechaUltimaModificacion) y moverlo le haria saltarse dias.
 
       El efecto de no recalcular el hash es que, si alguno de estos tickets
-      volviera a bajar del origen, el ETL lo veria "cambiado" y lo
-      reescribiria una vez con el texto -ya limpio- del origen. Inofensivo, y
-      en la practica ni pasa: son tickets cerrados que el incremental ya no
-      alcanza.
+      volviera a bajar del origen, el ETL lo veria "cambiado" y lo reescribiria
+      una vez con el texto -ya limpio- del origen. Inofensivo, y en la practica
+      ni pasa: son tickets cerrados que el incremental ya no alcanza.
    ===================================================================================== */
 /* >>>>>>>>>>>>>>  EL UNICO INTERRUPTOR DEL SCRIPT  <<<<<<<<<<<<<<
-   0 = solo mide (los bloques 1, 2 y 4 corren igual). 1 = corrige. */
+   0 = solo mide (los bloques 1, 1c, 2 y 4 corren igual). 1 = corrige. */
 DECLARE @Aplicar BIT = 0;
 
-DECLARE @t INT = 0, @c INT = 0, @so INT = 0, @pc INT = 0, @cd INT = 0, @sc INT = 0;
+DECLARE @t INT = 0, @filasCat INT = 0;
+DECLARE @tabla NVARCHAR(200), @col NVARCHAR(128);
+DECLARE @sql NVARCHAR(MAX);
+
+IF OBJECT_ID('tempdb..#Hecho') IS NOT NULL DROP TABLE #Hecho;
+CREATE TABLE #Hecho (Tabla NVARCHAR(300), Filas INT);
 
 IF @Aplicar = 0
 BEGIN
-    PRINT N'@Aplicar = 0: no se escribio nada. Revisa los bloques 1 y 2; si el 2 salio vacio, pon 1 y vuelve a correr.';
+    PRINT N'@Aplicar = 0: no se escribio nada. Revisa los bloques 1, 1c y 2;';
+    PRINT N'si el 2 salio vacio, pon 1 aqui arriba y vuelve a correr el script COMPLETO.';
+END
+ELSE IF EXISTS (SELECT 1 FROM #Choque)
+BEGIN
+    PRINT N'NO se escribio nada: el bloque 2 encontro choques de llave.';
+    PRINT N'Resuelvelos primero (decidir cual fila se queda) y vuelve a correr.';
 END
 ELSE
 BEGIN
     BEGIN TRY
         BEGIN TRANSACTION;
 
-        /* Por el JOIN contra #RutaSucia, no con la funcion en el WHERE: ver
-           la nota del bloque 1. */
+        /* Tickets va por el JOIN contra #RutaSucia, no con la funcion en el
+           WHERE: ver la nota del bloque 1. */
         UPDATE t
            SET t.Categoria = r.Despues
         FROM dbo.Tickets AS t
@@ -330,54 +425,45 @@ BEGIN
                 ON t.Categoria COLLATE Latin1_General_BIN2
                  = r.Antes COLLATE Latin1_General_BIN2;
         SET @t = @@ROWCOUNT;
+        INSERT INTO #Hecho (Tabla, Filas) VALUES (N'dbo.Tickets (Categoria)', @t);
 
-        UPDATE dbo.Categorias
-           SET RutaCompleta = dbo.fn_LimpiaEspaciosRuta(RutaCompleta)
-        WHERE RutaCompleta IS NOT NULL
-          AND RutaCompleta COLLATE Latin1_General_BIN2
-              <> dbo.fn_LimpiaEspaciosRuta(RutaCompleta) COLLATE Latin1_General_BIN2;
-        SET @c = @@ROWCOUNT;
+        DECLARE curFix CURSOR LOCAL FAST_FORWARD FOR
+            SELECT Tabla, Columna FROM #Objetivo WHERE Existe = 1 ORDER BY Orden;
+        OPEN curFix;
+        FETCH NEXT FROM curFix INTO @tabla, @col;
+        WHILE @@FETCH_STATUS = 0
+        BEGIN
+            SET @sql = N'UPDATE ' + @tabla
+                     + N' SET ' + QUOTENAME(@col) + N' = dbo.fn_LimpiaEspaciosRuta(' + QUOTENAME(@col) + N')'
+                     + N' WHERE ' + QUOTENAME(@col) + N' IS NOT NULL'
+                     + N'   AND ' + QUOTENAME(@col) + N' COLLATE Latin1_General_BIN2'
+                     + N'    <> dbo.fn_LimpiaEspaciosRuta(' + QUOTENAME(@col) + N') COLLATE Latin1_General_BIN2;'
+                     + N' SET @n = @@ROWCOUNT;';
 
-        UPDATE dbo.CategoriaServiceOwner
-           SET C1C2 = dbo.fn_LimpiaEspaciosRuta(C1C2)
-        WHERE C1C2 COLLATE Latin1_General_BIN2
-              <> dbo.fn_LimpiaEspaciosRuta(C1C2) COLLATE Latin1_General_BIN2;
-        SET @so = @@ROWCOUNT;
+            EXEC sp_executesql @sql, N'@n INT OUTPUT', @n = @filasCat OUTPUT;
+            INSERT INTO #Hecho (Tabla, Filas) VALUES (@tabla + N' (' + @col + N')', @filasCat);
 
-        UPDATE dbo.ProblemCategoria
-           SET Categoria = dbo.fn_LimpiaEspaciosRuta(Categoria)
-        WHERE Categoria COLLATE Latin1_General_BIN2
-              <> dbo.fn_LimpiaEspaciosRuta(Categoria) COLLATE Latin1_General_BIN2;
-        SET @pc = @@ROWCOUNT;
-
-        UPDATE dbo.CatCategoriaDueno
-           SET CategoriaN2 = dbo.fn_LimpiaEspaciosRuta(CategoriaN2)
-        WHERE CategoriaN2 COLLATE Latin1_General_BIN2
-              <> dbo.fn_LimpiaEspaciosRuta(CategoriaN2) COLLATE Latin1_General_BIN2;
-        SET @cd = @@ROWCOUNT;
-
-        UPDATE dbo.CatServicioCategoria
-           SET PrefijoCategoria = dbo.fn_LimpiaEspaciosRuta(PrefijoCategoria)
-        WHERE PrefijoCategoria COLLATE Latin1_General_BIN2
-              <> dbo.fn_LimpiaEspaciosRuta(PrefijoCategoria) COLLATE Latin1_General_BIN2;
-        SET @sc = @@ROWCOUNT;
+            FETCH NEXT FROM curFix INTO @tabla, @col;
+        END
+        CLOSE curFix; DEALLOCATE curFix;
 
         COMMIT TRANSACTION;
-
-        PRINT N'Corregido:';
-        PRINT N'  dbo.Tickets                 ' + CONVERT(NVARCHAR(20), @t);
-        PRINT N'  dbo.Categorias              ' + CONVERT(NVARCHAR(20), @c);
-        PRINT N'  dbo.CategoriaServiceOwner   ' + CONVERT(NVARCHAR(20), @so);
-        PRINT N'  dbo.ProblemCategoria        ' + CONVERT(NVARCHAR(20), @pc);
-        PRINT N'  dbo.CatCategoriaDueno       ' + CONVERT(NVARCHAR(20), @cd);
-        PRINT N'  dbo.CatServicioCategoria    ' + CONVERT(NVARCHAR(20), @sc);
+        PRINT N'Corregido. El detalle va en el resultado de abajo.';
     END TRY
     BEGIN CATCH
+        /* El cursor se abre dentro del TRY: si algo truena a media vuelta hay
+           que cerrarlo a mano o se queda colgado en la sesion. */
+        IF CURSOR_STATUS('local', 'curFix') >= 0
+        BEGIN
+            CLOSE curFix; DEALLOCATE curFix;
+        END
         IF XACT_STATE() <> 0 ROLLBACK TRANSACTION;
         PRINT N'No se escribio nada: la transaccion se revirtio completa.';
         THROW;
     END CATCH
 END;
+
+SELECT Bloque = '3) Corregido', Tabla, Filas FROM #Hecho ORDER BY Tabla;
 GO
 
 /* =====================================================================================
@@ -426,7 +512,13 @@ SELECT '4b) Referencia', 'vw_TBSlotCAT (suma)', SUM([Total general])
 FROM dbo.vw_TBSlotCAT WHERE Slot = 0;
 GO
 
+/* Las temporales se tiran al final para que una segunda corrida arranque
+   limpia. Cada bloque las vuelve a crear de todos modos. */
 IF OBJECT_ID('tempdb..#RutaSucia') IS NOT NULL DROP TABLE #RutaSucia;
+IF OBJECT_ID('tempdb..#Objetivo')  IS NOT NULL DROP TABLE #Objetivo;
+IF OBJECT_ID('tempdb..#Conteo')    IS NOT NULL DROP TABLE #Conteo;
+IF OBJECT_ID('tempdb..#Choque')    IS NOT NULL DROP TABLE #Choque;
+IF OBJECT_ID('tempdb..#Hecho')     IS NOT NULL DROP TABLE #Hecho;
 GO
 
 PRINT N'Hora de finalizacion: ' + CONVERT(NVARCHAR(40), SYSDATETIMEOFFSET(), 127);
