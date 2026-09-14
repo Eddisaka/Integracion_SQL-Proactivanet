@@ -7,8 +7,10 @@
 0) Prueba de la funcion [/Servidores/Memoria >= 80%, Warning]                    [/Servidores/Memoria >= 80%, Warning]                                                                                                                                                                                                                            ok
 0) Prueba de la funcion [/Punto de Venta/Aplicativo]                             [/Punto de Venta/Aplicativo]                                                                                                                                                                                                                                     ok
 
-Mens. 208, Nivel 16, Estado 1, Línea 184
-Invalid object name 'dbo.CategoriaServiceOwner'.
+Bloque               Tabla                   Filas
+-------------------- ----------------------- --------------------
+1) Filas por limpiar dbo.Tickets (Categoria) 781
+
 Bloque                        Antes                                                                                                                                                                                                                                                            Despues                                                                                                                                                                                                                                                          Tickets
 ----------------------------- ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- --------------------
 1b) Antes y despues (Tickets) [/Monitoreo Activación Continua /Job Control M]                                                                                                                                                                                                                  [/Monitoreo Activación Continua/Job Control M]                                                                                                                                                                                                                   582
@@ -28,9 +30,30 @@ Bloque                        Antes                                             
 1b) Antes y despues (Tickets) [/Monitoreo Activación Continua /Job SAP]                                                                                                                                                                                                                        [/Monitoreo Activación Continua/Job SAP]                                                                                                                                                                                                                         2
 1b) Antes y despues (Tickets) [/Monitoreo Activación Continua /Storage/Falla de Almacenamiento Unidad D]                                                                                                                                                                                       [/Monitoreo Activación Continua/Storage/Falla de Almacenamiento Unidad D]                                                                                                                                                                                        1
 
-Mens. 208, Nivel 16, Estado 1, Línea 248
-Invalid object name 'dbo.CategoriaServiceOwner'.
-@Aplicar = 0: no se escribio nada. Revisa los bloques 1 y 2; si el 2 salio vacio, pon 1 y vuelve a correr.
+Bloque                    Tabla                                                                                                                                                                                                                                                            Estado
+------------------------- ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- --------------------
+1c) Catalogos encontrados dbo.Categorias (RutaCompleta)                                                                                                                                                                                                                                    se revisa
+1c) Catalogos encontrados dbo.CategoriaServiceOwner (C1C2)                                                                                                                                                                                                                                 NO EXISTE - se salta
+1c) Catalogos encontrados dbo.ProblemCategoria (Categoria)                                                                                                                                                                                                                                 se revisa
+1c) Catalogos encontrados dbo.CatCategoriaDueno (CategoriaN2)                                                                                                                                                                                                                              se revisa
+1c) Catalogos encontrados dbo.CatServicioCategoria (PrefijoCategoria)                                                                                                                                                                                                                      se revisa
+
+Bloque                Tabla                                                                                                                                                                                                                                                            Filas
+--------------------- ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- --------------------
+1c) Filas por limpiar dbo.CatCategoriaDueno (CategoriaN2)                                                                                                                                                                                                                              14
+1c) Filas por limpiar dbo.Categorias (RutaCompleta)                                                                                                                                                                                                                                    299
+1c) Filas por limpiar dbo.CatServicioCategoria (PrefijoCategoria)                                                                                                                                                                                                                      0
+1c) Filas por limpiar dbo.ProblemCategoria (Categoria)                                                                                                                                                                                                                                 6
+
+Bloque              Tabla                                                                                                                                                                                                                                                            Llave                                                                                                                                                                                                                                                            LlaveLimpia
+------------------- ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Sin choques de llave: se puede aplicar.
+@Aplicar = 0: no se escribio nada. Revisa los bloques 1, 1c y 2;
+si el 2 salio vacio, pon 1 aqui arriba y vuelve a correr el script COMPLETO.
+Bloque       Tabla                                                                                                                                                                                                                                                            Filas
+------------ ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- -----------
+
 Bloque                   CategoriasAfectadas TicketsContadosDeMas
 ------------------------ ------------------- --------------------
 4a) Deben quedar en cero 4                   63
@@ -41,6 +64,6 @@ Bloque         Origen              Tickets
 4b) Referencia vw_TicketsSlotsBase 13283
 4b) Referencia vw_TBSlotCAT (suma) 13283
 
-Hora de finalizacion: 2026-09-14T23:02:14.0989596Z
+Hora de finalizacion: 2026-09-14T23:09:58.4859695Z
 
-Hora de finalización: 2026-09-14T17:02:14.1025424-06:00
+Hora de finalización: 2026-09-14T17:09:58.4980032-06:00
