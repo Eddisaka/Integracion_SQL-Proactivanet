@@ -236,11 +236,43 @@ GO
 /* ==================================================================== 3. VISTAS */
 
 /* Tickets con el líder responsable de su grupo.
-   LEFT JOIN: si un grupo no está en el catálogo, el ticket NO se pierde. */
+   LEFT JOIN: si un grupo no está en el catálogo, el ticket NO se pierde.
+
+   OJO CON 'Lider'. Esta vista lo traía como `Lider = l.Lider`, y eso llevaba
+   tiempo roto sin que nadie lo notara, porque nadie volvía a correr este
+   archivo:
+
+       Mensaje 4506: Column name 'Lider' in view 'vw_TicketsConLider'
+                     is specified more than once.
+
+   La causa es la deriva que advierte 01_esquema_proactivanet.sql: la
+   dbo.vw_Tickets de PRODUCCIÓN no es la de ese archivo. La de producción ya
+   hace `SELECT t.*, lg.Lider, ...`, así que `t.*` de aquí abajo YA trae Lider
+   y volver a añadirlo lo duplica.
+
+   Se quita de aquí, no de allá: la de producción es la que usan el tablero y
+   el correo de backlog, y quien consuma esta vista sigue viendo `Lider` porque
+   viene dentro de `t.*`, del mismo CatLiderGrupo y con el mismo valor.
+
+   Se añade Gerente, que sí es nuevo y no está en vw_Tickets. */
+
+/* En una instalación NUEVA, dbo.vw_Tickets es la de 01_esquema_proactivanet.sql,
+   que no trae Lider. Sin esta comprobación la vista se crearía sin esa columna
+   y el fallo aparecería mucho después, en quien la consume. Mejor aquí y
+   diciendo qué hacer. */
+IF OBJECT_ID('dbo.vw_Tickets', 'V') IS NOT NULL
+   AND NOT EXISTS (SELECT 1 FROM sys.columns
+                   WHERE object_id = OBJECT_ID('dbo.vw_Tickets')
+                     AND name = N'Lider')
+    RAISERROR (N'dbo.vw_Tickets no expone Lider. vw_TicketsConLider lo toma de ahi: anada "lg.Lider" a vw_Tickets (join a dbo.CatLiderGrupo por Grupo) antes de seguir.', 16, 1);
+GO
+
 CREATE OR ALTER VIEW dbo.vw_TicketsConLider
 AS
 SELECT t.*,
-       Lider          = l.Lider,
+       Gerente        = l.Gerente,
+       CorreoLider    = l.CorreoLider,
+       CorreoGerente  = l.CorreoGerente,
        TieneLider     = CASE WHEN l.Grupo IS NULL THEN 0 ELSE 1 END,
        LiderVigente   = l.VigenteEnOrigen
 FROM dbo.vw_Tickets AS t
