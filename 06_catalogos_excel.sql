@@ -62,11 +62,26 @@ END
 GO
 
 CREATE OR ALTER PROCEDURE dbo.usp_CargarCatGruposValidos
-    @LoteCarga UNIQUEIDENTIFIER = NULL
+    @LoteCarga UNIQUEIDENTIFIER = NULL,
+    @PermitirVaciar BIT = 0
 AS
 BEGIN
     SET NOCOUNT ON; SET XACT_ABORT ON;
     DECLARE @ins INT = 0, @upd INT = 0;
+
+    /* Este archivo BORRA Y RECREA stg al principio. Si alguien lo corre y
+       despues llama aqui sin volver a cargar el Excel, la tabla de paso esta
+       vacia y el UPDATE final de mas abajo marca TODO el catalogo como no
+       vigente de un golpe, en silencio. Paso de verdad con CatLiderGrupo: 53
+       grupos a cero.
+
+       Vaciar el catalogo puede ser legitimo, pero nunca por accidente: hay que
+       pedirlo con @PermitirVaciar = 1. */
+    IF NOT EXISTS (SELECT 1 FROM stg.CatGruposValidos) AND @PermitirVaciar = 0
+    BEGIN
+        RAISERROR (N'stg.CatGruposValidos esta vacia. Cargue Cat_gruposvalidos.xlsx antes, o llame con @PermitirVaciar = 1 si de verdad quiere marcar todo el catalogo como no vigente.', 16, 1);
+        RETURN;
+    END;
 
     IF OBJECT_ID('tempdb..#G') IS NOT NULL DROP TABLE #G;
     SELECT DISTINCT
@@ -168,11 +183,23 @@ IF COL_LENGTH('dbo.CatLiderGrupo', 'CorreoGerente') IS NULL
 GO
 
 CREATE OR ALTER PROCEDURE dbo.usp_CargarCatLiderGrupo
-    @LoteCarga UNIQUEIDENTIFIER = NULL
+    @LoteCarga UNIQUEIDENTIFIER = NULL,
+    @PermitirVaciar BIT = 0
 AS
 BEGIN
     SET NOCOUNT ON; SET XACT_ABORT ON;
     DECLARE @ins INT = 0, @upd INT = 0;
+
+    /* Misma guarda que en usp_CargarCatGruposValidos, y aqui no es hipotetica:
+       el 15 de septiembre, tras correr este archivo -que recrea stg vacia- y
+       llamar a este procedimiento, los 53 grupos quedaron con
+       VigenteEnOrigen = 0 sin que nada lo dijera. Los nombres no se pierden,
+       pero todo lo que filtra por vigencia deja de verlos. */
+    IF NOT EXISTS (SELECT 1 FROM stg.CatLiderGrupo) AND @PermitirVaciar = 0
+    BEGIN
+        RAISERROR (N'stg.CatLiderGrupo esta vacia. Cargue lider_grupo.xlsx antes, o llame con @PermitirVaciar = 1 si de verdad quiere marcar todo el catalogo como no vigente.', 16, 1);
+        RETURN;
+    END;
 
     IF OBJECT_ID('tempdb..#L') IS NOT NULL DROP TABLE #L;
     /* Si el Excel trajera el mismo grupo dos veces, se conserva uno solo.
