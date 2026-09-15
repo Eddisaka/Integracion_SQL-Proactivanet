@@ -6,6 +6,21 @@
    Idempotente: se puede ejecutar varias veces sin perder datos.
    Ejecutar sobre Tickets_Proactivanet.
 
+   COLUMNAS DE lider_grupo.xlsx
+   ----------------------------
+     Grupo          el grupo resolutor, tal como viene en dbo.Tickets
+     Lider          quien ya venía; es nivel Subdirección
+     Gerente        el responsable directo del grupo
+     CorreoLider    un correo
+     CorreoGerente  UNO O VARIOS, separados por coma, para sumar a los
+                    supervisores del grupo:
+                      edgarrad@soriana.com,gustavonun@soriana.com
+
+   Las tres últimas se añadieron para la alerta de resueltos con mala
+   categorización. Los correos hacen falta porque no existen en ninguna otra
+   parte de la base: CatPersona sólo cubre a los dueños de categoría, y el
+   correo de backlog manda a una lista fija de su config.
+
    NOTA DE DISEÑO
    --------------
    Cat_gruposvalidos NO es un mapeo 1 a 1. Un "Grupo Correcto" admite varios
@@ -96,8 +111,11 @@ IF OBJECT_ID('stg.CatLiderGrupo') IS NOT NULL DROP TABLE stg.CatLiderGrupo;
 GO
 CREATE TABLE stg.CatLiderGrupo
 (
-    Grupo         NVARCHAR(300) NULL,
-    Lider         NVARCHAR(300) NULL,
+    Grupo         NVARCHAR(300)  NULL,
+    Lider         NVARCHAR(300)  NULL,
+    Gerente       NVARCHAR(300)  NULL,
+    CorreoLider   NVARCHAR(500)  NULL,
+    CorreoGerente NVARCHAR(1000) NULL,
     LoteCarga     UNIQUEIDENTIFIER NULL,
     FechaCargaStg DATETIME2(0) NOT NULL CONSTRAINT DF_stgCLG_Fecha DEFAULT (SYSDATETIME())
 );
@@ -107,8 +125,11 @@ IF OBJECT_ID('dbo.CatLiderGrupo') IS NULL
 BEGIN
     CREATE TABLE dbo.CatLiderGrupo
     (
-        Grupo              NVARCHAR(150) NOT NULL,
-        Lider              NVARCHAR(150) NULL,
+        Grupo              NVARCHAR(150)  NOT NULL,
+        Lider              NVARCHAR(150)  NULL,
+        Gerente            NVARCHAR(150)  NULL,
+        CorreoLider        NVARCHAR(500)  NULL,
+        CorreoGerente      NVARCHAR(1000) NULL,
         VigenteEnOrigen    BIT           NOT NULL CONSTRAINT DF_CLG_Vig   DEFAULT (1),
         FechaAltaDW        DATETIME2(0)  NOT NULL CONSTRAINT DF_CLG_Alta  DEFAULT (SYSDATETIME()),
         FechaUltimaCargaDW DATETIME2(0)  NOT NULL CONSTRAINT DF_CLG_Carga DEFAULT (SYSDATETIME()),
@@ -116,6 +137,34 @@ BEGIN
     );
     CREATE INDEX IX_CLG_Lider ON dbo.CatLiderGrupo (Lider) INCLUDE (Grupo);
 END
+GO
+
+/* Gerente, CorreoLider y CorreoGerente se anadieron despues, para la alerta de
+   resueltos con mala categorizacion: el Lider que ya habia resulto ser de nivel
+   Subdireccion, y hacia falta el responsable directo. Ademas, el correo de esas
+   personas no estaba en ninguna parte de la base -el correo de backlog va a una
+   lista fija del config-, asi que sin estas dos columnas la alerta no tendria a
+   donde mandar nada.
+
+   Van ademas con ALTER, no solo dentro del CREATE de arriba: ese CREATE solo
+   corre en una instalacion nueva, y dbo.CatLiderGrupo ya tiene datos en
+   produccion. Asi el archivo sirve para los dos casos y se puede volver a
+   correr sin romper nada.
+
+   CorreoGerente admite VARIOS correos separados por coma:
+
+       "edgarrad@soriana.com,gustavonun@soriana.com"
+
+   para poder sumar a los supervisores del grupo sin inventar otra tabla. De ahi
+   que sea mas larga que CorreoLider. */
+IF COL_LENGTH('dbo.CatLiderGrupo', 'Gerente') IS NULL
+    ALTER TABLE dbo.CatLiderGrupo ADD Gerente NVARCHAR(150) NULL;
+GO
+IF COL_LENGTH('dbo.CatLiderGrupo', 'CorreoLider') IS NULL
+    ALTER TABLE dbo.CatLiderGrupo ADD CorreoLider NVARCHAR(500) NULL;
+GO
+IF COL_LENGTH('dbo.CatLiderGrupo', 'CorreoGerente') IS NULL
+    ALTER TABLE dbo.CatLiderGrupo ADD CorreoGerente NVARCHAR(1000) NULL;
 GO
 
 CREATE OR ALTER PROCEDURE dbo.usp_CargarCatLiderGrupo
@@ -126,30 +175,49 @@ BEGIN
     DECLARE @ins INT = 0, @upd INT = 0;
 
     IF OBJECT_ID('tempdb..#L') IS NOT NULL DROP TABLE #L;
-    /* Si el Excel trajera el mismo grupo dos veces, se conserva uno solo */
-    SELECT Grupo, Lider
+    /* Si el Excel trajera el mismo grupo dos veces, se conserva uno solo.
+       Los correos se normalizan aqui -espacios alrededor de las comas fuera-
+       porque CorreoGerente admite varios y el Excel lo llenan personas: un
+       "uno@soriana.com, otro@soriana.com" con espacio es lo normal, y llega al
+       envio como un destinatario invalido si no se limpia. */
+    SELECT Grupo, Lider, Gerente, CorreoLider, CorreoGerente
     INTO #L
     FROM (
-        SELECT Grupo = LTRIM(RTRIM(Grupo)),
-               Lider = NULLIF(LTRIM(RTRIM(Lider)),''),
+        SELECT Grupo   = LTRIM(RTRIM(Grupo)),
+               Lider   = NULLIF(LTRIM(RTRIM(Lider)),''),
+               Gerente = NULLIF(LTRIM(RTRIM(Gerente)),''),
+               CorreoLider   = NULLIF(LTRIM(RTRIM(REPLACE(REPLACE(
+                                   ISNULL(CorreoLider, N''), N'; ', N','), N' ,', N','))), ''),
+               CorreoGerente = NULLIF(LTRIM(RTRIM(REPLACE(REPLACE(
+                                   ISNULL(CorreoGerente, N''), N'; ', N','), N' ,', N','))), ''),
                rn = ROW_NUMBER() OVER (PARTITION BY LTRIM(RTRIM(Grupo)) ORDER BY (SELECT 1))
         FROM stg.CatLiderGrupo
         WHERE NULLIF(LTRIM(RTRIM(Grupo)),'') IS NOT NULL
     ) q WHERE rn = 1;
 
+    UPDATE #L SET CorreoLider   = REPLACE(CorreoLider,   N', ', N','),
+                  CorreoGerente = REPLACE(CorreoGerente, N', ', N',');
+
     CREATE UNIQUE CLUSTERED INDEX IX_L ON #L (Grupo);
 
     BEGIN TRAN;
         UPDATE d SET d.Lider = t.Lider,
+                     d.Gerente = t.Gerente,
+                     d.CorreoLider = t.CorreoLider,
+                     d.CorreoGerente = t.CorreoGerente,
                      d.VigenteEnOrigen = 1,
                      d.FechaUltimaCargaDW = SYSDATETIME()
         FROM dbo.CatLiderGrupo d
         INNER JOIN #L t ON t.Grupo = d.Grupo
-        WHERE ISNULL(d.Lider,'') <> ISNULL(t.Lider,'') OR d.VigenteEnOrigen = 0;
+        WHERE ISNULL(d.Lider,'')         <> ISNULL(t.Lider,'')
+           OR ISNULL(d.Gerente,'')       <> ISNULL(t.Gerente,'')
+           OR ISNULL(d.CorreoLider,'')   <> ISNULL(t.CorreoLider,'')
+           OR ISNULL(d.CorreoGerente,'') <> ISNULL(t.CorreoGerente,'')
+           OR d.VigenteEnOrigen = 0;
         SET @upd = @@ROWCOUNT;
 
-        INSERT INTO dbo.CatLiderGrupo (Grupo, Lider)
-        SELECT t.Grupo, t.Lider
+        INSERT INTO dbo.CatLiderGrupo (Grupo, Lider, Gerente, CorreoLider, CorreoGerente)
+        SELECT t.Grupo, t.Lider, t.Gerente, t.CorreoLider, t.CorreoGerente
         FROM #L t
         WHERE NOT EXISTS (SELECT 1 FROM dbo.CatLiderGrupo d WHERE d.Grupo = t.Grupo);
         SET @ins = @@ROWCOUNT;
