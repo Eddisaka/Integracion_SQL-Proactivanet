@@ -286,3 +286,44 @@ GRANT SELECT  ON dbo.vw_AlertaQA_Base           TO [PROACTIVANETAD];
 GRANT EXECUTE ON dbo.usp_AlertaQA_Pendientes    TO [PROACTIVANETAD];
 GRANT EXECUTE ON dbo.usp_AlertaQA_MarcarAvisado TO [PROACTIVANETAD];
 GO
+
+
+/* ================================================ 6. QUE QUEDO, Y COMO SE VE
+
+   Este archivo solo CREA objetos: por si solo no devuelve ni una fila, y
+   quedarse sin saber si funciono es exactamente lo que no debe pasar. Esto de
+   aqui abajo no crea nada; dice que quedo instalado y da el primer numero.
+   ============================================================================ */
+SELECT Bloque = N'1. Objetos', Objeto, Estado = CASE WHEN Id IS NULL THEN N'FALTA' ELSE N'ok' END
+FROM (VALUES
+    (N'dbo.AlertaQAAvisado',            OBJECT_ID('dbo.AlertaQAAvisado', 'U')),
+    (N'dbo.vw_AlertaQA_Base',           OBJECT_ID('dbo.vw_AlertaQA_Base', 'V')),
+    (N'dbo.usp_AlertaQA_Pendientes',    OBJECT_ID('dbo.usp_AlertaQA_Pendientes', 'P')),
+    (N'dbo.usp_AlertaQA_MarcarAvisado', OBJECT_ID('dbo.usp_AlertaQA_MarcarAvisado', 'P'))
+) AS v(Objeto, Id);
+
+/* Como se reparten los resueltos de las ultimas 48 horas. Si 'Incorrecto' sale
+   en cero y el resto tambien, la vista no esta viendo nada y hay que mirar
+   por que antes de seguir. */
+SELECT Bloque = N'2. Resueltos, ultimas 48 h', Validacion, Tickets = COUNT(*)
+FROM   dbo.vw_AlertaQA_Base
+WHERE  FechaFirmaSolucion >= DATEADD(HOUR, -48, SYSDATETIME())
+GROUP BY Validacion
+ORDER BY COUNT(*) DESC;
+
+/* Cuantos se avisarian AHORA MISMO, por lider. Es una llamada de mentira al
+   procedimiento: no marca nada, no manda nada. */
+SELECT Bloque   = N'3. Se avisaria de',
+       Lider    = ISNULL(NULLIF(LTRIM(RTRIM(b.Lider)), N''), N'Sin lider'),
+       Tickets  = COUNT(*),
+       Tecnicos = COUNT(DISTINCT b.Tecnico)
+FROM   dbo.vw_AlertaQA_Base AS b
+WHERE  b.Validacion = N'Incorrecto'
+  AND  b.FechaFirmaSolucion >= DATEADD(HOUR, -48, SYSDATETIME())
+  AND  NOT EXISTS (SELECT 1 FROM dbo.AlertaQAAvisado a WHERE a.CodigoTicket = b.CodigoTicket)
+GROUP BY ISNULL(NULLIF(LTRIM(RTRIM(b.Lider)), N''), N'Sin lider')
+ORDER BY COUNT(*) DESC;
+
+/* Y lo que ya se aviso, que al instalar debe estar vacio */
+SELECT Bloque = N'4. Ya avisados', Filas = COUNT(*) FROM dbo.AlertaQAAvisado;
+GO
