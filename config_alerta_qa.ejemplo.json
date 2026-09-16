@@ -1,0 +1,30 @@
+{
+  "_comentario": "PLANTILLA de config_alerta_qa.json, que usa Enviar_AlertaQA.ps1. Copiala como config_alerta_qa.json y ajustala. NO subas config_alerta_qa.json a git: lleva el webhook de Teams, que es una credencial. .gitignore ya lo cubre.",
+
+  "_modo_prueba": "DEJALO EN true LA PRIMERA VEZ. Con true: todos los correos van a destinatario_prueba y NO a los lideres, no se publica nada en Teams, y no se marca ningun ticket como avisado, asi que se puede repetir cuantas veces haga falta. Cada correo de prueba dice arriba a quien habria ido de verdad. Ponlo en false solo cuando el ensayo se vea bien.",
+  "modo_prueba": true,
+  "destinatario_prueba": "tu.usuario@soriana.com",
+
+  "_destinatario_respaldo": "A donde van los avisos de grupos que NO tienen lider en lider_grupo.xlsx. Sin esto esos tickets se perderian en silencio. Admite varios correos separados por coma.",
+  "destinatario_respaldo": "tu.usuario@soriana.com",
+
+  "_remitente": "Usa el mismo buzon que ya usan los otros correos automatizados: copialo de tu config_correo_backlog.json.",
+  "remitente": "reportes-ti@soriana.com",
+
+  "_smtp": "Relay interno de Soriana. Acepta correo sin autenticacion desde las IPs conocidas, por eso smtp_usuario va vacio. Si algun dia hiciera falta usuario, la contrasena NO se escribe aqui: se lee de la variable de entorno PVNET_SMTP_PASS.",
+  "smtp_servidor": "corpex10.soriana.com",
+  "smtp_puerto": 25,
+  "smtp_usa_ssl": false,
+  "smtp_usuario": "",
+
+  "_ventana_horas": "Cuantas horas hacia atras se miran los tickets resueltos. Puede ser generosa sin miedo: lo que evita repetir avisos es la tabla dbo.AlertaQAAvisado, no esta ventana. 48 cubre un fin de semana largo o un dia que la tarea no haya corrido; con 24 un ticket resuelto el viernes tarde ya no se alcanzaria el lunes.",
+  "ventana_horas": 48,
+
+  "_teams_webhook": "URL del flujo de Power Automate del canal -Workflows > 'Post to a channel when a webhook request is received'-. ES UNA CREDENCIAL: quien tenga la URL puede publicar en el canal. Dejalo vacio para no publicar en Teams. Si se filtra, se regenera el flujo y la URL vieja deja de servir.",
+  "teams_webhook": "",
+
+  "_api_base": "Normalmente VACIO: la direccion se deduce del config.json del ETL, igual que hace el propio ETL -del host de api.url_cruda_incremental, o de ids_proactivanet.url_incidentes si esta lleno-. Solo se llena si esa deduccion fallara. El token sale de PVNET_API_TOKEN o de api.auth.token del mismo config.json.",
+  "api_base": "",
+
+  "_para_que_sirve_el_api": "Para el correo de los tecnicos. CatAgenteTecnico solo cubre Service Desk y End User: la mitad de los tecnicos que aparecen no estan ahi. Si el API no responde, el aviso sale igual -al lider y al gerente- y el correo dice a quien no se pudo copiar."
+}
