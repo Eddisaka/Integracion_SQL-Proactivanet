@@ -26,5 +26,8 @@
   "_api_base": "Normalmente VACIO: la direccion se deduce del config.json del ETL, igual que hace el propio ETL -del host de api.url_cruda_incremental, o de ids_proactivanet.url_incidentes si esta lleno-. Solo se llena si esa deduccion fallara. El token sale de PVNET_API_TOKEN o de api.auth.token del mismo config.json.",
   "api_base": "",
 
+  "_api_proxy": "Como salir a la red para llamar al API. Dejalo VACIO o en 'auto': prueba primero con la configuracion de proxy de Windows y las credenciales de la sesion, y si el proxy contesta 407 reintenta saltandoselo, que es como llega el ETL en Python. El script dice en el log cual funciono; cuando lo sepas, ponlo aqui -'credenciales' o 'directo'- y deja de gastar el intento que sobra. Esto NO afecta al webhook de Teams, que siempre sale por el proxy porque es un host externo.",
+  "api_proxy": "auto",
+
   "_para_que_sirve_el_api": "Para el correo de los tecnicos. CatAgenteTecnico solo cubre Service Desk y End User: la mitad de los tecnicos que aparecen no estan ahi. Si el API no responde, el aviso sale igual -al lider y al gerente- y el correo dice a quien no se pudo copiar."
 }

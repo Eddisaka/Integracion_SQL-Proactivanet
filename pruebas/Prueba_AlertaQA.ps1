@@ -47,7 +47,8 @@ if ($errores -and $errores.Count -gt 0) {
     exit 1
 }
 
-$queremos = @("Clave-DeNombre", "Correos-De", "Base-DelApi", "Destinatarios-DelLider")
+$queremos = @("Clave-DeNombre", "Correos-De", "Base-DelApi", "Destinatarios-DelLider",
+              "Es-ProblemaDeProxy")
 $definiciones = $arbol.FindAll({
     param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst]
 }, $true)
@@ -356,6 +357,40 @@ Comprobar "DataRow: Group-Object -Property Tecnico" `
     ((@($filasReales | Group-Object -Property Tecnico | Sort-Object Count -Descending) | Select-Object -First 1).Count) 2
 Comprobar "DataRow: fecha formateada" `
     ("{0:yyyy-MM-dd HH:mm}" -f $filasReales[1]["FechaFirmaSolucion"]) "2026-09-16 11:30"
+
+# ========================================================= Es-ProblemaDeProxy
+# Decide si vale la pena reintentar la llamada al API saltandose el proxy. Si
+# dice que si cuando no lo es, se pierde un minuto en un reintento inutil; si
+# dice que no cuando si lo era, nadie recibe copia y el motivo -el proxy, no el
+# API- queda escondido detras de un mensaje generico.
+Write-Host "Es-ProblemaDeProxy"
+
+function Fallo($mensaje, $estado) {
+    $respuesta = if ($estado) { [pscustomobject]@{ StatusCode = $estado } } else { $null }
+    [pscustomobject]@{ Exception = [pscustomobject]@{ Response = $respuesta; Message = $mensaje } }
+}
+
+# El caso real, con Windows en espanol: el mensaje viene traducido.
+Comprobar "407 en espanol" `
+    (Es-ProblemaDeProxy (Fallo "Error en el servidor remoto: (407) Se requiere autenticacion del proxy." $null)) $true
+Comprobar "407 en ingles" `
+    (Es-ProblemaDeProxy (Fallo "The remote server returned an error: (407) Proxy Authentication Required." $null)) $true
+# Y por codigo, sin depender del idioma del mensaje.
+Comprobar "407 por codigo de estado" `
+    (Es-ProblemaDeProxy (Fallo "lo que sea" ([Net.HttpStatusCode]::ProxyAuthenticationRequired))) $true
+
+# Lo que NO es del proxy: reintentar sin proxy fallaria igual y solo gastaria
+# tiempo de la pasada.
+Comprobar "401 no es del proxy" `
+    (Es-ProblemaDeProxy (Fallo "Error en el servidor remoto: (401) No autorizado." ([Net.HttpStatusCode]::Unauthorized))) $false
+Comprobar "DNS no es del proxy" `
+    (Es-ProblemaDeProxy (Fallo "No se puede resolver el nombre remoto: 'soriana.proactivanet.com'" $null)) $false
+Comprobar "timeout no es del proxy" `
+    (Es-ProblemaDeProxy (Fallo "Se agoto el tiempo de espera de la operacion." $null)) $false
+Comprobar "sin mensaje" (Es-ProblemaDeProxy (Fallo $null $null)) $false
+# Un numero que CONTIENE 407 no es un 407: por eso la expresion lleva \b.
+Comprobar "el ticket 1407 no es un 407" `
+    (Es-ProblemaDeProxy (Fallo "Fallo al procesar el incidente 1407." $null)) $false
 
 # ---- 3. Que el .ps1 no tenga acentos ------------------------------------
 # Windows PowerShell 5.1 lee los .ps1 sin BOM en ANSI: un acento rompe el

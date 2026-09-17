@@ -49,8 +49,37 @@ Add-Type -AssemblyName "System.Data"
 [Net.ServicePointManager]::SecurityProtocol =
     [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 
+# EL PROXY DE LA EMPRESA
+# Invoke-RestMethod hereda la configuracion de proxy de Windows pero NO le manda
+# las credenciales de la sesion, asi que el proxy contesta 407 ("Se requiere
+# autenticacion del proxy") y la llamada muere antes de salir. El ETL en Python
+# no se topa con esto porque requests, sin HTTP_PROXY definido, va directo.
+#
+# Darle al proxy las credenciales del usuario que corre la tarea es lo que
+# necesita el webhook de Teams, que si es un host externo. Para el API de
+# Proactivanet, que es interno, ademas hay un plan B mas abajo: saltarse el
+# proxy, igual que hace el ETL.
+if ([Net.WebRequest]::DefaultWebProxy) {
+    [Net.WebRequest]::DefaultWebProxy.Credentials =
+        [Net.CredentialCache]::DefaultNetworkCredentials
+}
+
 function Escribir($texto) {
     Write-Host ("{0}  {1}" -f (Get-Date -Format "HH:mm:ss"), $texto)
+}
+
+# Un 407 tiene exactamente dos arreglos -autenticarse o saltarse el proxy- y
+# cual sirve depende de la red, no del script. Por eso hay que reconocerlo:
+# distinguirlo de un error cualquiera es lo que permite reintentar solo cuando
+# el reintento tiene sentido.
+function Es-ProblemaDeProxy($fallo) {
+    $respuesta = $fallo.Exception.Response
+    if ($respuesta -and $respuesta.StatusCode -eq
+        [Net.HttpStatusCode]::ProxyAuthenticationRequired) { return $true }
+    # El mensaje viene traducido a la configuracion regional de Windows, asi que
+    # no se puede buscar el texto en ingles. "proxy" y "407" si son iguales en
+    # las dos.
+    return ([string]$fallo.Exception.Message -match "\b407\b|proxy")
 }
 
 $configSql  = Get-Content (Join-Path $carpetaScript "config.json")           -Raw | ConvertFrom-Json
@@ -172,6 +201,52 @@ function Base-DelApi($configEtl, $configAlerta) {
     return ""
 }
 
+# Llama al API probando, si hace falta, las dos salidas del 407. Devuelve lo que
+# conteste el API, o lanza si ninguna sirvio.
+#
+#   auto (por omision)  primero como esta configurado Windows -que es lo que
+#                       necesita cualquier host externo-, y si el proxy contesta
+#                       407, otra vez saltandoselo, que es como llega el ETL.
+#   credenciales        solo la primera.
+#   directo             solo la segunda.
+#
+# Se anota cual funciono para que se pueda fijar en el config y dejar de gastar
+# el intento que sobra.
+function Leer-Tecnicos([string]$url, [string]$token, [string]$modoConfigurado) {
+    $modos = switch ($modoConfigurado) {
+        "credenciales" { @("credenciales") }
+        "directo"      { @("directo") }
+        default        { @("credenciales", "directo") }
+    }
+
+    # El proxy es del proceso entero, y mas abajo Teams lo necesita: se deja
+    # como estaba pase lo que pase aqui.
+    $proxyOriginal = [Net.WebRequest]::DefaultWebProxy
+    try {
+        for ($i = 0; $i -lt $modos.Count; $i++) {
+            $modo = $modos[$i]
+            if ($modo -eq "directo") { [Net.WebRequest]::DefaultWebProxy = $null }
+            else                     { [Net.WebRequest]::DefaultWebProxy = $proxyOriginal }
+            try {
+                $respuesta = Invoke-RestMethod -Uri $url -Headers @{ Authorization = $token } -TimeoutSec 60
+                if ($modoConfigurado -notin @("credenciales", "directo")) {
+                    Escribir ("API: se llego por '{0}'. Para no reintentar cada vez, ponga api_proxy = `"{0}`" en config_alerta_qa.json." -f $modo)
+                }
+                return $respuesta
+            } catch {
+                $ultimo = $_
+                # Reintentar solo cuando el reintento puede cambiar algo: si el
+                # API contesto 401 o no hay red, la otra ruta fallaria igual.
+                if ($i -eq $modos.Count - 1 -or -not (Es-ProblemaDeProxy $_)) { throw }
+                Escribir ("AVISO: el proxy pidio autenticacion ({0}). Se reintenta sin proxy, como el ETL." -f $modo)
+            }
+        }
+        throw $ultimo
+    } finally {
+        [Net.WebRequest]::DefaultWebProxy = $proxyOriginal
+    }
+}
+
 $correoPorTecnico = @{}
 try {
     $baseApi = Base-DelApi $configSql $cfg
@@ -182,7 +257,7 @@ try {
     if ($baseApi -and $token) {
         $tecnicosAmbiguos = @()
         $url = ($baseApi.TrimEnd('/')) + "/api/Technicians"
-        $tecnicos = Invoke-RestMethod -Uri $url -Headers @{ Authorization = $token } -TimeoutSec 60
+        $tecnicos = Leer-Tecnicos $url $token ([string]$cfg.api_proxy)
         foreach ($t in $tecnicos) {
             $correo = $t.Mail; if (-not $correo) { $correo = $t.Email }
             if (-not $correo) { continue }

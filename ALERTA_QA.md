@@ -75,6 +75,39 @@ es peor que no mandarlo.
 Si el API no responde, **el aviso sale igual** al lider y al gerente, sin copia
 a los tecnicos y diciendolo en el log. Un aviso incompleto vale mas que ninguno.
 
+### El proxy de la empresa
+
+En el primer ensayo real el API contesto esto:
+
+```
+AVISO: no se pudo leer /api/Technicians (Error en el servidor remoto:
+(407) Se requiere autenticacion del proxy.)
+```
+
+El 407 **no es del API**: es del proxy de Soriana. `Invoke-RestMethod` hereda la
+configuracion de proxy de Windows pero no le manda las credenciales de la
+sesion. El ETL en Python no se topa con esto porque `requests`, sin `HTTP_PROXY`
+definido, sale directo.
+
+Un 407 tiene exactamente dos arreglos, y cual sirve depende de la red:
+
+| | |
+|---|---|
+| `credenciales` | Darle al proxy la cuenta que corre la tarea |
+| `directo` | Saltarse el proxy, porque el host es interno — como el ETL |
+
+Con `api_proxy` en `auto` (lo que trae el ejemplo) se prueban los dos: primero
+con credenciales, y si el proxy vuelve a contestar 407, otra vez sin proxy. El
+log dice cual funciono, y ese valor se puede fijar en el config para dejar de
+gastar el intento que sobra.
+
+El reintento **solo** ocurre si el error es del proxy. Un 401 del API o un
+nombre que no resuelve fallarian igual por la otra ruta, y reintentar solo
+gastaria tiempo de la pasada.
+
+El webhook de Teams es un host **externo** y sale siempre por el proxy, ahora ya
+con las credenciales de la sesion.
+
 ## Teams
 
 El resumen — cuantos tickets y cuantos tecnicos por lider — se publica como
@@ -164,8 +197,8 @@ ETL, para que la alerta vea la base al dia. Ver
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File pruebas\Prueba_AlertaQA.ps1
 ```
 
-65 comprobaciones, sin tocar la base, sin red y sin mandar nada. Cubren las
-cuatro funciones que deciden **a quien** se le manda, que son las unicas cuyo
+73 comprobaciones, sin tocar la base, sin red y sin mandar nada. Cubren las
+cinco funciones que deciden **a quien** se le manda, que son las unicas cuyo
 error no se nota: el correo sale igual, solo que a quien no era.
 
 Las funciones no se copian en la prueba: se leen del propio
@@ -180,7 +213,7 @@ estan escritas, para que la prueba no pueda quedarse atras del codigo.
 | `06_catalogos_excel.sql` | Agrega `Gerente`, `CorreoLider` y `CorreoGerente` al catalogo de lideres |
 | `Enviar_AlertaQA.ps1` | El envio |
 | `config_alerta_qa.ejemplo.json` | Plantilla del config. El real **no** se sube |
-| `pruebas\Prueba_AlertaQA.ps1` | Las 65 comprobaciones |
+| `pruebas\Prueba_AlertaQA.ps1` | Las 73 comprobaciones |
 
 ## Una nota sobre la codificacion
 
