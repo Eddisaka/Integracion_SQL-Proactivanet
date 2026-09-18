@@ -207,9 +207,10 @@ try {
 # funcion les pide es el indexador ["columna"], igual que a un DataRow.
 Write-Host "Destinatarios-DelLider"
 
-function Fila($grupo, $tecnico, $correoLider, $correoGerente, $esProveedor) {
+function Fila($grupo, $tecnico, $correoLider, $correoGerente, $esProveedor, $esCuenta = 0) {
     @{ Grupo = $grupo; Tecnico = $tecnico; CorreoLider = $correoLider
-       CorreoGerente = $correoGerente; EsProveedor = $esProveedor }
+       CorreoGerente = $correoGerente; EsProveedor = $esProveedor
+       EsCuentaNoPersona = $esCuenta }
 }
 
 $agenda = @{
@@ -268,6 +269,52 @@ $caso = Destinatarios-DelLider @(
 Comprobar "desconocido: copia vacia"    ($caso.Copia.Count)         0
 Comprobar "desconocido: se reporta"     ($caso.SinCorreo -join "|") "Perez Gomez, Juan"
 
+# --- cuentas de sistema: ni copia, ni reproche ---------------------------
+# "User, Setup" cierra tickets en doce grupos y no es una persona. Sus tickets
+# se QUEDAN -estan mal categorizados de verdad- pero no se le busca correo...
+$agendaConCuenta = @{
+    (Clave-DeNombre "Lucia Torres") = "tecnico2@ejemplo.com"
+    # ...aunque el API devolviera un buzon para ella, que puede pasar:
+    (Clave-DeNombre "User, Setup")  = "setup@ejemplo.com"
+}
+$caso = Destinatarios-DelLider @(
+    (Fila "End User" "User, Setup" "lider@ejemplo.com" "gerente@ejemplo.com" 0 1)
+) $false $respaldo $agendaConCuenta
+Comprobar "cuenta de sistema: el lider igual recibe" ($caso.Para -join "|")  "lider@ejemplo.com"
+Comprobar "cuenta de sistema: NO se le copia"        ($caso.Copia -join "|") "gerente@ejemplo.com"
+# Y esto es lo que distingue "no es persona" de "no encontre su correo": una
+# cuenta de sistema sin correo no es una falla, asi que no se reporta. Si
+# entrara en la nota, cada correo traeria una linea de ruido que entrena a no
+# leer esa linea, y el dia que falte el correo de alguien de verdad no se veria.
+Comprobar "cuenta de sistema: no se reporta como sin correo" ($caso.SinCorreo.Count) 0
+
+# Mezcla: la persona si se copia y si se reporta; la cuenta no hace ninguna.
+$caso = Destinatarios-DelLider @(
+    (Fila "End User" "User, Setup"   "lider@ejemplo.com" "gerente@ejemplo.com" 0 1),
+    (Fila "End User" "Lucia Torres"  "lider@ejemplo.com" "gerente@ejemplo.com" 0 0),
+    (Fila "End User" "Perez, Juan"   "lider@ejemplo.com" "gerente@ejemplo.com" 0 0)
+) $false $respaldo $agendaConCuenta
+Comprobar "mezcla: solo la persona conocida en copia" ($caso.Copia -join "|") `
+    "gerente@ejemplo.com|tecnico2@ejemplo.com"
+Comprobar "mezcla: solo la persona desconocida se reporta" ($caso.SinCorreo -join "|") "Perez, Juan"
+
+# Una cuenta de sistema en grupo de proveedor: las dos reglas a la vez, sin
+# que una deshaga a la otra.
+$caso = Destinatarios-DelLider @(
+    (Fila "Proveedor Fenicia" "Transnetwork, Proveedor" "lider@ejemplo.com" "gerente@ejemplo.com" 1 1)
+) $false $respaldo $agendaConCuenta
+Comprobar "proveedor + cuenta: para = lider"   ($caso.Para -join "|")  "lider@ejemplo.com"
+Comprobar "proveedor + cuenta: copia = gerente" ($caso.Copia -join "|") "gerente@ejemplo.com"
+Comprobar "proveedor + cuenta: nada que reportar" ($caso.SinCorreo.Count) 0
+
+# La columna ausente -una base sin el 14 actualizado- no puede reventar el
+# aviso: sin bandera, se trata como persona, que es como se comportaba antes.
+$caso = Destinatarios-DelLider @(
+    @{ Grupo = "End User"; Tecnico = "Lucia Torres"; CorreoLider = "lider@ejemplo.com"
+       CorreoGerente = ""; EsProveedor = 0 }
+) $false $respaldo $agendaConCuenta
+Comprobar "sin la columna nueva: se comporta como antes" ($caso.Copia -join "|") "tecnico2@ejemplo.com"
+
 # --- sin lider: al respaldo ----------------------------------------------
 $caso = Destinatarios-DelLider @(
     (Fila "Grupo Nuevo" "Lucia Torres" "" "" 0)
@@ -324,14 +371,18 @@ foreach ($c in @("Lider","Grupo","Tecnico","CodigoTicket","Categoria","GrupoCorr
 }
 [void]$tabla.Columns.Add("FechaFirmaSolucion", [datetime])
 [void]$tabla.Columns.Add("EsProveedor", [int])
+[void]$tabla.Columns.Add("EsCuentaNoPersona", [int])
 
 [void]$tabla.Rows.Add("Herrera","End User","Lucia Torres","INC-1","Cat A","Redes",
-                      "lider@ejemplo.com","gerente1@ejemplo.com",(Get-Date "2026-09-15 10:00"),0)
+                      "lider@ejemplo.com","gerente1@ejemplo.com",(Get-Date "2026-09-15 10:00"),0,0)
 [void]$tabla.Rows.Add("Herrera","Service Desk","Lucia Torres","INC-2","Cat B","Redes",
-                      "lider@ejemplo.com","gerente2@ejemplo.com",(Get-Date "2026-09-16 11:30"),0)
-# Ivan solo aparece en el grupo de proveedor: no debe ir en copia.
+                      "lider@ejemplo.com","gerente2@ejemplo.com",(Get-Date "2026-09-16 11:30"),0,0)
+# Mario solo aparece en el grupo de proveedor: no debe ir en copia.
 [void]$tabla.Rows.Add("Herrera","Proveedor Fenicia","Ramirez Solis, Mario Mario","INC-3","Cat C","Tiendas",
-                      "lider@ejemplo.com","gerente1@ejemplo.com",(Get-Date "2026-09-16 08:00"),1)
+                      "lider@ejemplo.com","gerente1@ejemplo.com",(Get-Date "2026-09-16 08:00"),1,0)
+# Y una cuenta de sistema, como llega de verdad del procedimiento.
+[void]$tabla.Rows.Add("Herrera","End User","User, Setup","INC-5","Cat D","Service Desk",
+                      "lider@ejemplo.com","gerente1@ejemplo.com",(Get-Date "2026-09-17 09:00"),0,1)
 # Fila con nulos de verdad (DBNull), no con cadenas vacias.
 $nula = $tabla.NewRow()
 $nula["Lider"] = "Herrera"; $nula["Grupo"] = "X"; $nula["CodigoTicket"] = "INC-4"
@@ -352,7 +403,19 @@ Comprobar "DataRow: nulos y proveedor no ensucian sin-correo" ($caso.SinCorreo.C
 # Y que el agrupado y el formato de fecha que usa el cuerpo del correo tambien
 # funcionan sobre DataRow, que es donde se leen por nombre de propiedad.
 Comprobar "DataRow: Group-Object -Property Lider" `
-    ((@($filasReales | Group-Object -Property Lider) | ForEach-Object { "$($_.Name)=$($_.Count)" }) -join ",") "Herrera=4"
+    ((@($filasReales | Group-Object -Property Lider) | ForEach-Object { "$($_.Name)=$($_.Count)" }) -join ",") "Herrera=5"
+
+# Lo que de verdad importa del bloque de DataRow: la cuenta de sistema no se
+# cuela en la copia ni en la nota, con la columna llegando como int de una
+# DataTable y no como un valor de una tabla hash.
+Comprobar "DataRow: la cuenta de sistema no va en copia" `
+    (@($caso.Copia | Where-Object { $_ -like "setup@*" }).Count) 0
+Comprobar "DataRow: la cuenta de sistema no se reporta" `
+    (@($caso.SinCorreo | Where-Object { $_ -like "User*" }).Count) 0
+# Y sus tickets NO desaparecen: siguen en el grupo del lider, que es el punto
+# de toda la decision.
+Comprobar "DataRow: los tickets de la cuenta se quedan" `
+    (@($filasReales | Where-Object { $_["EsCuentaNoPersona"] -eq 1 }).Count) 1
 Comprobar "DataRow: Group-Object -Property Tecnico" `
     ((@($filasReales | Group-Object -Property Tecnico | Sort-Object Count -Descending) | Select-Object -First 1).Count) 2
 Comprobar "DataRow: fecha formateada" `

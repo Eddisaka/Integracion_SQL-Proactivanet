@@ -127,6 +127,28 @@ SELECT
        queda corto y hay que darle una columna propia al catalogo. */
     EsProveedor = CASE WHEN LTRIM(RTRIM(t.Grupo)) LIKE N'Proveedor%' THEN 1 ELSE 0 END,
 
+    /* Quien firmo no siempre es una persona. "User, Setup" cierra tickets en
+       doce grupos distintos, y hay siete cuentas mas asi -de automatizacion,
+       genericas y de proveedor- en dbo.CatCuentaNoPersona.
+
+       Es una BANDERA, no un filtro: estos tickets estan mal categorizados
+       igual que los demas y alguien tiene que corregirlos. Quitarlos de la
+       vista los haria desaparecer del aviso, y entonces nadie se enteraria de
+       que existen. Lo que cambia es COMO se muestran -no se le echa la culpa a
+       una persona que no existe- y que no se les busca correo.
+
+       El cruce es por igualdad simple porque se midio: Cuenta trae los
+       nombres exactamente como vienen en FirmaSolucion, sin espacios de mas
+       ni diferencias de escritura. Si algun dia dejara de cruzar, el bloque 3
+       de 16_localizar_cuentas_no_persona.sql lo dice.
+
+       Habilitado = 1 se respeta: da como deshabilitar una fila sin borrarla. */
+    EsCuentaNoPersona = CASE WHEN EXISTS (
+        SELECT 1 FROM dbo.CatCuentaNoPersona AS cnp
+        WHERE cnp.Cuenta = ISNULL(NULLIF(LTRIM(RTRIM(t.FirmaSolucion)), N''), N'Sin firma')
+          AND cnp.Habilitado = 1
+    ) THEN 1 ELSE 0 END,
+
     Validacion = CASE
         WHEN cat.RutaCompleta IS NULL THEN N'Sin catalogo'
         WHEN LTRIM(RTRIM(t.Grupo)) = LTRIM(RTRIM(cat.GrupoIncidenciasPeticiones)) THEN N'OK'
@@ -213,7 +235,11 @@ BEGIN
         Lider          = ISNULL(NULLIF(LTRIM(RTRIM(p.Lider)), N''), N'Sin lider'),
         Tickets        = COUNT(*),
         Grupos         = COUNT(DISTINCT p.Grupo),
-        Tecnicos       = COUNT(DISTINCT p.Tecnico),
+        /* Tecnicos cuenta PERSONAS. Las cuentas de sistema van aparte y no se
+           suman aqui: el resumen de Teams dice "3 tecnicos", y meter ahi a
+           "User, Setup" seria contar como companero a algo que no lo es. */
+        Tecnicos       = COUNT(DISTINCT CASE WHEN p.EsCuentaNoPersona = 0 THEN p.Tecnico END),
+        CuentasSistema = COUNT(DISTINCT CASE WHEN p.EsCuentaNoPersona = 1 THEN p.Tecnico END),
         SinCatalogoDeLider = MAX(CASE WHEN p.TieneLider = 0 THEN 1 ELSE 0 END),
         LiderNoVigente     = MAX(CASE WHEN p.LiderVigente = 0 THEN 1 ELSE 0 END),
         TieneProveedor     = MAX(CAST(p.EsProveedor AS INT))
@@ -233,6 +259,7 @@ BEGIN
         p.GrupoCorrecto,
         p.FechaFirmaSolucion,
         p.EsProveedor,
+        p.EsCuentaNoPersona,
         p.CorreoLider,
         p.CorreoGerente
     FROM #P AS p
@@ -299,7 +326,10 @@ FROM (VALUES
     (N'dbo.AlertaQAAvisado',            OBJECT_ID('dbo.AlertaQAAvisado', 'U')),
     (N'dbo.vw_AlertaQA_Base',           OBJECT_ID('dbo.vw_AlertaQA_Base', 'V')),
     (N'dbo.usp_AlertaQA_Pendientes',    OBJECT_ID('dbo.usp_AlertaQA_Pendientes', 'P')),
-    (N'dbo.usp_AlertaQA_MarcarAvisado', OBJECT_ID('dbo.usp_AlertaQA_MarcarAvisado', 'P'))
+    (N'dbo.usp_AlertaQA_MarcarAvisado', OBJECT_ID('dbo.usp_AlertaQA_MarcarAvisado', 'P')),
+    /* No lo crea este archivo, pero la vista lo necesita: sin el, el CREATE VIEW
+       de arriba falla y conviene verlo dicho aqui y no en un error suelto. */
+    (N'dbo.CatCuentaNoPersona (requerida)', OBJECT_ID('dbo.CatCuentaNoPersona', 'U'))
 ) AS v(Objeto, Id);
 
 /* Como se reparten los resueltos de las ultimas 48 horas. Si 'Incorrecto' sale
@@ -316,13 +346,44 @@ ORDER BY COUNT(*) DESC;
 SELECT Bloque   = N'3. Se avisaria de',
        Lider    = ISNULL(NULLIF(LTRIM(RTRIM(b.Lider)), N''), N'Sin lider'),
        Tickets  = COUNT(*),
-       Tecnicos = COUNT(DISTINCT b.Tecnico)
+       Tecnicos = COUNT(DISTINCT CASE WHEN b.EsCuentaNoPersona = 0 THEN b.Tecnico END),
+       CuentasSistema = COUNT(DISTINCT CASE WHEN b.EsCuentaNoPersona = 1 THEN b.Tecnico END)
 FROM   dbo.vw_AlertaQA_Base AS b
 WHERE  b.Validacion = N'Incorrecto'
   AND  b.FechaFirmaSolucion >= DATEADD(HOUR, -48, SYSDATETIME())
   AND  NOT EXISTS (SELECT 1 FROM dbo.AlertaQAAvisado a WHERE a.CodigoTicket = b.CodigoTicket)
 GROUP BY ISNULL(NULLIF(LTRIM(RTRIM(b.Lider)), N''), N'Sin lider')
 ORDER BY COUNT(*) DESC;
+
+/* Que cuentas de sistema estan firmando tickets mal categorizados, y cuales
+   NO estan en el catalogo todavia.
+
+   La segunda parte es la que importa: el catalogo tiene ocho cuentas, pero en
+   los tickets aparecen mas -las de proveedor sobre todo-. Una cuenta que no
+   este aqui sigue saliendo en el correo como si fuera una persona, y se le
+   busca correo en el API. Este bloque las saca a la luz en vez de esperar a
+   que alguien las note en un correo. */
+SELECT Bloque  = N'3b. Cuentas que firman, y si estan catalogadas',
+       Tecnico = b.Tecnico,
+       Tickets = COUNT(*),
+       Grupos  = COUNT(DISTINCT b.Grupo),
+       EnCatalogo = MAX(CAST(b.EsCuentaNoPersona AS INT)),
+       /* Heuristica, solo para mirar: nombres que HUELEN a cuenta y no a
+          persona. No decide nada -el catalogo decide-, nada mas senala donde
+          mirar. */
+       PareceCuenta = CASE WHEN b.Tecnico LIKE N'%, Proveedor'
+                             OR b.Tecnico LIKE N'%Soporte%'
+                             OR b.Tecnico LIKE N'%, Mesa%'
+                             OR b.Tecnico LIKE N'Sin firma' THEN N'revisar' ELSE N'' END
+FROM   dbo.vw_AlertaQA_Base AS b
+WHERE  b.FechaFirmaSolucion >= DATEADD(DAY, -30, SYSDATETIME())
+GROUP BY b.Tecnico
+HAVING MAX(CAST(b.EsCuentaNoPersona AS INT)) = 1
+    OR b.Tecnico LIKE N'%, Proveedor'
+    OR b.Tecnico LIKE N'%Soporte%'
+    OR b.Tecnico LIKE N'%, Mesa%'
+    OR b.Tecnico LIKE N'Sin firma'
+ORDER BY MAX(CAST(b.EsCuentaNoPersona AS INT)), COUNT(*) DESC;
 
 /* Y lo que ya se aviso, que al instalar debe estar vacio */
 SELECT Bloque = N'4. Ya avisados', Filas = COUNT(*) FROM dbo.AlertaQAAvisado;

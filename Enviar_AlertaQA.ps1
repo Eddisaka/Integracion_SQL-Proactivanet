@@ -328,11 +328,25 @@ function Destinatarios-DelLider($filas, [bool]$esSinLider, $respaldo, [hashtable
         }
     }
 
-    # Los tecnicos van en copia, salvo en los grupos de proveedor: son externos.
+    # Los tecnicos van en copia, con dos excepciones:
+    #
+    #   proveedor        son externos. El lider y el gerente si se enteran.
+    #   cuenta de sistema  "User, Setup" y las otras siete de
+    #                    dbo.CatCuentaNoPersona no son personas. Buscarles
+    #                    correo en el API no encontraria nada, y aunque
+    #                    encontrara algo -una cuenta generica con buzon- seria
+    #                    mandarle el aviso a un buzon que nadie lee.
+    #
+    # Las dos se saltan igual, pero por razones distintas, y sobre todo: la
+    # cuenta de sistema TAMPOCO entra en $sinCorreo. Ahi van los tecnicos a
+    # quienes no se pudo copiar, que es una falla que hay que arreglar; que
+    # "User, Setup" no tenga correo no es una falla, es lo normal, y decirlo en
+    # cada correo seria ruido que entrena a no leer esa linea.
     foreach ($f in $filas) {
         # Sin [int]: si la columna llegara nula, convertir reventaria el aviso
         # entero por un dato de catalogo.
         if ($f["EsProveedor"] -eq 1) { continue }
+        if ($f["EsCuentaNoPersona"] -eq 1) { continue }
         $clave = Clave-DeNombre $f["Tecnico"]
         if (-not $clave) { continue }
         if ($correoPorTecnico.ContainsKey($clave)) {
@@ -394,8 +408,22 @@ foreach ($grupo in $porLider) {
         [void]$sb.Append("<p style='color:#a33'><b>Estos grupos no tienen l&iacute;der en el cat&aacute;logo</b>, por eso llega aqu&iacute;. Conviene darlos de alta en <i>lider_grupo.xlsx</i>.</p>")
     }
 
-    foreach ($porTecnico in ($filas | Group-Object -Property Tecnico | Sort-Object Count -Descending)) {
-        [void]$sb.Append(("<h3 style='margin:18px 0 6px'>{0} <span style='font-weight:normal;color:#666'>({1})</span></h3>" -f (Html $porTecnico.Name), $porTecnico.Count))
+    # Las cuentas de sistema van al final, despues de las personas: primero lo
+    # que alguien tiene que responder, y luego lo que hay que reasignar.
+    $bloques = @($filas | Group-Object -Property Tecnico |
+                 Sort-Object @{ Expression = { [int]($_.Group[0]["EsCuentaNoPersona"] -eq 1) } },
+                             @{ Expression = "Count"; Descending = $true })
+
+    foreach ($porTecnico in $bloques) {
+        $esCuenta = ($porTecnico.Group[0]["EsCuentaNoPersona"] -eq 1)
+        if ($esCuenta) {
+            # Se conserva el nombre de la cuenta -dice algo: que los firmo un
+            # automatismo- pero queda claro que no hay a quien preguntarle.
+            [void]$sb.Append(("<h3 style='margin:18px 0 6px;color:#555'>{0} <span style='font-weight:normal;color:#666'>({1})</span> <span style='font-weight:normal;font-size:12px;background:#eee;padding:2px 8px;border-radius:10px;color:#555'>cuenta de sistema, no una persona</span></h3>" -f (Html $porTecnico.Name), $porTecnico.Count))
+            [void]$sb.Append("<p style='margin:0 0 8px;font-size:12px;color:#666'>Estos los cerr&oacute; una cuenta autom&aacute;tica, as&iacute; que no hay t&eacute;cnico a qui&eacute;n preguntarle. Siguen mal categorizados y se pueden corregir igual.</p>")
+        } else {
+            [void]$sb.Append(("<h3 style='margin:18px 0 6px'>{0} <span style='font-weight:normal;color:#666'>({1})</span></h3>" -f (Html $porTecnico.Name), $porTecnico.Count))
+        }
         [void]$sb.Append("<table cellpadding='6' cellspacing='0' style='border-collapse:collapse;font-size:13px'>")
         [void]$sb.Append("<tr style='background:#f2f2f2'><th align='left'>Ticket</th><th align='left'>Grupo que atendi&oacute;</th><th align='left'>Categor&iacute;a puesta</th><th align='left'>Grupo que corresponde</th><th align='left'>Resuelto</th></tr>")
         foreach ($f in ($porTecnico.Group | Sort-Object -Property FechaFirmaSolucion -Descending)) {
@@ -470,7 +498,13 @@ foreach ($grupo in $porLider) {
 if ($cfg.teams_webhook -and -not $modoPrueba) {
     try {
         $lineas = @($resumen | ForEach-Object {
-            "- **{0}**: {1} ticket(s), {2} tecnico(s)" -f $_["Lider"], $_["Tickets"], $_["Tecnicos"]
+            $linea = "- **{0}**: {1} ticket(s), {2} tecnico(s)" -f $_["Lider"], $_["Tickets"], $_["Tecnicos"]
+            # Que el conteo de tecnicos no cuadre con el de tickets tiene una
+            # explicacion, y es mejor darla que dejar a alguien sacando cuentas.
+            if ($_["CuentasSistema"] -gt 0) {
+                $linea += " + {0} cuenta(s) de sistema" -f $_["CuentasSistema"]
+            }
+            $linea
         }) -join "`n"
 
         $pie = "El detalle va por correo a cada lider. De cada ticket se avisa una sola vez."
