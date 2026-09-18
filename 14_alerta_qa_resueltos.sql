@@ -355,35 +355,47 @@ WHERE  b.Validacion = N'Incorrecto'
 GROUP BY ISNULL(NULLIF(LTRIM(RTRIM(b.Lider)), N''), N'Sin lider')
 ORDER BY COUNT(*) DESC;
 
-/* Que cuentas de sistema estan firmando tickets mal categorizados, y cuales
-   NO estan en el catalogo todavia.
+/* Las cuentas que firman sin ser personas, y POR CUAL DE LAS DOS VIAS quedan
+   cubiertas. Son dos reglas distintas y conviene no confundirlas:
 
-   La segunda parte es la que importa: el catalogo tiene ocho cuentas, pero en
-   los tickets aparecen mas -las de proveedor sobre todo-. Una cuenta que no
-   este aqui sigue saliendo en el correo como si fuera una persona, y se le
-   busca correo en el API. Este bloque las saca a la luz en vez de esperar a
-   que alguien las note en un correo. */
-SELECT Bloque  = N'3b. Cuentas que firman, y si estan catalogadas',
+     EnCatalogo = 1          esta en dbo.CatCuentaNoPersona. Mira la CUENTA.
+     SiempreProveedor = 1    todos sus tickets caen en un grupo 'Proveedor%'.
+                             Mira el GRUPO, no la cuenta.
+
+   Las seis cuentas de proveedor -Lexmark, Transnetwork, Mexba...- no estan en
+   el catalogo y no hace falta que esten: firman en su propio grupo, que se
+   llama 'Proveedor <algo>', asi que la segunda regla ya se dispara antes.
+
+   Lo que hay que vigilar es la fila que salga con las DOS en cero: esa cuenta
+   se esta tratando como una persona. Y tambien una con SiempreProveedor = 0 y
+   Grupos > 1: quiere decir que empezo a firmar fuera de su grupo y la regla
+   del grupo dejo de alcanzarle. */
+SELECT Bloque  = N'3b. Cuentas que firman, y como quedan cubiertas',
        Tecnico = b.Tecnico,
        Tickets = COUNT(*),
        Grupos  = COUNT(DISTINCT b.Grupo),
-       EnCatalogo = MAX(CAST(b.EsCuentaNoPersona AS INT)),
-       /* Heuristica, solo para mirar: nombres que HUELEN a cuenta y no a
-          persona. No decide nada -el catalogo decide-, nada mas senala donde
-          mirar. */
-       PareceCuenta = CASE WHEN b.Tecnico LIKE N'%, Proveedor'
-                             OR b.Tecnico LIKE N'%Soporte%'
-                             OR b.Tecnico LIKE N'%, Mesa%'
-                             OR b.Tecnico LIKE N'Sin firma' THEN N'revisar' ELSE N'' END
+       EnCatalogo       = MAX(CAST(b.EsCuentaNoPersona AS INT)),
+       SiempreProveedor = MIN(CAST(b.EsProveedor AS INT)),
+       Cobertura = CASE
+           WHEN MAX(CAST(b.EsCuentaNoPersona AS INT)) = 1 THEN N'catalogo'
+           WHEN MIN(CAST(b.EsProveedor AS INT)) = 1       THEN N'grupo proveedor'
+           ELSE N'NINGUNA: sale como persona' END
 FROM   dbo.vw_AlertaQA_Base AS b
 WHERE  b.FechaFirmaSolucion >= DATEADD(DAY, -30, SYSDATETIME())
 GROUP BY b.Tecnico
+/* Heuristica, solo para elegir a quien mirar: nombres que HUELEN a cuenta y no
+   a persona. No decide nada -las dos reglas de arriba deciden-, nada mas evita
+   listar a los sesenta y tantos tecnicos de verdad. */
 HAVING MAX(CAST(b.EsCuentaNoPersona AS INT)) = 1
     OR b.Tecnico LIKE N'%, Proveedor'
     OR b.Tecnico LIKE N'%Soporte%'
     OR b.Tecnico LIKE N'%, Mesa%'
     OR b.Tecnico LIKE N'Sin firma'
-ORDER BY MAX(CAST(b.EsCuentaNoPersona AS INT)), COUNT(*) DESC;
+ORDER BY CASE
+           WHEN MAX(CAST(b.EsCuentaNoPersona AS INT)) = 1 THEN 2
+           WHEN MIN(CAST(b.EsProveedor AS INT)) = 1       THEN 1
+           ELSE 0 END,                    /* lo descubierto primero */
+         COUNT(*) DESC;
 
 /* Y lo que ya se aviso, que al instalar debe estar vacio */
 SELECT Bloque = N'4. Ya avisados', Filas = COUNT(*) FROM dbo.AlertaQAAvisado;

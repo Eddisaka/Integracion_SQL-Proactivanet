@@ -140,23 +140,39 @@ suposicion: se midio con el bloque 3 de `16_localizar_cuentas_no_persona.sql`.
 `Cuenta` trae los nombres exactamente como vienen en `FirmaSolucion`. Si algun
 dia dejara de cruzar, ese mismo bloque lo dice.
 
-### El catalogo se queda corto
+### Las cuentas de proveedor ya estaban cubiertas, por otra via
 
-Mirando los nombres que firman tickets en los ultimos 30 dias aparecieron
-**seis cuentas de proveedor que no estan en el catalogo**:
+En los ultimos 30 dias firman tickets seis cuentas de proveedor que **no** estan
+en `CatCuentaNoPersona`:
 
 ```
 Transnetwork, Proveedor    Lexmark, Proveedor     Lexmark2, Proveedor
 Honeywell, Proveedor       Realfix, Proveedor     Mexba, Proveedor
 ```
 
-Tienen la misma forma que *«NetLogistik, NetLogistik Soporte»*, que si esta
-catalogada como `Proveedor`. Mientras no se den de alta, esas cuentas siguen
-saliendo en el correo como si fueran personas y se les busca correo en el API.
+No hace falta darlas de alta. Cada una firma en **su propio grupo**, y ese grupo
+se llama `Proveedor <algo>`:
 
-Darlas de alta es un `INSERT` en `dbo.CatCuentaNoPersona`; el bloque **3b** de
-`14_alerta_qa_resueltos.sql` las vuelve a listar cada vez que se corre, para
-que no haya que acordarse de revisarlo.
+```
+INC 2026-388777   FirmaSolucion: Lexmark, Proveedor   Grupo: Proveedor Lexmark
+```
+
+Asi que la regla `EsProveedor` —`Grupo LIKE 'Proveedor%'`— ya se dispara antes:
+no se les copia, no se les busca correo, y no aparecen en la nota de «no se pudo
+copiar a». Los grupos, ademas, estan en `CatLiderGrupo` con su lider y su
+gerente, asi que el aviso llega a quien debe.
+
+Lo unico que cambiaria si se agregaran es el encabezado del bloque en el correo,
+que hoy muestra `Lexmark, Proveedor` como si fuera un nombre de persona. Y ahi ni
+siquiera esta claro que convenga: ese nombre le dice al lider **que proveedor**
+firmo, mientras que la etiqueta generica no diria nada que el nombre del grupo no
+diga ya.
+
+**Donde si hay que poner atencion:** la regla mira el **grupo**, no la cuenta. Si
+alguna de estas cuentas llegara a firmar un ticket en un grupo que no empiece por
+`Proveedor`, se trataria como persona. Hoy no pasa —las seis tienen un solo grupo
+cada una—, y el bloque **3b** de `14_alerta_qa_resueltos.sql` las relista en cada
+corrida, con la columna `Grupos`, para que se vea el dia que deje de ser cierto.
 
 ## Teams
 
