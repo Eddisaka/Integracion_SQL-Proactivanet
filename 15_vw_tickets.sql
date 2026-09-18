@@ -37,6 +37,35 @@
    aparece sola en la vista. Conviene tenerlo presente antes de agregar
    columnas a Tickets.
 
+   UNA TRAMPA QUE CONVIENE CONOCER: LOS NULOS EN TipoRelacion
+
+   La ultima linea del filtro es
+
+       AND TipoRelacion <> 'Dependiente'
+
+   y eso NO quiere decir "todo lo que no sea dependiente". En SQL, comparar
+   contra NULL no da ni verdadero ni falso: da desconocido, y la fila se cae.
+   Asi que ese filtro tira DOS cosas: los dependientes y todos los tickets
+   cuyo TipoRelacion venga vacio.
+
+   Medido sobre un SQL Server 2022, con 7 tickets de los cuales 1 es
+   dependiente y 4 traen TipoRelacion nulo, la vista devuelve 2. No 6.
+
+   Aqui no se toca, a proposito: cambiarlo a ISNULL(TipoRelacion, '') haria
+   aparecer de golpe todos esos tickets en el tablero, en el correo de backlog
+   y en el aviso de QA. Puede que sea lo correcto, pero es una decision de
+   negocio con consecuencias visibles, no un arreglo de paso.
+
+   Para saber si esto muerde en produccion:
+
+       SELECT TipoRelacion, Tickets = COUNT(*)
+       FROM   dbo.Tickets
+       GROUP  BY TipoRelacion
+       ORDER  BY COUNT(*) DESC;
+
+   Si no aparece una fila con TipoRelacion en NULL, no muerde y este apartado
+   es solo para que nadie se lleve la sorpresa mas adelante.
+
    CUIDADO CON LA CODIFICACION - ESTE ARCHIVO LLEVA BOM
 
    La lista de grupos excluidos trae acentos que son DATOS, no comentarios:

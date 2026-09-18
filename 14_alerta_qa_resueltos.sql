@@ -467,13 +467,26 @@ CROSS APPLY (
        podria contar lo que ya cruzaba, que es justo lo que no se quiere saber.
 
        ISNULL porque SUM sobre cero filas devuelve NULL, y una cuenta sin
-       tickets debe decir 0, no dejar la columna en blanco. */
+       tickets debe decir 0, no dejar la columna en blanco.
+
+       La marca Exacto se calcula en una consulta ANIDADA y no dentro del SUM.
+       SQL Server rechaza un agregado que mezcle una referencia externa
+       -cnp.Cuenta- con una columna de adentro -b.Tecnico-:
+
+           Msg 8124: Multiple columns are specified in an aggregated
+           expression containing an outer reference.
+
+       Asi la referencia externa queda en el SELECT de adentro y en el WHERE,
+       que si la admiten, y el SUM solo ve una columna ya calculada. */
     SELECT
-        Cruzan    = ISNULL(SUM(CASE WHEN b.Tecnico = cnp.Cuenta THEN 1 ELSE 0 END), 0),
+        Cruzan    = ISNULL(SUM(y.Exacto), 0),
         Parecidos = COUNT(*)
-    FROM dbo.vw_AlertaQA_Base AS b
-    WHERE b.FechaFirmaSolucion >= DATEADD(DAY, -30, SYSDATETIME())
-      AND REPLACE(b.Tecnico, NCHAR(160), N' ') = REPLACE(cnp.Cuenta, NCHAR(160), N' ')
+    FROM (
+        SELECT Exacto = CASE WHEN b.Tecnico = cnp.Cuenta THEN 1 ELSE 0 END
+        FROM dbo.vw_AlertaQA_Base AS b
+        WHERE b.FechaFirmaSolucion >= DATEADD(DAY, -30, SYSDATETIME())
+          AND REPLACE(b.Tecnico, NCHAR(160), N' ') = REPLACE(cnp.Cuenta, NCHAR(160), N' ')
+    ) AS y
 ) AS x
 ORDER BY CASE
            WHEN LEN(LTRIM(RTRIM(cnp.Cuenta))) < 4
