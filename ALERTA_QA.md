@@ -135,10 +135,47 @@ porque nadie se enteraria de que existen—. Lo que cambia es como se muestran:
 | En la nota «no se pudo copiar a» | **No aparecen.** Que una cuenta de sistema no tenga correo no es una falla, es lo normal; meterla ahi cada vez seria ruido que entrena a no leer esa linea, y el dia que falte el correo de alguien de verdad no se veria |
 | En el resumen de Teams | `Tecnicos` cuenta **personas**; las cuentas van aparte, como *«+1 cuenta(s) de sistema»* |
 
-El cruce es por igualdad simple contra `CatCuentaNoPersona.Cuenta`, y no es una
-suposicion: se midio con el bloque 3 de `16_localizar_cuentas_no_persona.sql`.
-`Cuenta` trae los nombres exactamente como vienen en `FirmaSolucion`. Si algun
-dia dejara de cruzar, ese mismo bloque lo dice.
+El cruce es por igualdad simple contra `CatCuentaNoPersona.Cuenta`. La vista
+normaliza ademas el espacio duro (`NCHAR(160)`) en los dos lados, por lo mismo
+que la linea de al lado ya lo hacia con `Categoria`: este origen de datos los
+mete. Hoy los nombres vienen limpios —se midio, byte a byte— asi que eso es
+precaucion, no cura de nada.
+
+### El catalogo tambien se rompe, y en silencio
+
+Vale la pena contar como se descubrio, porque el fallo no estaba donde se
+buscaba.
+
+De un dia para otro `User, Setup` dejo de cruzar. La primera explicacion que
+di fue un espacio duro en el nombre, y la di con demasiada seguridad: dije
+«no es una suposicion, se midio», cuando lo que se habia medido era el
+catalogo contra un literal escrito a mano, **no** contra lo que traen los
+tickets. Al medir lo segundo, el nombre del ticket resulto impecable:
+
+```
+User, Setup   →   11 caracteres, 22 bytes, coma normal, espacio normal
+```
+
+Lo que habia pasado es otra cosa: la fila del catalogo aparecio con
+`Cuenta = '/'`. Ocho filas antes y ocho despues, pero esa ya no se llamaba
+`User, Setup`. Como `Cuenta` es la llave primaria, la cuenta dejo de existir
+—y sus 83 tickets volvieron a contarse como si los hubiera firmado una
+persona—. Un teclazo sobre una celda en una cuadricula de SSMS basta.
+
+De ahi salieron tres cosas:
+
+- **`19_reparar_cuenta_no_persona.sql`**, que devuelve el nombre. Viene en
+  simulacion; muestra la fila rota entera antes de tocarla, y trae comentada
+  una restriccion `CHECK` para que un teclazo deje de guardarse en vez de
+  guardarse y esperar.
+- **El bloque 5 del `14`** ahora marca `ROTA: esto no es un nombre de cuenta`.
+  Antes le ponia a esa misma fila *«sin tickets en 30 dias (normal si la
+  cuenta ya no se usa)»*: la respuesta mas tranquilizadora posible para el
+  unico renglon roto de la tabla.
+- **El bloque 3b** ya no se fia solo del nombre. Lo que mejor distingue una
+  cuenta de sistema es **en cuantos grupos firma**: una persona atiende uno o
+  dos, y `User, Setup` firma en doce. Eso no depende de como este escrito el
+  nombre, que es justo lo que fallo.
 
 ### Las cuentas de proveedor ya estaban cubiertas, por otra via
 

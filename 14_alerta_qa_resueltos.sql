@@ -400,10 +400,20 @@ SELECT Bloque  = N'3b. Cuentas que firman, y como quedan cubiertas',
 FROM   dbo.vw_AlertaQA_Base AS b
 WHERE  b.FechaFirmaSolucion >= DATEADD(DAY, -30, SYSDATETIME())
 GROUP BY b.Tecnico
-/* Heuristica, solo para elegir a quien mirar: nombres que HUELEN a cuenta y no
-   a persona. No decide nada -las dos reglas de arriba deciden-, nada mas evita
-   listar a los sesenta y tantos tecnicos de verdad. */
+/* Heuristica, solo para elegir a quien mirar. No decide nada -las dos reglas de
+   arriba deciden-, nada mas evita listar a los sesenta y tantos tecnicos de
+   verdad.
+
+   El criterio que mas sirve NO es el nombre sino el numero de grupos. Una
+   persona atiende uno o dos; las cuentas de sistema aparecen en muchos porque
+   cierran a lo ancho de toda la mesa -"User, Setup" firma en DOCE-. Y a
+   diferencia del nombre, eso no depende de como este escrito.
+
+   Se agrego despues de que "User, Setup" desaparecio del catalogo -su fila
+   quedo con Cuenta = '/'- y ninguna de las heuristicas de nombre la alcanzo:
+   se volvio invisible justo cuando habia que verla. Por grupos si sale. */
 HAVING MAX(CAST(b.EsCuentaNoPersona AS INT)) = 1
+    OR COUNT(DISTINCT b.Grupo) >= 5
     OR b.Tecnico LIKE N'%, Proveedor'
     OR b.Tecnico LIKE N'%Soporte%'
     OR b.Tecnico LIKE N'%, Mesa%'
@@ -433,6 +443,17 @@ SELECT
     Tickets30d = x.Cruzan,
     ParecidosSinEspacioDuro = x.Parecidos,
     Diagnostico = CASE
+        /* Lo primero, porque es lo que paso de verdad: la fila de "User, Setup"
+           aparecio un dia con Cuenta = '/'. Cuenta es la llave primaria, asi
+           que basta un teclazo sobre la celda en una cuadricula de SSMS para
+           que la cuenta deje de existir con ese nombre.
+
+           La version anterior de este bloque le puso a esa fila "sin tickets en
+           30 dias (normal si la cuenta ya no se usa)". Era la respuesta mas
+           tranquilizadora posible para el unico renglon roto de la tabla. */
+        WHEN LEN(LTRIM(RTRIM(cnp.Cuenta))) < 4
+          OR cnp.Cuenta NOT LIKE N'%[A-Za-z]%'
+            THEN N'ROTA: esto no es un nombre de cuenta. Ver 19_reparar_cuenta_no_persona.sql'
         WHEN cnp.Habilitado = 0 THEN N'deshabilitada a proposito'
         WHEN x.Cruzan > 0       THEN N'ok'
         WHEN x.Parecidos > 0    THEN N'NO CRUZA, pero el nombre existe: correr 18_por_que_no_cruza_la_cuenta.sql'
@@ -454,7 +475,11 @@ CROSS APPLY (
     WHERE b.FechaFirmaSolucion >= DATEADD(DAY, -30, SYSDATETIME())
       AND REPLACE(b.Tecnico, NCHAR(160), N' ') = REPLACE(cnp.Cuenta, NCHAR(160), N' ')
 ) AS x
-ORDER BY CASE WHEN x.Cruzan = 0 AND x.Parecidos > 0 AND cnp.Habilitado = 1 THEN 0 ELSE 1 END,
+ORDER BY CASE
+           WHEN LEN(LTRIM(RTRIM(cnp.Cuenta))) < 4
+             OR cnp.Cuenta NOT LIKE N'%[A-Za-z]%'                       THEN 0
+           WHEN x.Cruzan = 0 AND x.Parecidos > 0 AND cnp.Habilitado = 1 THEN 1
+           ELSE 2 END,
          x.Cruzan DESC;
 
 /* Y lo que ya se aviso, que al instalar debe estar vacio */
