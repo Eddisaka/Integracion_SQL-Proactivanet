@@ -105,7 +105,7 @@ SELECT
     Grupo   = ISNULL(NULLIF(LTRIM(RTRIM(t.Grupo)), N''), N'Sin grupo'),
     /* El tecnico sale de FirmaSolucion -quien firmo la solucion-, no de
        TecnicoSegundaLinea: es quien cerro el ticket con esa categoria. */
-    Tecnico = ISNULL(NULLIF(LTRIM(RTRIM(t.FirmaSolucion)), N''), N'Sin firma'),
+    Tecnico = tecn.TecnicoNorm,
     t.TecnicoSegundaLinea,
     Categoria = catn.CategoriaNorm,
     GrupoCorrecto = cat.GrupoIncidenciasPeticiones,
@@ -145,7 +145,7 @@ SELECT
        Habilitado = 1 se respeta: da como deshabilitar una fila sin borrarla. */
     EsCuentaNoPersona = CASE WHEN EXISTS (
         SELECT 1 FROM dbo.CatCuentaNoPersona AS cnp
-        WHERE cnp.Cuenta = ISNULL(NULLIF(LTRIM(RTRIM(t.FirmaSolucion)), N''), N'Sin firma')
+        WHERE REPLACE(cnp.Cuenta, NCHAR(160), N' ') = tecn.TecnicoNorm
           AND cnp.Habilitado = 1
     ) THEN 1 ELSE 0 END,
 
@@ -160,6 +160,23 @@ SELECT
         ELSE N'Incorrecto'
     END
 FROM dbo.vw_TicketsConLider AS t
+CROSS APPLY (
+    /* El nombre de quien firmo, normalizado UNA vez y usado en los dos sitios
+       donde importa: la columna Tecnico y el cruce con CatCuentaNoPersona.
+
+       El REPLACE del NCHAR(160) -el espacio duro, el que produce Word y muchos
+       formularios web- no es precaucion teorica. La linea de abajo ya lo hacia
+       con Categoria porque este mismo origen ya habia metido espacios duros
+       ahi. Y se ve identico en pantalla: "User, Setup" con espacio duro y con
+       espacio normal son indistinguibles al leerlos, pero no son iguales para
+       SQL Server, y LTRIM/RTRIM no lo quita.
+
+       Normalizar los DOS lados y no solo uno: el espacio duro puede estar en
+       el ticket, en el catalogo, o en los dos. */
+    SELECT TecnicoNorm = ISNULL(NULLIF(
+               LTRIM(RTRIM(REPLACE(ISNULL(t.FirmaSolucion, N''), NCHAR(160), N' '))),
+               N''), N'Sin firma')
+) AS tecn
 CROSS APPLY (
     SELECT CategoriaNorm = LTRIM(RTRIM(REPLACE(ISNULL(t.Categoria, N''), NCHAR(160), N' ')))
 ) AS catn
@@ -397,6 +414,59 @@ ORDER BY CASE
            ELSE 0 END,                    /* lo descubierto primero */
          COUNT(*) DESC;
 
+/* El cruce visto DESDE EL CATALOGO, que es como habria que haberlo mirado
+   desde el principio.
+
+   Los bloques 3 y 3b miran los tickets y preguntan cuales estan catalogados.
+   Eso no ve el fallo contrario: una cuenta catalogada que no cruza con nada.
+   Paso de verdad -"User, Setup" tenia 83 tickets y cruzaba cero, por un
+   espacio duro- y no se noto porque desde el lado de los tickets una cuenta
+   que no cruza es indistinguible de una persona.
+
+   Lo que hay que leer es la columna Diagnostico. 'NO CRUZA, pero el nombre
+   existe' es el caso malo: la cuenta esta en el catalogo, sus tickets estan en
+   la base, y el filtro no los esta uniendo. */
+SELECT
+    Bloque = N'5. El catalogo visto al reves',
+    cnp.Cuenta,
+    cnp.Habilitado,
+    Tickets30d = x.Cruzan,
+    ParecidosSinEspacioDuro = x.Parecidos,
+    Diagnostico = CASE
+        WHEN cnp.Habilitado = 0 THEN N'deshabilitada a proposito'
+        WHEN x.Cruzan > 0       THEN N'ok'
+        WHEN x.Parecidos > 0    THEN N'NO CRUZA, pero el nombre existe: correr 18_por_que_no_cruza_la_cuenta.sql'
+        ELSE N'sin tickets en 30 dias (normal si la cuenta ya no se usa)'
+    END
+FROM dbo.CatCuentaNoPersona AS cnp
+CROSS APPLY (
+    /* El WHERE usa la comparacion PERMISIVA -perdonando el espacio duro- para
+       traer un superconjunto, y dentro se cuentan las dos cosas. Al reves no
+       sirve de nada: filtrando por la comparacion estricta, "Parecidos" solo
+       podria contar lo que ya cruzaba, que es justo lo que no se quiere saber.
+
+       ISNULL porque SUM sobre cero filas devuelve NULL, y una cuenta sin
+       tickets debe decir 0, no dejar la columna en blanco. */
+    SELECT
+        Cruzan    = ISNULL(SUM(CASE WHEN b.Tecnico = cnp.Cuenta THEN 1 ELSE 0 END), 0),
+        Parecidos = COUNT(*)
+    FROM dbo.vw_AlertaQA_Base AS b
+    WHERE b.FechaFirmaSolucion >= DATEADD(DAY, -30, SYSDATETIME())
+      AND REPLACE(b.Tecnico, NCHAR(160), N' ') = REPLACE(cnp.Cuenta, NCHAR(160), N' ')
+) AS x
+ORDER BY CASE WHEN x.Cruzan = 0 AND x.Parecidos > 0 AND cnp.Habilitado = 1 THEN 0 ELSE 1 END,
+         x.Cruzan DESC;
+
 /* Y lo que ya se aviso, que al instalar debe estar vacio */
-SELECT Bloque = N'4. Ya avisados', Filas = COUNT(*) FROM dbo.AlertaQAAvisado;
+SELECT Bloque = N'6. Ya avisados', Filas = COUNT(*) FROM dbo.AlertaQAAvisado;
+
+/* NOTA sobre un aviso que va a salir y no es un problema:
+
+       Warning: Null value is eliminated by an aggregate or other SET operation.
+
+   Lo produce el COUNT(DISTINCT CASE WHEN ... THEN Tecnico END) del bloque 3 y
+   del resumen del procedimiento. El CASE sin ELSE devuelve NULL en las filas
+   que no cuentan y COUNT los ignora, que es exactamente lo que se quiere. Es
+   informativo, no cambia ningun resultado, y el envio no lo ve. Queda dicho
+   aqui para que no haga dudar cada vez. */
 GO
