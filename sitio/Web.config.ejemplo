@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Plantilla de configuracion del sitio. Copiala como Web.config en la raiz
+  y sustituye SOLO los dos placeholders de credenciales:
+
+      YOUR_SQL_USER       usuario de SQL Server
+      YOUR_SQL_PASSWORD   su contrasena
+
+  Web.config NO se sube al repositorio (ya esta en .gitignore). Este
+  Web.config.ejemplo si, y por eso nunca debe llevar credenciales reales.
+
+  Alternativa sin contrasena: reemplaza
+      User ID=...;Password=...
+  por
+      Integrated Security=True
+  y deja que el App Pool corra con una cuenta de dominio que tenga
+  GRANT EXECUTE sobre los procedimientos.
+
+  Para cifrar la seccion en un servidor real:
+      %windir%\Microsoft.NET\Framework64\v4.0.30319\aspnet_regiis.exe -pef "connectionStrings" "C:\ruta\del\sitio"
+-->
+<configuration>
+
+  <!-- Unica fuente de la conexion. La leen App_Code/DashboardDb.cs y
+       App_Code/QaDb.cs con ConfigurationManager. El HTML/JS nunca la ve:
+       el navegador solo habla con los .ashx de handlers/. -->
+  <connectionStrings>
+    <add name="TicketsProactivanet"
+         connectionString="Server=AZVMBDCENTRALQA;Database=Tickets_Proactivanet;User ID=YOUR_SQL_USER;Password=YOUR_SQL_PASSWORD;Encrypt=True;TrustServerCertificate=True;Connection Timeout=60"
+         providerName="System.Data.SqlClient" />
+  </connectionStrings>
+
+  <!--
+    Consola de administracion (admin/admin.html) -> handlers/admin_correos.ashx.
+
+    AdminScriptsDir es la CARPETA donde ya viven los tres scripts, juntos.
+    Los scripts NO se copian al sitio web: se ejecutan desde su propia
+    carpeta para que sus archivos de configuracion sigan resolviendo igual
+    que hoy. Los nombres de los .ps1 estan fijos en el handler; aqui solo va
+    la ruta, y es lo unico que cambia al mover el sitio de maquina.
+
+      Enviar_CorreoQA.ps1
+      Enviar_CorreoBacklog_direccion.ps1
+      Enviar_CorreoServicio.ps1
+
+    AdminServiciosPermitidos es la lista blanca del parametro -Servicio,
+    separada por comas. El handler solo pasa al script una cadena de esta
+    lista, nunca la que mando el navegador. Los servicios de verdad viven en
+    dbo.CatServicioCorreo; para ver cuales hay dados de alta:
+
+        .\Enviar_CorreoServicio.ps1 -Listar
+
+    Esta lista debe reflejar esos nombres tal cual. La fecha (-FechaCorte) no
+    se configura: siempre es el dia anterior segun el reloj del servidor.
+  -->
+  <appSettings>
+    <add key="AdminScriptsDir"          value="C:\RUTA\A\Envio_correos" />
+    <add key="AdminServiciosPermitidos" value="WMS" />
+
+    <!-- Tablero de Experiencia (experiencia/experiencia.html). Carpeta de
+         SharePoint con el detalle que hay detras del tablero; sale en el
+         boton "Ver detalle". La URL lleva token, por eso vive aqui y no en
+         el HTML ni en el JavaScript. Si se deja vacia, el boton no aparece. -->
+    <add key="ExperienciaLigaDetalle"    value="" />
+  </appSettings>
+
+  <system.web>
+    <!-- App_Code/ se compila sola en el primer request: sin Visual Studio
+         y sin paso de build. -->
+    <compilation debug="true" targetFramework="4.8" />
+    <!-- executionTimeout: los correos reales (SQL + reporte + SMTP) tardan
+         mas que los 110 s por defecto. El handler tiene ademas su propio
+         limite de 600 s sobre el proceso de PowerShell. -->
+    <httpRuntime targetFramework="4.8" executionTimeout="900" />
+    <!-- Los handlers ya devuelven sus errores como JSON; esto solo evita
+         que un fallo fuera de ellos exponga el stack trace en remoto. -->
+    <customErrors mode="RemoteOnly" />
+  </system.web>
+
+  <system.webServer>
+    <defaultDocument>
+      <files>
+        <add value="dashboard.html" />
+      </files>
+    </defaultDocument>
+
+    <!-- CACHE DE LOS ARCHIVOS ESTATICOS
+         IIS mandaba solo Last-Modified, sin Cache-Control. Sin esa cabecera
+         el navegador aplica su heuristica -se queda con el archivo un rato
+         sin volver a preguntar-, y por eso un despliegue puede quedar
+         invisible: se copian los archivos nuevos y el navegador sigue
+         pintando la hoja vieja, sin ningun aviso.
+
+         DisableCache manda "Cache-Control: no-cache". NO prohibe guardar:
+         obliga a revalidar. Lo que no cambio vuelve como 304 -unos cientos
+         de bytes, nada en una red interna- y lo que si cambio llega entero.
+
+         Cubre tambien los .html, que es lo que de verdad importa: si
+         dashboard.html se sirviera viejo, cualquier ?v= escrito DENTRO de el
+         no llegaria nunca al navegador. Por eso esto va aqui y no como
+         parametro en las etiquetas <link> y <script>. -->
+    <staticContent>
+      <clientCache cacheControlMode="DisableCache" />
+    </staticContent>
+
+    <security>
+      <requestFiltering>
+        <!-- El SQL fuente y los snapshots del modo offline no se sirven por
+             HTTP: solo se llega a los datos a traves de los handlers. -->
+        <fileExtensions>
+          <add fileExtension=".json" allowed="false" />
+          <add fileExtension=".sql" allowed="false" />
+          <add fileExtension=".ps1" allowed="false" />
+        </fileExtensions>
+        <hiddenSegments>
+          <add segment="sql" />
+          <add segment="tools" />
+          <!-- Los scripts de correo se ejecutan desde el servidor, nunca se
+               descargan: la carpeta queda fuera del alcance de HTTP. -->
+          <add segment="reenviacorreo" />
+        </hiddenSegments>
+      </requestFiltering>
+    </security>
+  </system.webServer>
+
+  <!-- Las carpetas vendor/ son de terceros (la copia local de Chart.js).
+       No las tocamos nosotros y su nombre no cambia, asi que revalidarlas en
+       cada carga solo gasta viajes: se quedan cacheables un año. Si algun dia
+       se sube de version, se cambia el nombre del archivo. -->
+  <location path="assets/vendor">
+    <system.webServer>
+      <staticContent>
+        <clientCache cacheControlMode="UseMaxAge" cacheControlMaxAge="365.00:00:00" />
+      </staticContent>
+    </system.webServer>
+  </location>
+  <location path="experiencia/vendor">
+    <system.webServer>
+      <staticContent>
+        <clientCache cacheControlMode="UseMaxAge" cacheControlMaxAge="365.00:00:00" />
+      </staticContent>
+    </system.webServer>
+  </location>
+  <location path="orquestacion/vendor">
+    <system.webServer>
+      <staticContent>
+        <clientCache cacheControlMode="UseMaxAge" cacheControlMaxAge="365.00:00:00" />
+      </staticContent>
+    </system.webServer>
+  </location>
+
+</configuration>

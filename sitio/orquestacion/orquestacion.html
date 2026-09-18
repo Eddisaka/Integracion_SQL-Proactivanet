@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Orquestación</title>
+<link rel="stylesheet" href="orquestacion.css">
+<!-- Desplegable compartido: el mismo componente que el resto del tablero. -->
+<link rel="stylesheet" href="../assets/css/desplegable.css">
+<script src="../assets/js/desplegable.js"></script>
+<script src="vendor/chart.umd.min.js"></script>
+<!-- Paleta categorica compartida. -->
+<script src="../assets/js/paleta.js"></script>
+<script src="../assets/js/barras.js"></script>
+</head>
+<body>
+<div class="wrap">
+  <div id="tab-orquestacion" class="maintab-content active">
+    <header class="top">
+      <h1>Orquestación</h1>
+      <div class="sub" id="subheadOr">Análisis de Jobs y tareas</div>
+      <div class="selrow">
+        <div class="grp"><label>Director</label>
+          <select id="selDirOr"><option value="">— Todos —</option></select></div>
+        <div class="grp"><label>Product Owner</label>
+          <select id="selPOOr"><option value="">— Todos —</option></select></div>
+        <button id="btnResetOr">Ver resumen general</button>
+        <a id="ligaHeaderOr" href="#" target="_blank" rel="noopener"
+           style="display:none;align-items:center;gap:6px;padding:8px 14px;border-radius:8px;
+           background:#d97706;color:var(--ink);font-size:12px;font-weight:700;text-decoration:none">
+           🔎 Consulta el Detalle</a>
+      </div>
+      <div id="filtroCand" style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+        <span style="font-size:11px;font-weight:700;color:var(--g-900);letter-spacing:.4px">CANDIDATO (COL. B):</span>
+      </div>
+    </header>
+    <section class="kpis" id="kpisOr"></section>
+    <section class="grid2">
+      <div class="card">
+        <h3>Distribución de Jobs por Clasificación</h3>
+        <canvas id="chartCatJobs" style="max-height:300px"></canvas>
+        <div class="legend" id="legendCatJobs"></div>
+      </div>
+      <div class="card">
+        <h3>Distribución de Jobs por Categoría</h3>
+        <canvas id="chartClasif" style="max-height:300px"></canvas>
+        <div class="legend" id="legendClasif"></div>
+      </div>
+    </section>
+    <section class="grid2">
+      <div class="card">
+        <h3>Distribución por Candidato (columna B)</h3>
+        <canvas id="chartCand" style="max-height:300px"></canvas>
+        <div class="legend" id="legendCand"></div>
+      </div>
+      <div class="card">
+        <h3>Resumen de KPIs por Director</h3>
+        <div style="overflow-x:auto;max-height:330px"><table id="tblOrqDir"><thead><tr>
+          <th>Director</th><th class="num">Jobs</th><th class="num">Tareas</th>
+          <th class="num">% Migr.</th><th class="num">Complet.</th>
+        </tr></thead><tbody id="bodyOrqDir"></tbody></table></div>
+      </div>
+    </section>
+    <footer>Generado el 02/09/2026 · Fuente: Concentrado Análisis de Jobs — bd Jobs + Jobs Nuevos.</footer>
+  </div><!-- fin tab-orquestacion -->
+</div>
+<script src="orquestacion.js"></script>
+</body></html>

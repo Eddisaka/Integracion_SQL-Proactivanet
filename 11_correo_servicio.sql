@@ -47,6 +47,7 @@
    - dbo.CatCedis                 Sucursal (numero) -> nombre del CEDIS
    - dbo.CatCausaRaizAgrupador    causa raiz de Fenix -> agrupador
    - dbo.fn_CategoriaNivel        saca el nivel N de una ruta de categoria
+   - dbo.fn_CategoriaRelativa     la ruta que cuelga de la rama del servicio
    - dbo.vw_ServicioTickets       vista base, con todo ya derivado
 
    Los dos catalogos de datos se llenan desde Excel con el mismo patron de
@@ -143,6 +144,8 @@ BEGIN
         CopiaCc       NVARCHAR(MAX)  NULL,
         DiasVentana   INT            NOT NULL CONSTRAINT DF_CSC_Dias DEFAULT (15),
         Habilitado    BIT            NOT NULL CONSTRAINT DF_CSC_Hab  DEFAULT (1),
+        -- Ver la nota de la seccion 2.0.
+        UsaCausaRaiz  BIT            NOT NULL CONSTRAINT DF_CSC_Causa DEFAULT (0),
         FechaAltaDW   DATETIME2(0)   NOT NULL CONSTRAINT DF_CSC_Alta DEFAULT (SYSDATETIME()),
         CONSTRAINT PK_CatServicioCorreo PRIMARY KEY CLUSTERED (Servicio)
     );
@@ -187,6 +190,33 @@ BEGIN
     );
     CREATE UNIQUE INDEX UQ_CatServicioCategoria_Prefijo
         ON dbo.CatServicioCategoria (PrefijoCategoria);
+END;
+GO
+
+/* =====================================================================================
+   2.0) La bandera UsaCausaRaiz
+
+      'Causa y raiz Fenix' es un campo que solo captura el equipo de WMS. Para
+      cualquier otro servicio llega siempre vacio, y con el vienen sin
+      contenido las cinco columnas que salen de el: CausaRaizFenix, CausaC1,
+      CausaC2, CausaC3 y Agrupador.
+
+      Cinco columnas vacias en una hoja de casi cincuenta estorban mas de lo
+      que ayudan, asi que el Excel solo las incluye para los servicios que
+      tengan esta bandera en 1.
+
+      Es una bandera del catalogo y no una deteccion automatica a proposito:
+      un servicio que hoy no captura causa raiz pero manana empiece a hacerlo
+      -o al reves- se resuelve con un UPDATE, y el correo no cambia de forma
+      solo porque un dia entro un ticket suelto con el campo lleno.
+
+          UPDATE dbo.CatServicioCorreo SET UsaCausaRaiz = 1 WHERE Servicio = N'WMS';
+   ===================================================================================== */
+IF COL_LENGTH('dbo.CatServicioCorreo', 'UsaCausaRaiz') IS NULL
+BEGIN
+    ALTER TABLE dbo.CatServicioCorreo
+        ADD UsaCausaRaiz BIT NOT NULL CONSTRAINT DF_CSC_Causa DEFAULT (0);
+    PRINT N'CatServicioCorreo.UsaCausaRaiz agregada en 0. Ponla en 1 para los servicios que capturen "Causa y raiz Fenix".';
 END;
 GO
 
@@ -235,7 +265,27 @@ ORDER BY 2 DESC;
       categorias con guion bajo ('S-FENIX_WMS'), y en LIKE el guion bajo es
       comodin de un caracter. Con LIKE, 'FENIX_WMS' tambien casaria con
       'FENIXAWMS'.
+
+      OJO CON EL DROP DE ABAJO
+      fn_CategoriaRelativa (2.3) llama a esta funcion y esta declarada WITH
+      SCHEMABINDING, que es justo lo que hace el schemabinding: amarra a la
+      referenciada para que nadie la cambie por debajo. El efecto secundario
+      es que a la segunda corrida del script el CREATE OR ALTER de aqui truena
+      con "Cannot ALTER 'dbo.fn_RutaServicio' because it is being referenced
+      by object 'fn_CategoriaRelativa'".
+
+      Por eso se suelta el amarre antes de recrearla. fn_CategoriaRelativa se
+      vuelve a crear unas lineas mas abajo, en el mismo script, asi que la
+      unica ventana en que no existe es la de esta corrida.
+
+      La alternativa -quitarle el SCHEMABINDING a fn_CategoriaRelativa- se
+      descarto: el schemabinding es lo que permite marcarla determinista, y
+      esta funcion se llama dos veces por fila en vw_ServicioTickets.
    ===================================================================================== */
+IF OBJECT_ID('dbo.fn_CategoriaRelativa', 'FN') IS NOT NULL
+    DROP FUNCTION dbo.fn_CategoriaRelativa;
+GO
+
 CREATE OR ALTER FUNCTION dbo.fn_RutaServicio (@Categoria NVARCHAR(1000))
 RETURNS NVARCHAR(1000)
 WITH SCHEMABINDING
@@ -255,6 +305,72 @@ SELECT dbo.fn_RutaServicio(N'/S-Logistica/EMBARQUE/'),
        dbo.fn_RutaServicio(N'S-Logistica/EMBARQUE'),
        dbo.fn_RutaServicio(N'/S-Logistica/EMBARQUE'),
        dbo.fn_RutaServicio(N'S-Logistica/EMBARQUE/');
+*/
+
+/* =====================================================================================
+   2.3) La ruta QUE CUELGA de la rama del servicio
+
+      fn_CategoriaNivel cuenta niveles desde el principio de la ruta, y eso se
+      rompe cuando Proactivanet reestructura su catalogo: la rama vieja tiene
+      un nivel menos que la nueva, asi que el mismo par de categorias cae en
+      renglones distintos.
+
+          /S-FENIX WMS/RECIBO PROVEEDORES/CITA NO REPLICA
+              nivel 2 -> RECIBO PROVEEDORES   nivel 3 -> CITA NO REPLICA
+
+          /S-Logistica/FENIX WMS/RECIBO PROVEEDORES/CITA NO REPLICA
+              nivel 2 -> FENIX WMS            nivel 3 -> RECIBO PROVEEDORES
+
+      Es exactamente el defecto que tiene hoy el Excel manual: su hoja
+      'creados_dash' parte los tickets de WMS en dos, y 56 de ellos quedan
+      colgando de un renglon 'FENIX WMS' que no significa nada.
+
+      Esta funcion quita el prefijo de la rama del catalogo, de modo que los
+      niveles se cuenten DESDE el servicio y no desde la raiz. Con eso las dos
+      rutas de arriba dan el mismo C1 y el mismo C2.
+
+      La comparacion va con LEFT y no con LIKE por lo mismo de 2.2: hay
+      categorias con guion bajo y en LIKE el guion bajo es comodin.
+   ===================================================================================== */
+CREATE OR ALTER FUNCTION dbo.fn_CategoriaRelativa
+(
+    @Categoria NVARCHAR(1000),
+    @Prefijo   NVARCHAR(1000)
+)
+RETURNS NVARCHAR(1000)
+WITH SCHEMABINDING
+AS
+BEGIN
+    DECLARE @ruta NVARCHAR(1000) = dbo.fn_RutaServicio(@Categoria);
+    DECLARE @pre  NVARCHAR(1000) = dbo.fn_RutaServicio(@Prefijo);
+
+    IF @ruta = N'' RETURN N'';
+    IF @pre  = N'' RETURN @ruta;
+
+    -- La ruta ES la rama: no cuelga nada de ella.
+    IF @ruta = @pre RETURN N'';
+
+    -- Cuelga de la rama: se devuelve lo que va despues de la diagonal.
+    IF LEFT(@ruta, LEN(@pre + N'|')) = @pre + N'/'
+        RETURN SUBSTRING(@ruta, LEN(@pre + N'|') + 1, LEN(@ruta + N'|'));
+
+    -- No cuelga (no deberia pasar, porque la vista une por este mismo
+    -- criterio). Se devuelve la ruta completa para no perder el dato.
+    RETURN @ruta;
+END;
+GO
+
+/* Comprobacion: los dos SELECT deben dar 'RECIBO PROVEEDORES' y 'CITA NO REPLICA'.
+
+SELECT dbo.fn_CategoriaNivel(dbo.fn_CategoriaRelativa(
+           N'/S-FENIX WMS/RECIBO PROVEEDORES/CITA NO REPLICA', N'S-FENIX WMS'), 1),
+       dbo.fn_CategoriaNivel(dbo.fn_CategoriaRelativa(
+           N'/S-FENIX WMS/RECIBO PROVEEDORES/CITA NO REPLICA', N'S-FENIX WMS'), 2);
+
+SELECT dbo.fn_CategoriaNivel(dbo.fn_CategoriaRelativa(
+           N'/S-Logistica/FENIX WMS/RECIBO PROVEEDORES/CITA NO REPLICA', N'S-Logistica/FENIX WMS'), 1),
+       dbo.fn_CategoriaNivel(dbo.fn_CategoriaRelativa(
+           N'/S-Logistica/FENIX WMS/RECIBO PROVEEDORES/CITA NO REPLICA', N'S-Logistica/FENIX WMS'), 2);
 */
 
 /* =====================================================================================
@@ -443,10 +559,28 @@ AS
 SELECT
     t.CodigoTicket,
     s.Servicio,
-    C1 = dbo.fn_CategoriaC1(t.Categoria),
+    -- Nivel 1 de la ruta ('S-Logistica'). Se llama C1Raiz y no C1 porque el
+    -- C1 que interesa al correo es el de mas abajo, el relativo a la rama.
+    C1Raiz = dbo.fn_CategoriaC1(t.Categoria),
     -- Que rama del catalogo lo trajo. Sirve para ver, en el Excel, cuanto
     -- viene de la categoria vieja y cuanto de la nueva.
     RamaServicio = sc.PrefijoCategoria,
+
+    /* C1 y C2: los dos niveles que cuelgan de la rama del servicio.
+
+       Son los que agrupa la hoja 'creados_dash'. Se calculan con
+       fn_CategoriaRelativa (ver 2.3) y NO con fn_CategoriaNivel a secas, para
+       que un ticket de la rama vieja y uno de la nueva caigan en el mismo
+       renglon aunque sus rutas tengan distinta profundidad.
+
+       N2 y N3 se dejan como estaban -posicionales- porque son los que replican
+       al pie de la letra las columnas del Excel manual y sirven para
+       cuadrar contra el. */
+    C1 = ISNULL(NULLIF(dbo.fn_CategoriaNivel(
+             dbo.fn_CategoriaRelativa(t.Categoria, sc.PrefijoCategoria), 1), N''), N'Sin clasificar'),
+    C2 = ISNULL(NULLIF(dbo.fn_CategoriaNivel(
+             dbo.fn_CategoriaRelativa(t.Categoria, sc.PrefijoCategoria), 2), N''), N'Sin detalle'),
+
     N2 = dbo.fn_CategoriaNivel(t.Categoria, 2),
     N3 = dbo.fn_CategoriaNivel(t.Categoria, 3),
     t.Categoria,
@@ -463,6 +597,12 @@ SELECT
     TipoCedis = c.Tipo,
 
     t.Grupo,
+    -- Aqui viaja a quien estaba ASIGNADO el ticket. Quien firmo la solucion
+    -- viaja tambien, mas abajo, con el resto de las columnas del export: en el
+    -- 13.66% de los tickets no son la misma persona -son escalaciones reales,
+    -- no errores de captura- y en una hoja de detalle esa diferencia es
+    -- informacion. No agregar FirmaSolucion aqui: ya esta, y repetirla tumba
+    -- la vista entera con "Column names in each view must be unique".
     t.TecnicoSegundaLinea,
     t.Estado,
     t.Subestado,
@@ -472,6 +612,34 @@ SELECT
     t.SLA,
     t.IntentosSolucion,
     Reabierto = CASE WHEN ISNULL(t.IntentosSolucion, 1) > 1 THEN 1 ELSE 0 END,
+
+    /* El resto de las columnas del export de Proactivanet. No las usa el
+       cuerpo del correo, pero si las hojas de detalle del Excel adjunto, que
+       replican las del reporte que el equipo arma a mano.
+
+       Los textos largos -Descripcion, SolucionUsuario- van SIN recortar aqui
+       a proposito: el tope lo pone quien consume, con el @MaxTexto de
+       usp_CorreoServicio_Datos. Una vista no deberia decidir eso. */
+    t.Descripcion,
+    t.SolucionUsuario,
+    t.Cliente,
+    t.NotificadoPor,
+    t.RegistradoPor,
+    t.ResponsableUltimaModificacion,
+    t.FirmaSolucion,
+    t.FirmaCierreRevocacion,
+    t.TipoRelacion,
+    t.Caducada,
+    t.ReasignacionesGrupo,
+    t.CausaRaizGrupos,
+    t.TiempoResolucion,
+    t.TiempoAtencion,
+    t.TiempoAtencionHorasMin,
+    t.TiempoPrimeraRespuesta,
+    t.TiempoPrimeraRespuestaHorasMin,
+    t.FechaEstimadaResolucion,
+    t.FechaEstimadaOlaUc,
+    t.FechaUltimaModificacion,
 
     t.FechaRegistro,
     FechaRegistroDia = CONVERT(DATE, t.FechaRegistro),

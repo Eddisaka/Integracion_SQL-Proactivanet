@@ -1,0 +1,5 @@
+# Nada se ignora por omision: esta carpeta existe para compartir salidas.
+#
+# El filtro NO es automatico y no puede serlo: ningun patron de nombre
+# distingue una salida con nombres de personas de una que solo trae conteos.
+# Lo decide quien sube el archivo, leyendo LEEME.md antes de hacer git add.

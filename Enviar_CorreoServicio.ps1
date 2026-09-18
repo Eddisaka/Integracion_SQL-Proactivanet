@@ -27,8 +27,15 @@
     Un cuerpo de una sola pantalla -tarjetas de KPI con su comparativo contra
     el corte anterior, la tendencia de creados por categoria, el flujo diario
     de creados/cerrados/reabiertos, el backlog por antiguedad y la causa raiz
-    agrupada- y un Excel adjunto con el detalle: Backlog, Creados, Cerrados y
-    una hoja de resumen.
+    agrupada- y un Excel adjunto con cinco hojas: Resumen, creados_dash
+    -creados por categoria y dia, la matriz que hoy se arma con una tabla
+    dinamica- y el detalle de Backlog, Creados y Cerrados.
+
+    LA CAUSA RAIZ ES SOLO DE ALGUNOS SERVICIOS
+    'Causa y raiz Fenix' lo captura el equipo de WMS y nadie mas. Para los
+    servicios que tengan CatServicioCorreo.UsaCausaRaiz en 0 -el default- se
+    omiten sus cinco columnas de las hojas de detalle, la seccion del Resumen
+    y la grafica del cuerpo. Encenderlo es un UPDATE.
 
     DE DONDE SALEN LOS DATOS
     De dbo.usp_CorreoServicio_Principal y dbo.usp_CorreoServicio_Datos
@@ -179,6 +186,25 @@ try {
     $aging      = $ds.Tables[6]
     $causaRaiz  = $ds.Tables[7]
 
+    # 'Causa y raiz Fenix' solo lo captura el equipo de WMS. Para los demas
+    # servicios llega siempre vacio, y con el las cinco columnas que salen de
+    # el y la grafica de causa raiz. Es una bandera del catalogo y no una
+    # deteccion automatica: asi el correo no cambia de forma solo porque un
+    # dia entro un ticket suelto con el campo lleno.
+    #
+    # Se comprueba que la columna venga en el encabezado antes de leerla: si
+    # el procedimiento en la base es de antes de este cambio, no la trae, y
+    # sin esta guarda el script tronaria con un ArgumentException que no dice
+    # que hacer. El valor leido queda en el log para no tener que adivinar por
+    # que salio o no salio la causa raiz.
+    $usaCausaRaiz = $false
+    if ($enc.Table.Columns.Contains('UsaCausaRaiz')) {
+        $usaCausaRaiz = ($enc['UsaCausaRaiz'] -isnot [DBNull]) -and [bool]$enc['UsaCausaRaiz']
+        Write-Log "UsaCausaRaiz del catalogo: $usaCausaRaiz"
+    } else {
+        Write-Log 'El encabezado no trae UsaCausaRaiz: dbo.usp_CorreoServicio_Principal esta desactualizado en la base. Corre 12_correo_servicio_datos.sql. Por ahora se asume 0.' 'WARN'
+    }
+
     $cultura = [Globalization.CultureInfo]::GetCultureInfo('es-MX')
     $fechaTexto = $FechaCorte.ToString('dd MMMM yyyy', $cultura)
     $desde = [datetime]$enc['Desde']
@@ -194,18 +220,46 @@ try {
     $tCreados  = (Invoke-SpDataSet 'dbo.usp_CorreoServicio_Datos' @{ '@Servicio'=$Servicio; '@Conjunto'='Creados';  '@FechaCorte'=$FechaCorte }).Tables[0]
     $tCerrados = (Invoke-SpDataSet 'dbo.usp_CorreoServicio_Datos' @{ '@Servicio'=$Servicio; '@Conjunto'='Cerrados'; '@FechaCorte'=$FechaCorte }).Tables[0]
 
+    # Cinco columnas en blanco en una hoja de casi cincuenta estorban mas de lo
+    # que ayudan. El procedimiento las devuelve siempre -asi el tablero web
+    # decide por su cuenta- y aqui se quitan.
+    if (-not $usaCausaRaiz) {
+        foreach ($t in @($tBacklog, $tCreados, $tCerrados)) {
+            foreach ($c in @('CausaRaizFenix','CausaC1','CausaC2','CausaC3','Agrupador')) {
+                if ($t.Columns.Contains($c)) { $t.Columns.Remove($c) }
+            }
+        }
+        Write-Log 'El servicio no usa causa raiz: se quitaron sus 5 columnas de las hojas de detalle.'
+    }
+
+    # La hoja 'creados_dash': la matriz de creados por categoria y dia que hoy
+    # se arma a mano con una tabla dinamica. SQL la devuelve en formato largo
+    # -una fila por C1/C2/dia- y aqui se abre en columnas.
+    $tDash = (Invoke-SpDataSet 'dbo.usp_CorreoServicio_CreadosDash' @{ '@Servicio'=$Servicio; '@FechaCorte'=$FechaCorte }).Tables[0]
+    $mDash = ConvertTo-TablaPivote -Tabla $tDash -ColumnasFijas @('Servicio','C1','C2') `
+                                   -ColumnaPivote 'Dia' -ColumnaValor 'Tickets'
+    $diasVentana = ($FechaCorte.Date - $desde.Date).Days
+
     # La hoja Resumen lleva los mismos numeros que las tablas dinamicas del
     # Excel manual, pero como celdas: el generador escribe XML plano y no
     # sabe hacer pivotes. A cambio, el archivo abre sin recalcular nada.
+    $seccionesResumen = @(
+        @{Titulo="KPIs - $Servicio al $fechaTexto"; Tabla=$ds.Tables[1]},
+        @{Titulo='Tiempo de solucion por grupo';    Tabla=$porGrupo},
+        @{Titulo='Backlog por subestado';           Tabla=$subestados},
+        @{Titulo='Creados por categoria y dia';     Tabla=$porCat},
+        @{Titulo='Flujo diario';                    Tabla=$flujo},
+        @{Titulo='Backlog por antiguedad';          Tabla=$aging}
+    )
+    if ($usaCausaRaiz) {
+        $seccionesResumen += @{Titulo='Causa raiz agrupada'; Tabla=$causaRaiz}
+    }
+
     New-Xlsx $archivo @(
-        @{Nombre='Resumen'; Filtro=$false; Secciones=@(
-            @{Titulo="KPIs - $Servicio al $fechaTexto"; Tabla=$ds.Tables[1]},
-            @{Titulo='Tiempo de solucion por grupo';    Tabla=$porGrupo},
-            @{Titulo='Backlog por subestado';           Tabla=$subestados},
-            @{Titulo='Creados por categoria y dia';     Tabla=$porCat},
-            @{Titulo='Flujo diario';                    Tabla=$flujo},
-            @{Titulo='Backlog por antiguedad';          Tabla=$aging},
-            @{Titulo='Causa raiz agrupada';             Tabla=$causaRaiz}
+        @{Nombre='Resumen'; Filtro=$false; Secciones=$seccionesResumen},
+        @{Nombre='creados_dash'; Filtro=$false; Secciones=@(
+            @{Titulo=("Tickets creados en los ultimos {0} dias por categoria - {1} al {2}" -f $diasVentana, $Servicio, $fechaTexto)
+              Tabla=$mDash}
         )},
         @{Nombre='Backlog';  Filtro=$true; Secciones=@(@{Titulo=$null; Tabla=$tBacklog})},
         @{Nombre='Creados';  Filtro=$true; Secciones=@(@{Titulo=$null; Tabla=$tCreados})},
@@ -271,7 +325,10 @@ try {
     }
 
     # 4) Causa raiz agrupada.
-    $hayCausa = $causaRaiz.Rows.Count -gt 0
+    # Sin la bandera no se dibuja aunque el proc devuelva filas: para un
+    # servicio que no captura causa raiz serian todas 'Sin agrupador', una
+    # sola barra que no dice nada.
+    $hayCausa = $usaCausaRaiz -and $causaRaiz.Rows.Count -gt 0
     if ($hayCausa) {
         New-GraficaBarras -Filas $causaRaiz -ColumnaEtiqueta 'Agrupador' -ColumnaValor 'Tickets' -Titulo 'Causa raiz de los tickets cerrados' -RutaArchivo $gCausa -ColorHex '#7c3aed' -Ancho 640 -Alto 380
     }
@@ -294,6 +351,15 @@ try {
     $imgAging = if ($hayAging) { "<img src='cid:gAging' style='max-width:640px'>" } else { '' }
     $imgCausa = if ($hayCausa) { "<img src='cid:gCausa' style='max-width:640px'>" } else { '' }
 
+    # Antiguedad y causa raiz van lado a lado. Cuando el servicio no captura
+    # causa raiz se arma la fila con una sola celda: un <td> vacio dejaria a la
+    # de antiguedad con su margen derecho y descuadrada respecto al resto.
+    $filaGraficas = if ($hayCausa) {
+        "<td style='vertical-align:top;padding-right:18px'>$imgAging</td><td style='vertical-align:top'>$imgCausa</td>"
+    } else {
+        "<td style='vertical-align:top'>$imgAging</td>"
+    }
+
     $body = @"
 <html><body style='font-family:Segoe UI,Arial;font-size:13px;color:#111827'>
 <h2 style='color:#1f4e78;margin-bottom:2px'>Tickets $(Html $enc['Descripcion']) al $fechaTexto</h2>
@@ -301,10 +367,7 @@ try {
 $tarjetas
 <div style='margin-top:18px'>$imgCat</div>
 <div style='margin-top:18px'>$imgFlujo</div>
-<table style='margin-top:18px'><tr>
-  <td style='vertical-align:top;padding-right:18px'>$imgAging</td>
-  <td style='vertical-align:top'>$imgCausa</td>
-</tr></table>
+<table style='margin-top:18px'><tr>$filaGraficas</tr></table>
 <table style='margin-top:22px'><tr>
   <td style='vertical-align:top;padding-right:28px'>
     <h3 style='color:#1f4e78;margin-bottom:6px'>Tiempo de solucion por grupo</h3>

@@ -1,0 +1,192 @@
+/* =========================================================================
+   assets/css/desplegable.css
+
+   Capa visual UNICA de los desplegables del tablero. La usan las cuatro
+   familias de paginas -dashboard.html, experiencia/, qa/, observabilidad/ y
+   orquestacion/-, sueltas o embebidas en una pestaña, y tambien el documento
+   legacy del <iframe>, donde dashboard.js la inyecta.
+
+   El <select> original NUNCA se toca: sigue en el DOM, con su id, sus
+   <option>, su value y sus listeners. Esta hoja solo pinta el boton y el
+   menu que lo tapan (ver assets/js/desplegable.js).
+
+   Los colores salen de los tokens que ya declara cada hoja (--accent, --ring,
+   --g-*, --ctrl-*). Como no todas las paginas declaran la escala completa,
+   cada token se lee con su cadena de reserva: asi el control se ve igual
+   dentro del tablero, en la pagina suelta y dentro del marco legacy, sin
+   copiar la paleta a ningun sitio.
+   ========================================================================= */
+
+.dd {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  min-width: 0;
+  max-width: 100%;
+  vertical-align: middle;
+
+  --dd-alto: 36px;
+  /* Misma esquina que los botones de "Rango rapido" (7 dias, año) de la
+     barra de filtros: cuadrado de esquinas redondeadas, no pastilla. */
+  --dd-radio: 8px;
+  --dd-radio-panel: 12px;
+  --dd-linea:        var(--ctrl-line,       var(--g-200, #d3e9ac));
+  --dd-linea-hover:  var(--ctrl-line-hover, var(--g-400, #9dd323));
+  --dd-linea-panel:  var(--line, #e3e7de);
+  --dd-fondo:        var(--ctrl-bg, #ffffff);
+  --dd-fondo-2:      var(--ctrl-bg-2,       var(--g-50, #f4fae7));
+  --dd-tinta:        var(--ctrl-ink,        var(--ink, #191919));
+  --dd-tinta-2:      var(--ink-2, #393939);
+  --dd-tinta-3:      var(--muted, #6b7280);
+  --dd-acento:       var(--accent,          var(--g-600, #65bb2b));
+  --dd-acento-tinta: var(--accent-ink,      var(--g-900, #3a7431));
+  --dd-suave:        var(--accent-soft,     var(--g-50, #f4fae7));
+  --dd-aro:          var(--ring, 0 0 0 3px rgba(101, 187, 43, .30));
+  --dd-hundido: inset 0 1px 2px rgba(25, 25, 25, .05);
+}
+
+/* El original se esconde sin salir del DOM ni del formulario. */
+.dd > select {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); border: 0;
+}
+
+/* ---- Control cerrado: la misma pieza que los botones del tablero ---- */
+.dd .dd-boton {
+  position: relative;
+  display: flex; align-items: center; gap: 8px;
+  width: 100%; height: var(--dd-alto);
+  padding: 0 32px 0 14px;
+  border: 1px solid var(--dd-linea);
+  border-radius: var(--dd-radio);
+  background: var(--dd-fondo);
+  color: var(--dd-tinta);
+  font: inherit; font-size: 13px; font-weight: 500; line-height: 1;
+  text-align: left; cursor: pointer;
+  box-shadow: var(--dd-hundido);
+  transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23478b3c' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+}
+.dd .dd-boton:hover {
+  background-color: var(--dd-fondo-2);
+  border-color: var(--dd-linea-hover);
+}
+/* Foco y abierto comparten el aro verde tenue de los demas controles. */
+.dd .dd-boton:focus-visible,
+.dd.abierto .dd-boton {
+  outline: none;
+  border-color: var(--dd-acento);
+  background-color: var(--dd-fondo-2);
+  box-shadow: var(--dd-aro), var(--dd-hundido);
+}
+/* Abierto, la flecha apunta arriba. */
+.dd.abierto .dd-boton { background-image: none; }
+.dd.abierto .dd-boton::after {
+  content: ""; position: absolute; right: 12px; width: 14px; height: 14px;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23478b3c' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M18 15l-6-6-6 6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: center;
+}
+
+/* El valor en vigor se lee en verde de marca: el realce discreto que ya usa
+   el tablero para lo que esta aplicado. Sin valor, tinta normal. */
+.dd .dd-valor {
+  flex: 1; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: var(--dd-acento-tinta); font-weight: 700;
+}
+.dd .dd-boton.dd-sin-valor .dd-valor { color: var(--dd-tinta); font-weight: 500; }
+.dd .dd-conteo {
+  flex: none; font-size: 11px; font-weight: 700; line-height: 1;
+  padding: 3px 7px; border-radius: 999px;
+  background: var(--g-400, #9dd323); color: var(--ink, #191919);
+}
+
+/* ---- Menu ----
+   Va en position: fixed, no absolute, y JS le pone left/top al abrirlo.
+   Motivo: la barra de filtros del tablero es una tarjeta con overflow:hidden
+   -lo necesita para sus esquinas redondeadas-, y un menu absoluto se recorta
+   contra ella. Fijo se sale de la barra sin tocar esa regla ni obligar a
+   nadie a desplazar la pagina. Ver colocar() en desplegable.js. */
+.dd .dd-panel {
+  position: fixed; z-index: 200;
+  top: 0; left: 0;
+  width: max-content; min-width: 160px; max-width: min(340px, 86vw);
+  display: none; flex-direction: column;
+  background: var(--card, var(--bg, #ffffff));
+  border: 1px solid var(--dd-linea-panel);
+  border-radius: var(--dd-radio-panel);
+  box-shadow: 0 10px 28px rgba(25, 25, 25, .18);
+  overflow: hidden;
+}
+.dd.abierto .dd-panel { display: flex; }
+
+.dd .dd-busca {
+  margin: 8px; height: 32px; flex: none;
+  border: 1px solid var(--dd-linea-panel); border-radius: 8px;
+  background: var(--dd-fondo-2); color: var(--dd-tinta);
+  font: inherit; font-size: 12.5px; padding: 0 12px;
+}
+.dd .dd-busca::placeholder { color: var(--dd-tinta-3); }
+.dd .dd-busca:focus {
+  outline: none; background: var(--card, var(--bg, #ffffff));
+  border-color: var(--dd-acento);
+  box-shadow: var(--dd-aro);
+}
+/* "Seleccionar todo / Limpiar" siguen en el DOM con sus listeners, fuera de
+   la vista: el menu se queda con el buscador como unico separador. */
+.dd .dd-acciones { display: none; }
+
+.dd .dd-lista {
+  list-style: none; margin: 0; padding: 6px;
+  max-height: 260px; overflow-y: auto; overscroll-behavior: contain;
+}
+.dd .dd-lista:focus { outline: none; }
+.dd .dd-lista li { margin: 1px 0; }
+.dd .dd-opcion {
+  display: flex; align-items: center; gap: 9px;
+  padding: 7px 12px; border-radius: 7px; cursor: pointer;
+  font-size: 12.5px; color: var(--dd-tinta-2);
+}
+.dd .dd-opcion:hover,
+.dd .dd-opcion.activa { background: var(--dd-suave); color: var(--dd-acento-tinta); }
+/* La resaltada por teclado se distingue de la elegida por el aro, no por el
+   fondo: si no, con el teclado no se sabria cual esta puesta. */
+.dd .dd-opcion.activa { box-shadow: 0 0 0 2px var(--accent-line, var(--g-200, #d3e9ac)) inset; }
+.dd .dd-opcion.marcada { background: var(--dd-suave); color: var(--dd-acento-tinta); font-weight: 700; }
+.dd .dd-opcion span {
+  flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.dd .dd-opcion::after {
+  content: ""; flex: none; width: 16px; height: 16px; margin-left: auto;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2716%27 height=%2716%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27%23478b3c%27 stroke-width=%273%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3E%3Cpath d=%27M20 6L9 17l-5-5%27/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: center; background-size: 15px 15px;
+  opacity: 0;
+}
+.dd .dd-opcion.marcada::after { opacity: 1; }
+.dd .dd-vacio { padding: 10px; font-size: 12px; color: var(--dd-tinta-3); text-align: center; }
+
+/* ---- Medidas por contexto ------------------------------------------------
+   El control se adapta a la barra donde cae, en vez de imponer una medida.
+   Alto y ancho son lo unico que cambia; el lenguaje visual es el mismo. */
+
+/* Barra de filtros del tablero (SLA / Backlog / Call Center): columnas de la
+   rejilla, mismo alto que los <input type="date"> de al lado. */
+.filtros .dd { display: flex; width: 100%; --dd-alto: 40px; }
+
+/* Cabeceras de Experiencia, Observabilidad y Orquestacion: piezas sueltas en
+   una fila flexible, con un ancho minimo para que quepa el nombre. */
+.selrow .dd { --dd-alto: 38px; min-width: 150px; }
+
+/* Selectores pequeños dentro de los paneles de graficas y de la barra de
+   detalle de QA. */
+.panel-graf .dd,
+.barra-detalle .dd { --dd-alto: 34px; }
+.panel-graf .dd .dd-boton,
+.barra-detalle .dd .dd-boton { font-size: 12px; padding: 0 30px 0 12px; }
+
+@media (max-width: 720px) {
+  .selrow .dd { min-width: 0; width: 100%; }
+  .dd .dd-panel { max-width: min(340px, 92vw); }
+}

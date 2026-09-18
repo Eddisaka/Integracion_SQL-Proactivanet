@@ -19,3 +19,23 @@ obj/
 correo_qa_temp/
 correo_backlog_temp/
 correo_backlog_direccion_temp/
+
+# Exports con datos de personal. Este repositorio es publico: los nombres de
+# los agentes del Call Center y los de Experiencia al Usuario no se suben.
+# Los catalogos se llenan con UPDATE directo en la base.
+CONCENTRADO_LLAMADAS*.xls*
+hiperpbx*.xls*
+Bases_de_Datos*Experiencia*.xls*
+
+# ---------------------------------------------------------------------
+# Datos del sitio (sitio/). NO se versionan: traen nombres y apellidos de
+# directores, product owners y service owners, y este repositorio es
+# publico. Son respaldos para desarrollar sin base de datos; el sitio lee
+# de Tickets_Proactivanet en cuanto los handlers responden.
+# ---------------------------------------------------------------------
+sitio/experiencia/data/*.mock.json
+sitio/observabilidad/data/*.mock.json
+sitio/orquestacion/data/*.mock.json
+# Documento generado por TableroExperiencia_v*.exe. Trae los mismos datos
+# embebidos y ademas pesa 3 MB: se copia al servidor, no se versiona.
+sitio/assets/Tablero_Experiencia.html
