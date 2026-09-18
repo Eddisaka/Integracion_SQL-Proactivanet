@@ -115,7 +115,8 @@ con las credenciales de la sesion.
 
 En el primer ensayo real le llego a una lider un bloque de 4 tickets a nombre
 de **«User, Setup»**. No es nadie: es una cuenta de sistema que cierra tickets
-en doce grupos distintos.
+en mas de una docena de grupos distintos -15 el 18 de septiembre, y el
+numero sube-.
 
 Ya existia el catalogo que las tiene identificadas, `dbo.CatCuentaNoPersona`
 —ocho cuentas, entre ellas *«Desk, Smart»* con 178,694 tickets, que es la barra
@@ -174,7 +175,7 @@ De ahi salieron tres cosas:
   unico renglon roto de la tabla.
 - **El bloque 3b** ya no se fia solo del nombre. Lo que mejor distingue una
   cuenta de sistema es **en cuantos grupos firma**: una persona atiende uno o
-  dos, y `User, Setup` firma en doce. Eso no depende de como este escrito el
+  dos, y `User, Setup` firma en 15. Eso no depende de como este escrito el
   nombre, que es justo lo que fallo.
 
 ### Las cuentas de proveedor ya estaban cubiertas, por otra via

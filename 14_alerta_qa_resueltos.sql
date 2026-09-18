@@ -128,7 +128,7 @@ SELECT
     EsProveedor = CASE WHEN LTRIM(RTRIM(t.Grupo)) LIKE N'Proveedor%' THEN 1 ELSE 0 END,
 
     /* Quien firmo no siempre es una persona. "User, Setup" cierra tickets en
-       doce grupos distintos, y hay siete cuentas mas asi -de automatizacion,
+       quince grupos distintos, y hay siete cuentas mas asi -de automatizacion,
        genericas y de proveedor- en dbo.CatCuentaNoPersona.
 
        Es una BANDERA, no un filtro: estos tickets estan mal categorizados
@@ -137,10 +137,16 @@ SELECT
        que existen. Lo que cambia es COMO se muestran -no se le echa la culpa a
        una persona que no existe- y que no se les busca correo.
 
-       El cruce es por igualdad simple porque se midio: Cuenta trae los
-       nombres exactamente como vienen en FirmaSolucion, sin espacios de mas
-       ni diferencias de escritura. Si algun dia dejara de cruzar, el bloque 3
-       de 16_localizar_cuentas_no_persona.sql lo dice.
+       El cruce es por igualdad simple, normalizando el espacio duro en los dos
+       lados por lo mismo que la linea de al lado lo hace con Categoria: este
+       origen los mete. Hoy los nombres vienen limpios -se midio byte a byte en
+       18_por_que_no_cruza_la_cuenta.sql-, asi que eso es precaucion.
+
+       Lo que si rompio el cruce una vez no fue el dato del ticket sino el
+       catalogo: la fila de "User, Setup" aparecio con Cuenta = '/'. Por eso el
+       bloque 5 de este mismo archivo mira el catalogo AL REVES. Mirar solo
+       desde los tickets es ciego a eso: una cuenta catalogada que no cruza es,
+       desde ese lado, indistinguible de una persona.
 
        Habilitado = 1 se respeta: da como deshabilitar una fila sin borrarla. */
     EsCuentaNoPersona = CASE WHEN EXISTS (
@@ -406,7 +412,7 @@ GROUP BY b.Tecnico
 
    El criterio que mas sirve NO es el nombre sino el numero de grupos. Una
    persona atiende uno o dos; las cuentas de sistema aparecen en muchos porque
-   cierran a lo ancho de toda la mesa -"User, Setup" firma en DOCE-. Y a
+   cierran a lo ancho de toda la mesa -"User, Setup" firma en QUINCE-. Y a
    diferencia del nombre, eso no depende de como este escrito.
 
    Se agrego despues de que "User, Setup" desaparecio del catalogo -su fila
