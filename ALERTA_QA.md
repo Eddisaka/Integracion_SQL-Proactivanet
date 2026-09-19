@@ -212,6 +212,45 @@ alguna de estas cuentas llegara a firmar un ticket en un grupo que no empiece po
 cada una—, y el bloque **3b** de `14_alerta_qa_resueltos.sql` las relista en cada
 corrida, con la columna `Grupos`, para que se vea el dia que deje de ser cierto.
 
+### Un destinatario rechazado no puede dejar al lider sin aviso
+
+El 18 de septiembre el correo de Jesus Campa fallo **tres de tres corridas**
+—12:00, 18:00 y 18:12— mientras los otros cuatro lideres salian bien:
+
+```
+FALLO el correo de Jesus Campa: Excepcion al llamar a "Send" con los
+argumentos "1": "No se puede enviar a un destinatario."
+```
+
+Determinista, no intermitente. Y era el lider con el **79 % de los tickets**:
+el unico aviso que no llegaba era el que mas importaba. Sus 25 tickets se
+acumulaban corrida tras corrida —eso si funciono: como el correo no salio, no
+se marcaron, y no se perdio ninguno—.
+
+La causa es que el envio era todo o nada: una sola direccion que el relay
+rechaza tumba el correo completo, y la copia de Campa es la mas larga porque
+es quien mas tecnicos tiene. Ahora el envio **escala**, renunciando a lo menos
+importante primero:
+
+| Intento | A quien |
+|---|---|
+| 1 | Todos |
+| 2 | Sin las direcciones que el servidor nombro al rechazar |
+| 3 | **Solo el lider**, sin ninguna copia |
+
+Y la escalada **diagnostica sola**: si el tercer intento funciona, el problema
+estaba en una copia. Si tambien falla, el problema es la direccion del propio
+lider y el registro lo dice con todas sus letras, apuntando a `CorreoLider` en
+`lider_grupo.xlsx`.
+
+Cuando se renuncia a alguien, el correo lo dice en el cuerpo. Si no, el lider
+creeria que su tecnico esta enterado y no lo esta.
+
+Una cosa mas, que era la que impedia arreglarlo: .NET **si** dice que direccion
+rechazo, pero PowerShell lo esconde dentro de un `MethodInvocationException`
+—por eso el registro repetia tres veces *"No se puede enviar a un
+destinatario"* sin nombrar a nadie—. Ahora se desentierra y se escribe.
+
 ## Teams
 
 El resumen — cuantos tickets y cuantos tecnicos por lider — se publica como
@@ -301,7 +340,7 @@ ETL, para que la alerta vea la base al dia. Ver
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File pruebas\Prueba_AlertaQA.ps1
 ```
 
-85 comprobaciones, sin tocar la base, sin red y sin mandar nada. Cubren las
+109 comprobaciones, sin tocar la base, sin red y sin mandar nada. Cubren las
 cinco funciones que deciden **a quien** se le manda, que son las unicas cuyo
 error no se nota: el correo sale igual, solo que a quien no era.
 
@@ -319,7 +358,7 @@ estan escritas, para que la prueba no pueda quedarse atras del codigo.
 | `15_vw_tickets.sql` | La `vw_Tickets` real, de la que cuelga todo lo anterior |
 | `Enviar_AlertaQA.ps1` | El envio |
 | `config_alerta_qa.ejemplo.json` | Plantilla del config. El real **no** se sube |
-| `pruebas\Prueba_AlertaQA.ps1` | Las 85 comprobaciones |
+| `pruebas\Prueba_AlertaQA.ps1` | Las 109 comprobaciones |
 
 ## Una nota sobre la codificacion
 

@@ -367,6 +367,79 @@ function Destinatarios-DelLider($filas, [bool]$esSinLider, $respaldo, [hashtable
     }
 }
 
+function Destinatarios-Rechazados($fallo) {
+    # Las direcciones que el servidor nombro al rechazar, o un arreglo vacio si
+    # no nombro ninguna.
+    #
+    # Hay que escarbar. Al llamar a $smtp.Send() desde PowerShell lo que sale
+    # es un MethodInvocationException envolviendo a la excepcion de verdad -por
+    # eso el mensaje empieza con 'Excepcion al llamar a "Send"' y no dice a
+    # quien-. La direccion esta varias capas mas adentro.
+    #
+    # SmtpFailedRecipientsException HEREDA de SmtpFailedRecipientException, asi
+    # que la plural se mira primero: al reves, un rechazo de cinco direcciones
+    # reportaria una sola.
+    $direcciones = @()
+    $e = if ($fallo -is [System.Management.Automation.ErrorRecord]) { $fallo.Exception } else { $fallo }
+    while ($e) {
+        if ($e -is [System.Net.Mail.SmtpFailedRecipientsException]) {
+            foreach ($i in @($e.InnerExceptions)) {
+                if ($i.FailedRecipient) { $direcciones += [string]$i.FailedRecipient }
+            }
+        } elseif ($e -is [System.Net.Mail.SmtpFailedRecipientException]) {
+            if ($e.FailedRecipient) { $direcciones += [string]$e.FailedRecipient }
+        }
+        $e = $e.InnerException
+    }
+    return @($direcciones | Where-Object { $_ } | Sort-Object -Unique)
+}
+
+function Quitar-Destinatarios($lista, $quitar) {
+    # -notcontains compara sin distinguir mayusculas, que es lo que toca con
+    # direcciones de correo.
+    if (-not $quitar -or @($quitar).Count -eq 0) { return @($lista) }
+    return @(@($lista) | Where-Object { @($quitar) -notcontains $_ })
+}
+
+function Siguiente-Intento($para, $copia, $rechazados) {
+    # A que se renuncia despues de que un envio fallo. Devuelve el siguiente
+    # juego de destinatarios, o Seguir = $false cuando ya no queda nada a que
+    # renunciar y reintentar seria repetir el mismo fallo.
+    #
+    # Esta aparte del bucle porque es la unica decision de aqui que se puede
+    # equivocar en silencio, y probarla no necesita un servidor de correo.
+    $para  = @($para)
+    $copia = @($copia)
+    $sinPara  = Quitar-Destinatarios $para  $rechazados
+    $sinCopia = Quitar-Destinatarios $copia $rechazados
+
+    # 1) El servidor nombro direcciones y quitarlas cambia algo, y ademas queda
+    #    alguien en el "Para". Es el mejor caso: se pierde solo lo rechazado.
+    if (@($rechazados).Count -gt 0 -and $sinPara.Count -gt 0 -and
+        ($sinPara.Count -lt $para.Count -or $sinCopia.Count -lt $copia.Count)) {
+        return @{
+            Seguir = $true; Para = $sinPara; Copia = $sinCopia
+            Renuncia = "No se pudo entregar a: " + (@($rechazados) -join ", ") +
+                       ". El aviso salio sin esas direcciones."
+            Log = "se reintenta sin ellas."
+        }
+    }
+
+    # 2) No se sabe cual era, o el rechazado es el propio lider y quitarlo
+    #    dejaria el correo sin nadie. Renunciar a TODA la copia es lo unico
+    #    que queda que pueda salvar el aviso del lider.
+    if ($copia.Count -gt 0) {
+        return @{
+            Seguir = $true; Para = $para; Copia = @()
+            Renuncia = "El servidor de correo rechazo la entrega. Este aviso salio SIN copia a nadie."
+            Log = "se reintenta solo al lider, sin copias."
+        }
+    }
+
+    # 3) Ya iba solo al lider y aun asi fallo: el problema es su direccion.
+    return @{ Seguir = $false; Para = $para; Copia = @(); Renuncia = ""; Log = "" }
+}
+
 $enviados = New-Object System.Collections.ArrayList
 $correosEnviados = 0
 $fallidos = 0
@@ -456,40 +529,108 @@ foreach ($grupo in $porLider) {
         }
     }
 
-    $mensaje = $null
-    $smtp = $null
-    try {
-        $mensaje = New-Object System.Net.Mail.MailMessage
-        $mensaje.From = New-Object System.Net.Mail.MailAddress($cfg.remitente)
-        foreach ($d in $para)  { $mensaje.To.Add($d) }
-        foreach ($d in $copia) { $mensaje.CC.Add($d) }
-        $mensaje.Subject = $asunto
-        # El asunto lleva el nombre del lider tal como esta en la base, con
-        # acentos; sin esto viajan como signos de interrogacion.
-        $mensaje.SubjectEncoding = [Text.Encoding]::UTF8
-        $mensaje.BodyEncoding    = [Text.Encoding]::UTF8
-        $mensaje.IsBodyHtml = $true
-        $mensaje.Body = $sb.ToString()
+    # Una direccion que el relay rechaza NO puede dejar al lider sin aviso.
+    #
+    # Paso de verdad: el 18 de septiembre el correo de Jesus Campa fallo TRES
+    # de tres veces -"No se puede enviar a un destinatario"- mientras los otros
+    # cuatro lideres salian bien. Es el lider con el 79% de los tickets, o sea
+    # que el unico aviso que no llegaba era el que mas importaba, y sus tickets
+    # se acumulaban sin marcar corrida tras corrida.
+    #
+    # Se intenta hasta tres veces, cada una renunciando a algo mas:
+    #
+    #   1. todos
+    #   2. sin las direcciones que el servidor nombro al rechazar
+    #   3. solo el "Para" -el lider-, sin ninguna copia
+    #
+    # La escalada ademas DIAGNOSTICA: si el tercero funciona, el problema
+    # estaba en una copia; si tambien falla, el problema es la direccion del
+    # propio lider y hay que arreglar el catalogo. Cualquiera de las dos cosas
+    # queda dicha en el registro con nombre y apellido.
+    $paraIntento  = $para
+    $copiaIntento = $copia
+    $renuncia     = ""          # que se dejo por el camino, para decirlo
+    $enviado      = $false
+    $ultimoFallo  = ""
+    $yaDicho      = $false      # si la escalada ya explico por que se rindio
 
-        $smtp = New-Object System.Net.Mail.SmtpClient($cfg.smtp_servidor, [int]$cfg.smtp_puerto)
-        $smtp.EnableSsl = [bool]$cfg.smtp_usa_ssl
-        if ($cfg.smtp_usuario) {
-            # La contrasena solo desde la variable de entorno: en el archivo
-            # quedaria en claro y el archivo se respalda, se copia y se comparte.
-            $smtp.Credentials = New-Object System.Net.NetworkCredential($cfg.smtp_usuario, $env:PVNET_SMTP_PASS)
+    for ($intento = 1; $intento -le 3 -and -not $enviado; $intento++) {
+        $mensaje = $null
+        $smtp = $null
+        try {
+            $cuerpo = $sb.ToString()
+            if ($renuncia) {
+                # Que el lider sepa a quien NO se pudo copiar: si no, cree que
+                # su tecnico esta enterado y no lo esta.
+                $cuerpo = $cuerpo -replace '</div>\s*$', (
+                    ("<p style='color:#a33;font-size:12px;margin-top:18px'>{0}</p></div>" -f (Html $renuncia)))
+            }
+
+            $mensaje = New-Object System.Net.Mail.MailMessage
+            $mensaje.From = New-Object System.Net.Mail.MailAddress($cfg.remitente)
+            foreach ($d in $paraIntento)  { $mensaje.To.Add($d) }
+            foreach ($d in $copiaIntento) { $mensaje.CC.Add($d) }
+            $mensaje.Subject = $asunto
+            # El asunto lleva el nombre del lider tal como esta en la base, con
+            # acentos; sin esto viajan como signos de interrogacion.
+            $mensaje.SubjectEncoding = [Text.Encoding]::UTF8
+            $mensaje.BodyEncoding    = [Text.Encoding]::UTF8
+            $mensaje.IsBodyHtml = $true
+            $mensaje.Body = $cuerpo
+
+            $smtp = New-Object System.Net.Mail.SmtpClient($cfg.smtp_servidor, [int]$cfg.smtp_puerto)
+            $smtp.EnableSsl = [bool]$cfg.smtp_usa_ssl
+            if ($cfg.smtp_usuario) {
+                # La contrasena solo desde la variable de entorno: en el archivo
+                # quedaria en claro y el archivo se respalda, se copia y se comparte.
+                $smtp.Credentials = New-Object System.Net.NetworkCredential($cfg.smtp_usuario, $env:PVNET_SMTP_PASS)
+            }
+            $smtp.Send($mensaje)
+            $enviado = $true
+
+            Escribir ("Enviado a {0}: {1} tickets, {2} en copia.{3}" -f `
+                ($paraIntento -join ","), $filas.Count, $copiaIntento.Count,
+                $(if ($intento -gt 1) { " (intento $intento)" } else { "" }))
+            $correosEnviados++
+            # Solo lo que de verdad salio entra en la lista de avisados.
+            foreach ($f in $filas) { [void]$enviados.Add([string]$f["CodigoTicket"]) }
+        } catch {
+            $ultimoFallo = $_.Exception.Message
+            $rechazados  = Destinatarios-Rechazados $_
+            if ($rechazados.Count -gt 0) {
+                Escribir ("   el servidor rechazo: {0}" -f ($rechazados -join ", "))
+            }
+
+            # Que se deja en el siguiente intento. Si no queda nada a que
+            # renunciar, se para: reintentar seria repetir el mismo fallo.
+            $siguiente = Siguiente-Intento $paraIntento $copiaIntento $rechazados
+            if ($siguiente.Seguir) {
+                $paraIntento  = $siguiente.Para
+                $copiaIntento = $siguiente.Copia
+                $renuncia     = $siguiente.Renuncia
+                Escribir ("   " + $siguiente.Log)
+            } else {
+                Escribir ("FALLO el correo de {0}: {1}" -f $lider, $ultimoFallo)
+                Escribir ("   iba solo al lider y aun asi lo rechazo, asi que el problema")
+                Escribir ("   es esa direccion: {0}" -f ($paraIntento -join ","))
+                Escribir ("   revise CorreoLider en lider_grupo.xlsx.")
+                $yaDicho = $true
+                break
+            }
+        } finally {
+            if ($mensaje) { $mensaje.Dispose() }
+            if ($smtp)    { $smtp.Dispose() }
         }
-        $smtp.Send($mensaje)
+    }
 
-        Escribir ("Enviado a {0}: {1} tickets, {2} en copia." -f ($para -join ","), $filas.Count, $copia.Count)
-        $correosEnviados++
-        # Solo lo que de verdad salio entra en la lista de avisados.
-        foreach ($f in $filas) { [void]$enviados.Add([string]$f["CodigoTicket"]) }
-    } catch {
-        Escribir ("FALLO el correo de {0}: {1}" -f $lider, $_.Exception.Message)
+    if (-not $enviado) {
+        # $yaDicho evita repetir el fallo cuando la escalada ya se rindio y lo
+        # explico. Aqui se cae por agotar los tres intentos, que es otra cosa y
+        # merece decirse distinto.
+        if (-not $yaDicho) {
+            Escribir ("FALLO el correo de {0} tras {1} intentos: {2}" -f $lider, ($intento - 1), $ultimoFallo)
+        }
         $fallidos++
-    } finally {
-        if ($mensaje) { $mensaje.Dispose() }
-        if ($smtp)    { $smtp.Dispose() }
     }
 }
 

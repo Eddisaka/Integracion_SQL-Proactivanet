@@ -48,7 +48,8 @@ if ($errores -and $errores.Count -gt 0) {
 }
 
 $queremos = @("Clave-DeNombre", "Correos-De", "Base-DelApi", "Destinatarios-DelLider",
-              "Es-ProblemaDeProxy")
+              "Es-ProblemaDeProxy", "Destinatarios-Rechazados", "Quitar-Destinatarios",
+              "Siguiente-Intento")
 $definiciones = $arbol.FindAll({
     param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst]
 }, $true)
@@ -454,6 +455,111 @@ Comprobar "sin mensaje" (Es-ProblemaDeProxy (Fallo $null $null)) $false
 # Un numero que CONTIENE 407 no es un 407: por eso la expresion lleva \b.
 Comprobar "el ticket 1407 no es un 407" `
     (Es-ProblemaDeProxy (Fallo "Fallo al procesar el incidente 1407." $null)) $false
+
+# ================================================== Destinatarios-Rechazados
+# Cuando el relay rechaza una direccion, .NET dice CUAL. PowerShell lo esconde
+# detras de un MethodInvocationException -por eso el registro del 18 de
+# septiembre solo decia 'Excepcion al llamar a "Send"... No se puede enviar a
+# un destinatario' tres veces seguidas, sin nombrar a nadie-. Esto lo desentierra.
+Write-Host "Destinatarios-Rechazados"
+
+function Envuelto($excepcion) {
+    # Como llega de verdad: PowerShell mete la excepcion real dentro de un
+    # MethodInvocationException al llamar a un metodo de .NET.
+    $mie = New-Object System.Management.Automation.MethodInvocationException(
+        'Excepcion al llamar a "Send" con los argumentos "1": "No se puede enviar a un destinatario."',
+        $excepcion)
+    New-Object System.Management.Automation.ErrorRecord($mie, "X", "NotSpecified", $null)
+}
+
+$unaSola = New-Object System.Net.Mail.SmtpFailedRecipientException(
+    [System.Net.Mail.SmtpStatusCode]::MailboxUnavailable, "malo@ejemplo.com")
+Comprobar "una direccion, envuelta como llega" `
+    ((Destinatarios-Rechazados (Envuelto $unaSola)) -join "|") "malo@ejemplo.com"
+
+# La plural HEREDA de la singular. Si el codigo comprobara la singular primero,
+# un rechazo de tres direcciones reportaria una sola y las otras dos seguirian
+# tumbando el correo en cada reintento.
+$varias = New-Object System.Net.Mail.SmtpFailedRecipientsException(
+    "tres rechazadas",
+    [System.Net.Mail.SmtpFailedRecipientException[]]@(
+        (New-Object System.Net.Mail.SmtpFailedRecipientException([System.Net.Mail.SmtpStatusCode]::MailboxUnavailable, "a@ejemplo.com")),
+        (New-Object System.Net.Mail.SmtpFailedRecipientException([System.Net.Mail.SmtpStatusCode]::MailboxUnavailable, "b@ejemplo.com")),
+        (New-Object System.Net.Mail.SmtpFailedRecipientException([System.Net.Mail.SmtpStatusCode]::MailboxUnavailable, "c@ejemplo.com"))))
+Comprobar "varias direcciones, no solo la primera" `
+    ((Destinatarios-Rechazados (Envuelto $varias)) -join "|") "a@ejemplo.com|b@ejemplo.com|c@ejemplo.com"
+
+# Un fallo de SMTP que NO nombra a nadie: hay que devolver vacio, no inventar.
+# De eso depende que el envio pase a "solo al lider" en vez de reintentar
+# identico y volver a fallar.
+$generico = New-Object System.Net.Mail.SmtpException("el servidor no responde")
+Comprobar "sin direccion nombrada: vacio" (@(Destinatarios-Rechazados (Envuelto $generico)).Count) 0
+Comprobar "nulo: vacio"                   (@(Destinatarios-Rechazados $null).Count) 0
+
+# ===================================================== Quitar-Destinatarios
+Write-Host "Quitar-Destinatarios"
+
+Comprobar "quita la que toca" `
+    ((Quitar-Destinatarios @("a@x.com","b@x.com","c@x.com") @("b@x.com")) -join "|") "a@x.com|c@x.com"
+# Las direcciones no distinguen mayusculas: si esto fallara, la mala se
+# quedaria dentro y el reintento volveria a fallar igual.
+Comprobar "no distingue mayusculas" `
+    ((Quitar-Destinatarios @("A@X.com","b@x.com") @("a@x.com")) -join "|") "b@x.com"
+Comprobar "nada que quitar"  ((Quitar-Destinatarios @("a@x.com") @()) -join "|") "a@x.com"
+Comprobar "quitar nulo"      ((Quitar-Destinatarios @("a@x.com") $null) -join "|") "a@x.com"
+Comprobar "se quita todo"    (@(Quitar-Destinatarios @("a@x.com") @("a@x.com")).Count) 0
+Comprobar "lista vacia"      (@(Quitar-Destinatarios @() @("a@x.com")).Count) 0
+
+# ========================================================= Siguiente-Intento
+# La escalada: a que se renuncia cuando el relay rechaza. Es la pieza que
+# decide si el lider recibe su aviso o no lo recibe nadie, y es justo lo que
+# fallo el 18 de septiembre: una direccion mala en la copia dejaba a Jesus
+# Campa -el 79% de los tickets- sin su correo, tres corridas seguidas.
+Write-Host "Siguiente-Intento"
+
+$P = @("lider@ejemplo.com")
+$C = @("g@ejemplo.com","t1@ejemplo.com","t2@ejemplo.com")
+
+# --- caso bueno: el servidor nombra una copia mala -> se pierde solo esa ---
+$s = Siguiente-Intento $P $C @("t1@ejemplo.com")
+Comprobar "copia mala: sigue"        $s.Seguir $true
+Comprobar "copia mala: lider intacto" ($s.Para -join "|")  "lider@ejemplo.com"
+Comprobar "copia mala: solo cae esa"  ($s.Copia -join "|") "g@ejemplo.com|t2@ejemplo.com"
+Comprobar "copia mala: se dice cual"  ($s.Renuncia -like "*t1@ejemplo.com*") $true
+
+# --- el servidor no dice a quien -> se renuncia a TODA la copia -----------
+# Es el caso real: el relay de Soriana contesto "No se puede enviar a un
+# destinatario" sin nombrar a nadie.
+$s = Siguiente-Intento $P $C @()
+Comprobar "sin nombre: sigue"          $s.Seguir $true
+Comprobar "sin nombre: lider intacto"  ($s.Para -join "|") "lider@ejemplo.com"
+Comprobar "sin nombre: cae toda la copia" ($s.Copia.Count) 0
+
+# --- ya iba solo al lider y fallo -> parar ------------------------------
+# Aqui NO hay que reintentar: el problema es la direccion del lider, y repetir
+# solo gastaria otro minuto para volver a fallar igual.
+$s = Siguiente-Intento $P @() @()
+Comprobar "solo lider y fallo: para" $s.Seguir $false
+
+# --- el rechazado es el propio lider -------------------------------------
+# Quitarlo dejaria el correo sin nadie, asi que se pasa a soltar la copia; si
+# tambien falla, la siguiente vuelta para y lo dice.
+$s = Siguiente-Intento $P $C @("lider@ejemplo.com")
+Comprobar "lider rechazado: no se queda sin Para" ($s.Para -join "|") "lider@ejemplo.com"
+Comprobar "lider rechazado: suelta la copia"      ($s.Copia.Count) 0
+$s = Siguiente-Intento $P @() @("lider@ejemplo.com")
+Comprobar "lider rechazado y sin copia: para"     $s.Seguir $false
+
+# --- el servidor nombra algo que no esta en la lista ---------------------
+# Si esto no pasara a soltar la copia, el bucle reintentaria identico hasta
+# agotar los tres turnos sin cambiar nada.
+$s = Siguiente-Intento $P $C @("nosotros@otrodominio.com")
+Comprobar "nombre desconocido: suelta la copia" ($s.Copia.Count) 0
+Comprobar "nombre desconocido: sigue"           $s.Seguir $true
+
+# --- varias copias malas de una vez --------------------------------------
+$s = Siguiente-Intento $P $C @("t1@ejemplo.com","t2@ejemplo.com")
+Comprobar "dos copias malas" ($s.Copia -join "|") "g@ejemplo.com"
 
 # ---- 3. Que el .ps1 no tenga acentos ------------------------------------
 # Windows PowerShell 5.1 lee los .ps1 sin BOM en ANSI: un acento rompe el
