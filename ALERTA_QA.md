@@ -341,8 +341,10 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File pruebas\Prueba_AlertaQA.
 ```
 
 109 comprobaciones, sin tocar la base, sin red y sin mandar nada. Cubren las
-cinco funciones que deciden **a quien** se le manda, que son las unicas cuyo
-error no se nota: el correo sale igual, solo que a quien no era.
+ocho funciones: las que deciden **a quien** se le manda —cuyo error no se
+nota, porque el correo sale igual, solo que a quien no era— y las que deciden
+**que hacer cuando el relay rechaza**, cuyo error tampoco se nota, porque el
+resto de los correos siguen saliendo.
 
 Las funciones no se copian en la prueba: se leen del propio
 `Enviar_AlertaQA.ps1` con el analizador de PowerShell y se evaluan tal como
