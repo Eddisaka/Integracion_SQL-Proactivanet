@@ -1,0 +1,36 @@
+{
+  "_comentario": "Copia este archivo como config_aviso_problems.json y ajusta lo tuyo. El .json real esta en .gitignore y no se sube: este repositorio es publico.",
+
+  "_texto": "Todo el texto fijo del correo vive AQUI y no en el .ps1, por dos razones. Una, que Windows PowerShell 5.1 lee un .ps1 sin BOM como ANSI y una sola tilde rompe el parseo del archivo completo. Dos, que asi lo puede corregir quien manda el correo sin tocar codigo. Este archivo SI se lee como UTF-8, asi que los acentos van tal cual.",
+
+  "asunto": "Solicitud de estatus y actualización de fechas – PRBs e Iniciativas con vencimiento. ({fecha})",
+  "saludo": "Buenas tardes,",
+  "intro": "Por medio del presente, solicitamos de su apoyo para compartir el estatus actualizado de las siguientes Iniciativas y Problemas relacionados a continuación, considerando los siguientes puntos:",
+  "nota_analisis": "Estatus de Análisis: Confirmar avance, actividades realizadas y, en caso necesario, la actualización de la fecha compromiso.",
+  "nota_solucion": "Estatus de Solución: Informar el avance en la implementación de la solución, así como cualquier ajuste requerido en las fechas estimadas.",
+  "titulo_vencidas": "Iniciativas y Problemas con la fecha de su estado vencida",
+  "titulo_sin_fecha": "Iniciativas y Problemas sin fecha compromiso capturada",
+  "cierre": "Agradeceremos nos puedan compartir la actualización correspondiente y, en su caso, la justificación del cambio de fechas.",
+  "firma": "Quedamos atentos a sus comentarios. Saludos cordiales.",
+  "pie": "Correo generado automáticamente a partir de la base de Experiencia al Usuario. Si algún dato no corresponde, responde a este mensaje.",
+
+  "remitente": "problemTI@soriana.com",
+
+  "_copia_fija": "El equipo de Problem Management, que va en copia de TODOS los correos. No sale del catalogo: dbo.CatPersona.Rol solo trae Service Owner, Product Owner y Director, no hay un rol de Problem Management. Pon aqui las direcciones reales en tu config_aviso_problems.json.",
+  "copia_fija": [
+    "alguien@ejemplo.com",
+    "otro@ejemplo.com"
+  ],
+
+  "_smtp": "Relay SMTP interno de Soriana, sin SSL ni usuario. Si algun dia pidiera usuario, la CLAVE NO VA AQUI: se exporta en la variable de entorno PVNET_SMTP_PASS. Una clave en un .json acaba en un repositorio tarde o temprano.",
+  "smtp_servidor": "corpex10.soriana.com",
+  "smtp_puerto": 25,
+  "smtp_usa_ssl": false,
+  "smtp_usuario": "",
+
+  "_modo_prueba": "Mientras este en true, TODOS los correos se redirigen a destinatario_prueba y nadie mas recibe nada. El log dice a quien habrian ido. Dejalo en true hasta ver un correo completo y correcto.",
+  "modo_prueba": true,
+  "destinatario_prueba": "TU_CORREO@soriana.com",
+
+  "conservar_archivos_dias": 15
+}

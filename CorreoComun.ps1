@@ -612,3 +612,94 @@ function New-GraficaBarrasAgrupadas {
     $chart.SaveImage($RutaArchivo, [System.Windows.Forms.DataVisualization.Charting.ChartImageFormat]::Png)
     $chart.Dispose()
 }
+
+# ============================================================================
+# ENTREGA: que hacer cuando el relay rechaza a un destinatario
+#
+# POR QUE ESTA AQUI
+#
+# $smtp.Send() es todo o nada. Si el servidor rechaza UNA direccion de la
+# copia, no entrega a nadie: ni al destinatario principal, que no tiene culpa
+# ni forma de enterarse. Paso de verdad -un lider se quedo sin su aviso tres
+# corridas seguidas por una direccion ajena en copia- y por eso el envio se
+# hace en tres intentos, renunciando a lo menos posible cada vez:
+#
+#   1. todos
+#   2. sin las direcciones que el servidor nombro al rechazar
+#   3. solo el "Para", sin ninguna copia
+#
+# Estas tres funciones son la parte que se puede equivocar en silencio, y
+# estan aqui separadas del bucle de envio porque asi se pueden probar sin
+# levantar un servidor de correo.
+# ============================================================================
+
+function Get-DestinatariosRechazados($fallo) {
+    # Las direcciones que el servidor nombro al rechazar, o un arreglo vacio si
+    # no nombro ninguna.
+    #
+    # Hay que escarbar. Al llamar a $smtp.Send() desde PowerShell lo que sale
+    # es un MethodInvocationException envolviendo a la excepcion de verdad -por
+    # eso el mensaje empieza con 'Excepcion al llamar a "Send"' y no dice a
+    # quien-. La direccion esta varias capas mas adentro.
+    #
+    # SmtpFailedRecipientsException HEREDA de SmtpFailedRecipientException, asi
+    # que la plural se mira primero: al reves, un rechazo de cinco direcciones
+    # reportaria una sola.
+    $direcciones = @()
+    $e = if ($fallo -is [System.Management.Automation.ErrorRecord]) { $fallo.Exception } else { $fallo }
+    while ($e) {
+        if ($e -is [System.Net.Mail.SmtpFailedRecipientsException]) {
+            foreach ($i in @($e.InnerExceptions)) {
+                if ($i.FailedRecipient) { $direcciones += [string]$i.FailedRecipient }
+            }
+        } elseif ($e -is [System.Net.Mail.SmtpFailedRecipientException]) {
+            if ($e.FailedRecipient) { $direcciones += [string]$e.FailedRecipient }
+        }
+        $e = $e.InnerException
+    }
+    return @($direcciones | Where-Object { $_ } | Sort-Object -Unique)
+}
+
+function Remove-Destinatarios($lista, $quitar) {
+    # -notcontains compara sin distinguir mayusculas, que es lo que toca con
+    # direcciones de correo.
+    if (-not $quitar -or @($quitar).Count -eq 0) { return @($lista) }
+    return @(@($lista) | Where-Object { @($quitar) -notcontains $_ })
+}
+
+function Get-SiguienteIntento($para, $copia, $rechazados) {
+    # A que se renuncia despues de que un envio fallo. Devuelve el siguiente
+    # juego de destinatarios, o Seguir = $false cuando ya no queda nada a que
+    # renunciar y reintentar seria repetir el mismo fallo.
+    $para  = @($para)
+    $copia = @($copia)
+    $sinPara  = Remove-Destinatarios $para  $rechazados
+    $sinCopia = Remove-Destinatarios $copia $rechazados
+
+    # 1) El servidor nombro direcciones y quitarlas cambia algo, y ademas queda
+    #    alguien en el "Para". Es el mejor caso: se pierde solo lo rechazado.
+    if (@($rechazados).Count -gt 0 -and $sinPara.Count -gt 0 -and
+        ($sinPara.Count -lt $para.Count -or $sinCopia.Count -lt $copia.Count)) {
+        return @{
+            Seguir = $true; Para = $sinPara; Copia = $sinCopia
+            Renuncia = "No se pudo entregar a: " + (@($rechazados) -join ", ") +
+                       ". El aviso salio sin esas direcciones."
+            Log = "se reintenta sin ellas."
+        }
+    }
+
+    # 2) No se sabe cual era, o el rechazado es el propio destinatario y
+    #    quitarlo dejaria el correo sin nadie. Renunciar a TODA la copia es lo
+    #    unico que queda que pueda salvar el aviso.
+    if ($copia.Count -gt 0) {
+        return @{
+            Seguir = $true; Para = $para; Copia = @()
+            Renuncia = "El servidor de correo rechazo la entrega. Este aviso salio SIN copia a nadie."
+            Log = "se reintenta solo al destinatario, sin copias."
+        }
+    }
+
+    # 3) Ya iba solo al destinatario y aun asi fallo: el problema es su
+    #    direccion.
+    return @{ Seguir = $false; Para = $para; Copia = @(); Renuncia = ""; Log = "" }
+}
