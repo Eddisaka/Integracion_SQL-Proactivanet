@@ -547,7 +547,16 @@ BEGIN
         ),
         HorasCicloPromedio = CAST(AVG(HorasCiclo) AS DECIMAL(18,2)),
         ReasignacionesPromedio = CAST(AVG(CAST(ReasignacionesGrupo AS DECIMAL(18,2))) AS DECIMAL(18,2)),
-        TicketsAltaPrioridad = SUM(CASE WHEN Prioridad IN (N'Alta', N'Crítica', N'Critica', N'Urgente') THEN 1 ELSE 0 END)
+        /* VENCIDOS de alta prioridad, no todos los de alta prioridad. El
+           tablero pone este numero debajo de la tarjeta de vencidos, con la
+           leyenda "de prioridad alta o critica", asi que tiene que ser un
+           subconjunto de los vencidos o la tarjeta dice una cosa y ensena
+           otra. Sin el filtro de SlaVencido daba el total del periodo -en
+           septiembre de 2026, 4,038 contra 1,559 vencidos reales-, casi el
+           triple, y ademas podia salir mayor que el numero grande de arriba. */
+        TicketsAltaPrioridad = SUM(CASE WHEN SlaVencido = 1
+                                         AND Prioridad IN (N'Alta', N'Crítica', N'Critica', N'Urgente')
+                                        THEN 1 ELSE 0 END)
     FROM base;
 END;
 GO
