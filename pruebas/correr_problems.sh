@@ -1,5 +1,7 @@
 #!/bin/sh
-# Corre 25_diagnostico_problems_vencidos.sql contra un SQL Server de verdad.
+# Corre contra un SQL Server de verdad los dos .sql del correo de PRBs
+# vencidos: 25_diagnostico_problems_vencidos.sql y
+# 26_aviso_problems_vencidos.sql.
 #
 # POR QUE EXISTE
 #
@@ -286,6 +288,19 @@ else
     FALLOS=0
 fi
 
+# --------------------------------------------------- los objetos del correo
+echo "== 26_aviso_problems_vencidos.sql =="
+docker cp "$REPO/26_aviso_problems_vencidos.sql" "$CONTENEDOR:/tmp/y.sql" >/dev/null
+salida26=$(sqlcmd -d Tickets_Proactivanet -i /tmp/y.sql 2>&1 || true)
+err26=$(printf '%s' "$salida26" | grep -cE '^(Msg|Mens)[. ]' || true)
+if [ "$err26" -gt 0 ]; then
+    echo "   FALLA con $err26 error(es):"
+    printf '%s\n' "$salida26" | grep -E '^(Msg|Mens)[. ]' -A2 | head -30 | sed 's/^/      /'
+    FALLOS=$((FALLOS+1))
+else
+    echo "   bien   sin errores de SQL"
+fi
+
 # -------------------------------------------------------------- aserciones
 # Que corra sin Msg no basta: tiene que dar el resultado correcto. Estas son
 # las tres cosas que de verdad importan.
@@ -373,6 +388,83 @@ afirmar "la consulta de candidatos si propone la pareja" \
                        WHERE LEN(t.value) > 2
                          AND dbo.fn_ClaveNombre(s.Nombre) NOT LIKE N'%' + dbo.fn_ClaveNombre(t.value) + N'%');" \
     "1"
+
+# ---------------------------------------------- aserciones de los objetos 26
+# Aqui no basta con que compile: son las vistas que arman el correo.
+
+# 6. El veredicto de la vista tiene que dar lo mismo que el diagnostico.
+afirmar "vw_ProblemVencido: 11 vencidas" \
+    "SELECT COUNT(*) FROM dbo.vw_ProblemVencido WHERE Veredicto = N'VENCIDA';" "11"
+afirmar "vw_ProblemVencido: 2 sin fecha" \
+    "SELECT COUNT(*) FROM dbo.vw_ProblemVencido WHERE Veredicto = N'SIN FECHA';" "2"
+
+# 7. NINGUNA iniciativa puede salir dos veces. Si el OUTER APPLY TOP (1) se
+#    volviera un JOIN, una sola persona duplicada en el catalogo duplicaria
+#    filas en el correo.
+afirmar "ninguna iniciativa se duplica en el aviso" \
+    "SELECT ISNULL(SUM(x.Veces), 0) FROM (
+        SELECT Veces = COUNT(*) FROM dbo.vw_ProblemVencidoAviso
+        GROUP BY Codigo HAVING COUNT(*) > 1) AS x;" \
+    "0"
+
+# 8. LA RAZON DE SER de fn_ClaveNombreOrdenada. 'Persona Problem Dos' esta en
+#    el catalogo como 'Problem Dos, Persona': fn_ClaveNombre NO los empata
+#    -eso lo comprueba la asercion 4- y sin la clave ordenada sus nueve
+#    iniciativas saldrian sin correo del Owner Problem. Son nueve y no diez:
+#    PRB 2026-000124 es de 'Persona Problem Uno'.
+afirmar "el nombre al reves si resuelve correo" \
+    "SELECT COUNT(DISTINCT a.Codigo) FROM dbo.vw_ProblemVencidoAviso a
+     WHERE a.OwnerProblem = N'Persona Problem Dos'
+       AND a.CorreoOwnerProblem = N'problem.dos@ejemplo.com';" \
+    "9"
+
+# 9. Y no afloja de mas: 'Persona Problem Cuatro' no esta en el catalogo ni
+#    como permutacion, asi que tiene que seguir sin correo.
+afirmar "el que no esta sigue sin correo" \
+    "SELECT COUNT(*) FROM dbo.vw_ProblemVencidoAviso a
+     WHERE a.OwnerProblem = N'Persona Problem Cuatro' AND a.CorreoOwnerProblem IS NOT NULL;" \
+    "0"
+
+# 10. La lista de duenos no puede empezar con el separador: el FOR XML lo
+#     emite antes de cada elemento y hay que quitarlo con STUFF.
+afirmar "la lista de correos no empieza con '|'" \
+    "SELECT COUNT(*) FROM dbo.vw_ProblemVencidoAviso
+     WHERE CorreosDuenos LIKE N'|%';" \
+    "0"
+
+# 11. Y si abre a varias categorias, tiene que traer las dos. PRB 2026-000124
+#     ataca dos, con Product Owner distinto en cada una.
+afirmar "el abanico de duenos junta las dos categorias" \
+    "SELECT COUNT(*) FROM dbo.vw_ProblemVencidoAviso
+     WHERE Codigo = N'PRB 2026-000124' AND ProductOwners LIKE N'%|%';" \
+    "1"
+
+# 12. El lider que se usa es el Director, que es el que produccion trae
+#     capturado.
+afirmar "el lider resuelto es el Director" \
+    "SELECT COUNT(DISTINCT a.Codigo) FROM dbo.vw_ProblemVencidoAviso a
+     WHERE a.OwnerProblem = N'Persona Problem Uno'
+       AND a.LiderOwnerProblem = N'Persona Dir Uno'
+       AND a.CorreoLiderOwnerProblem = N'dir.uno@ejemplo.com';" \
+    "1"
+
+# 13. El procedimiento solo devuelve lo reportable: nada cerrado ni al
+#     corriente se puede colar en el correo.
+afirmar "el procedimiento devuelve 13 filas" \
+    "CREATE TABLE #r (Veredicto NVARCHAR(20), Codigo NVARCHAR(100), Prefijo NVARCHAR(10),
+        Titulo NVARCHAR(MAX), Estado NVARCHAR(100), FechaCreacion DATETIME2(0),
+        ColumnaRige NVARCHAR(30), Compromiso DATETIME2(0), DiasVencida INT,
+        FechaAnalisis DATETIME2(0), FechaSolucion DATETIME2(0), FechaCierre DATETIME2(0),
+        NroA INT, NroS INT, NroC INT,
+        OwnerProblem NVARCHAR(255), CorreoOwnerProblem NVARCHAR(255),
+        LiderOwnerProblem NVARCHAR(255), CorreoLiderOwnerProblem NVARCHAR(255),
+        OwnerServicio NVARCHAR(255), CorreoOwnerServicio NVARCHAR(255),
+        Direccion NVARCHAR(255), CorreoDireccion NVARCHAR(255),
+        ProductOwners NVARCHAR(MAX), ServiceOwners NVARCHAR(MAX),
+        DirectoresPO NVARCHAR(MAX), CorreosDuenos NVARCHAR(MAX));
+     INSERT INTO #r EXEC dbo.usp_AvisoProblems_Pendientes;
+     SELECT COUNT(*) FROM #r;" \
+    "13"
 
 echo
 if [ "$FALLOS" -eq 0 ]; then echo "TODO BIEN"; else echo "$FALLOS problema(s)"; fi
