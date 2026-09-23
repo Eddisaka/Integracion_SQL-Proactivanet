@@ -28,7 +28,5 @@
 
   "_modo_prueba": "Mientras este en true, TODOS los correos se redirigen a destinatario_prueba y nadie mas recibe nada. El log dice a quien habrian ido. Dejalo en true hasta ver un correo completo y correcto.",
   "modo_prueba": true,
-  "destinatario_prueba": "TU_CORREO@soriana.com",
 
-  "conservar_archivos_dias": 15
 }
