@@ -18,6 +18,7 @@
 
   "_copia_fija": "El equipo de Problem Management, que va en copia de TODOS los correos. No sale del catalogo: dbo.CatPersona.Rol solo trae Service Owner, Product Owner y Director, no hay un rol de Problem Management. Pon aqui las direcciones reales en tu config_aviso_problems.json.",
   "copia_fija": [
+    ""
   ],
 
   "_smtp": "Relay SMTP interno de Soriana, sin SSL ni usuario. Si algun dia pidiera usuario, la CLAVE NO VA AQUI: se exporta en la variable de entorno PVNET_SMTP_PASS. Una clave en un .json acaba en un repositorio tarde o temprano.",
@@ -28,5 +29,7 @@
 
   "_modo_prueba": "Mientras este en true, TODOS los correos se redirigen a destinatario_prueba y nadie mas recibe nada. El log dice a quien habrian ido. Dejalo en true hasta ver un correo completo y correcto.",
   "modo_prueba": true,
+  "destinatario_prueba": "correo@ejemplo.com",
 
+  "conservar_archivos_dias": 10
 }
