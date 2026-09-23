@@ -493,6 +493,16 @@ afirmar "el dueno por categoria al reves si resuelve correo" \
      WHERE d.Rol = N'ServiceOwner' AND d.Dueno = N'Persona SO Dos';" \
     "so.dos@ejemplo.com"
 
+# 12c. EL OTRO LADO del guardian que vive en Prueba_AvisoProblems.ps1: la
+#      vista no puede producir una ColumnaRige que el correo no sepa pintar.
+#      Asi se colo el fallo de 'En Monitoreo': la vista decia FechaCierre y la
+#      tabla del correo solo tenia columnas para Analisis y Solucion.
+afirmar "ninguna ColumnaRige fuera de las tres que el correo pinta" \
+    "SELECT COUNT(*) FROM dbo.vw_ProblemVencido
+     WHERE ColumnaRige IS NOT NULL
+       AND ColumnaRige NOT IN (N'FechaAnalisis', N'FechaSolucion', N'FechaCierre');" \
+    "0"
+
 # 13a. REGLA: RTI y REQ no generan correo aunque esten vencidos.
 afirmar "RTI y REQ salen vencidos pero no se avisan" \
     "SELECT CONVERT(NVARCHAR(20), SUM(CASE WHEN Veredicto = N'VENCIDA' THEN 1 ELSE 0 END))

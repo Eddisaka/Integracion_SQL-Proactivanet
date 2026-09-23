@@ -102,6 +102,7 @@ function Fila($cambios) {
         Estado = "En Analisis"; FechaCreacion = [datetime]"2026-06-10"
         ColumnaRige = "FechaAnalisis"; Compromiso = [datetime]"2026-07-20"; DiasVencida = 64
         FechaAnalisis = [datetime]"2026-07-20"; FechaSolucion = [DBNull]::Value
+        FechaCierre = [DBNull]::Value
         OwnerServicio = "Persona Servicio"; Direccion = "Persona Direccion"
         CorreoOwnerProblem = "owner@ejemplo.com"
     }
@@ -174,6 +175,40 @@ Comprobar "en 'En Solucion' el rojo se mueve a la de solucion" `
     ($htmlSol -like "*<b style='color:#982a18'>22/07/2026</b>*") $true
 Comprobar "y la de analisis queda en gris" `
     ($htmlSol -like "*color:#6b7280'>22/06/2026</td>*") $true
+
+# LA QUE FALTABA. 'En Monitoreo' rige por FechaCierre, y la tabla no tenia esa
+# columna: se copio el diseno del correo hecho a mano del 19 de agosto, que no
+# traia ninguna fila en ese estado. 19 filas de produccion salian sin su fecha
+# comprometida a la vista y sin rojo en ninguna parte.
+$htmlCie = ConvertTo-TablaHtml -Filas @((Fila @{
+    ColumnaRige = "FechaCierre"; Estado = "En Monitoreo"
+    FechaAnalisis = [datetime]"2026-05-10"; FechaSolucion = [datetime]"2026-06-10"
+    FechaCierre = [datetime]"2026-07-15" }))
+Comprobar "en 'En Monitoreo' el rojo va en la fecha de cierre" `
+    ($htmlCie -like "*<b style='color:#982a18'>15/07/2026</b>*") $true
+Comprobar "y las otras dos quedan en gris" `
+    (($htmlCie -like "*color:#6b7280'>10/05/2026</td>*") -and
+     ($htmlCie -like "*color:#6b7280'>10/06/2026</td>*")) $true
+
+# El guardian de la CLASE de error, no del caso. La tabla tiene que traer una
+# columna por cada valor que pueda tomar ColumnaRige en dbo.vw_ProblemVencido.
+# Si algun dia se agrega un cuarto estado vivo y aqui no se agrega su columna,
+# esto falla. El otro lado lo vigila pruebas/correr_problems.sh.
+$rigen = @('FechaAnalisis', 'FechaSolucion', 'FechaCierre')
+$encabezados = @('Fecha Analisis', 'Fecha Solucion', 'Fecha Cierre')
+for ($i = 0; $i -lt $rigen.Count; $i++) {
+    $h = ConvertTo-TablaHtml -Filas @((Fila @{
+        ColumnaRige = $rigen[$i]
+        FechaAnalisis = [datetime]"2026-01-01"
+        FechaSolucion = [datetime]"2026-01-02"
+        FechaCierre   = [datetime]"2026-01-03" }))
+    Comprobar ("la tabla trae la columna '{0}'" -f $encabezados[$i]) `
+        ($h -like ("*<th*>{0}</th>*" -f $encabezados[$i])) $true
+    # Y que esa columna sea la que se pinta de rojo, no otra.
+    $esperado = @('01/01/2026', '02/01/2026', '03/01/2026')[$i]
+    Comprobar ("{0} se pinta de rojo cuando rige" -f $rigen[$i]) `
+        ($h -like ("*<b style='color:#982a18'>{0}</b>*" -f $esperado)) $true
+}
 
 $htmlSin = ConvertTo-TablaHtml -Filas @((Fila @{
     Veredicto = "SIN FECHA"; FechaAnalisis = [DBNull]::Value; DiasVencida = [DBNull]::Value })) -SinFecha

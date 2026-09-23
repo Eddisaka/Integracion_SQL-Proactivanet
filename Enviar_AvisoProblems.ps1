@@ -140,10 +140,23 @@ function Add-Sin-Repetir([System.Collections.ArrayList]$lista, $direcciones) {
 
 function ConvertTo-TablaHtml {
     <#
-        Pinta una de las dos tablas del correo. Las columnas son las mismas
-        que llevaba el correo hecho a mano, mas 'Dias' en la de vencidas:
-        sin ese numero no hay forma de saber que atender primero, y en la
-        tabla de sin fecha no aplica porque no hay contra que medir.
+        Pinta una de las dos tablas del correo.
+
+        LAS TRES COLUMNAS DE FECHA TIENEN QUE ESTAR TODAS
+        El correo hecho a mano del 19 de agosto traia solo dos, Analisis y
+        Solucion, porque aquel dia ninguna de sus diez iniciativas estaba
+        'En Monitoreo'. Copiar ese diseno dejo fuera Fecha Cierre, que es
+        justo la que manda en ese estado: 19 filas salian sin su fecha
+        comprometida a la vista y sin el rojo en ninguna parte.
+
+        La regla es: aqui tiene que haber una columna por cada valor que
+        pueda tomar ColumnaRige en dbo.vw_ProblemVencido. Si algun dia se
+        agrega un cuarto estado vivo, se agrega aqui tambien. Hay una
+        asercion en pruebas/Prueba_AvisoProblems.ps1 y otra en
+        pruebas/correr_problems.sh que lo vigilan desde los dos lados.
+
+        'Dias' solo va en la tabla de vencidas: en la de sin fecha no hay
+        contra que medir.
     #>
     param(
         [object[]]$Filas,
@@ -153,7 +166,8 @@ function ConvertTo-TablaHtml {
     if (@($Filas).Count -eq 0) { return '' }
 
     $cols = @('Fecha Creacion', 'Codigo', 'Titulo', 'Owner del Servicio',
-              'Estado', 'Direccion', 'Fecha Analisis', 'Fecha Solucion')
+              'Estado', 'Direccion',
+              'Fecha Analisis', 'Fecha Solucion', 'Fecha Cierre')
     if (-not $SinFecha) { $cols += 'Dias' }
 
     $sb = New-Object Text.StringBuilder
@@ -183,7 +197,8 @@ function ConvertTo-TablaHtml {
         # muestran porque dan contexto, no porque haya que actuar sobre ellas.
         $rige = Txt $f.ColumnaRige
         foreach ($par in @(@('FechaAnalisis', (Fecha $f.FechaAnalisis)),
-                           @('FechaSolucion', (Fecha $f.FechaSolucion)))) {
+                           @('FechaSolucion', (Fecha $f.FechaSolucion)),
+                           @('FechaCierre',   (Fecha $f.FechaCierre)))) {
             $col = $par[0]
             $val = $par[1]
             if ($SinFecha -and $col -eq $rige) {

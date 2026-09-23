@@ -285,6 +285,9 @@ SELECT TOP (30)
        Direccion    = CAST(a.Direccion AS NVARCHAR(26)),
        FAnalisis    = CONVERT(CHAR(10), a.FechaAnalisis, 103),
        FSolucion    = CONVERT(CHAR(10), a.FechaSolucion, 103),
+       -- Las TRES. Sin esta, una fila 'En Monitoreo' se ve sin la fecha que
+       -- de verdad manda, que es como se colo el mismo fallo en el correo.
+       FCierre      = CONVERT(CHAR(10), a.FechaCierre, 103),
        a.DiasVencida
 FROM dbo.vw_ProblemVencidoAviso AS a
 WHERE a.GeneraAviso = 1

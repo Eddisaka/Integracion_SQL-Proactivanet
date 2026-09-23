@@ -63,6 +63,29 @@ correo.
 > algun dia se quiere volver a avisar de los RTI, es un `UPDATE` sobre
 > `dbo.CatPrefijoProblem`.
 
+### Las tres columnas de fecha
+
+La tabla trae **las tres**: Fecha Analisis, Fecha Solucion y Fecha Cierre. La
+que manda en el estado de la iniciativa va en rojo y negritas; las otras dos,
+en gris, porque dan contexto pero no hay que actuar sobre ellas.
+
+Tiene que haber una columna por cada valor que pueda tomar `ColumnaRige` en
+`dbo.vw_ProblemVencido`. Si algun dia se agrega un cuarto estado vivo, se
+agrega tambien aqui.
+
+> **De donde salio esta nota.** El correo hecho a mano del 19 de agosto traia
+> solo dos columnas de fecha, porque aquel dia ninguna de sus diez iniciativas
+> estaba `En Monitoreo`. Copiar ese diseno dejo fuera `Fecha Cierre`, que es
+> justo la que manda en ese estado: **19 filas salian sin su fecha comprometida
+> a la vista y sin el rojo en ninguna parte**. Lo detecto quien recibio el
+> correo de prueba, no una prueba automatica.
+>
+> Ahora lo vigilan dos aserciones, una por lado: en
+> `pruebas/Prueba_AvisoProblems.ps1`, que la tabla traiga y pinte de rojo cada
+> una de las tres; y en `pruebas/correr_problems.sh`, que la vista no pueda
+> producir una `ColumnaRige` que el correo no sepa pintar. La segunda es la
+> que importa: caza la clase de error, no este caso.
+
 ### Destinatarios
 
 | | Quien |
@@ -339,10 +362,10 @@ Excel: un nombre colado en una lista de correos haria fallar el envio
 
 ```sh
 # SQL: compila y corre 25, 26 y 27 contra un SQL Server de verdad, con el
-# DDL extraido de los archivos versionados. 22 aserciones.
+# DDL extraido de los archivos versionados. 23 aserciones.
 sh pruebas/correr_problems.sh
 
-# PowerShell: 50 comprobaciones, sin base, sin red y sin mandar nada.
+# PowerShell: 58 comprobaciones, sin base, sin red y sin mandar nada.
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File pruebas\Prueba_AvisoProblems.ps1
 ```
 
