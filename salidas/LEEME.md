@@ -40,6 +40,15 @@ Un ejemplo de cada lado, de los mismos scripts:
 |---|---|
 | `19_` bloques 1 a 5 | conteos, porcentajes y nombres de grupo. Se sube |
 | `17_` bloques 3, 5, 7 y 8 | listas de nombres de personas. NO se sube |
+| `25_` bloques 1, 4 y 5 | agregados por grupo y categoria. Se suben |
+| `25_` bloques 2 y 3 | folios, titulos y tiendas, ticket por ticket. NO se suben |
+
+El `25_` merece una nota aparte porque rompe el patron de los demas. Los
+diagnosticos anteriores devuelven totales; ese devuelve el LISTADO, con folio,
+titulo libre y tienda de cada ticket. El titulo lo escribe una persona a las
+tres de la mañana y puede traer cualquier cosa adentro -un nombre, un
+telefono, el numero de una caja-, asi que no hay forma de revisarlo de un
+vistazo. Esa salida va por correo interno, no por aqui.
 
 Cuando una salida traiga las dos cosas, se recorta: se suben los bloques que
 no identifican a nadie y se dice en el commit cuales se dejaron fuera.
