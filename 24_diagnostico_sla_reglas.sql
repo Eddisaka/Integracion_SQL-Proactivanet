@@ -3,55 +3,58 @@
 
    SOLO LEE. No crea, no altera y no borra nada.
 
+   CORRECCION SOBRE LA PRIMERA VERSION, QUE FALLO AL CORRER
+
+   1) FechaEstimadaOlaUc NO esta en vw_Dash_ProductividadBase. La vista pasa
+      FechaEstimadaResolucion pero no la de OLA/UC. Aqui se toma con un JOIN a
+      dbo.Tickets por CodigoTicket, que es su PRIMARY KEY: una fila o ninguna,
+      sin riesgo de multiplicar conteos.
+
+   2) 'En trámite de compra' NO es una exencion equivalente a las otras dos.
+      En el correo produce su propia categoria -'Tramite de compra'-, no
+      'Dentro SLA'. La primera version lo contaba como cumplido, y con 875
+      tickets en el backlog abierto eso no es un detalle.
+
    POR QUE EL CORREO DICE ~89% Y LA PESTAÑA DICE 68%
 
-   No es un campo mal usado. Son DOS DEFINICIONES DISTINTAS de "cumplio", y la
-   del correo es mas indulgente en cinco puntos. Esta es la del correo, tal
-   como esta en 07_correo_backlog.sql (usp_CorreoBacklog_Backfill, EstadoSLA):
+   Son dos definiciones distintas de "cumplio". La del correo
+   (usp_CorreoBacklog_Backfill, EstadoSLA) produce CUATRO categorias:
 
-       WHEN Subestado = 'Escalado/Dependencia'           -> Dentro SLA
-       WHEN Subestado = 'En espera del CAB/Autorización' -> Dentro SLA
-       WHEN Subestado = 'En trámite de compra'           -> categoria aparte
-       WHEN FechaEstimadaOlaUc IS NOT NULL
-            AND FechaFirmaSolucion <= FechaEstimadaOlaUc -> Dentro SLA
-       WHEN FechaEstimadaResolucion IS NULL              -> Dentro SLA
+       Subestado 'Escalado/Dependencia'            -> Dentro SLA(Subestado)
+       Subestado 'En espera del CAB/Autorización'  -> Dentro SLA(Subestado)
+       Subestado 'En trámite de compra'            -> Tramite de compra
+       resuelto dentro de FechaEstimadaResolucion  -> Dentro SLA
+       resuelto dentro de FechaEstimadaOlaUc       -> Dentro SLA
+       sin FechaEstimadaResolucion                 -> Dentro SLA
+       lo demas                                    -> Fuera SLA
 
-   Y esta es la de la pestaña (vw_Dash_ProductividadBase):
+   La de la pestaña produce dos, y descarta una poblacion:
 
-       FechaFirmaSolucion <= FechaEstimadaResolucion     -> Dentro SLA
-       FechaEstimadaResolucion IS NULL                   -> no evaluable, fuera
-                                                            del denominador
+       FechaFirmaSolucion <= FechaEstimadaResolucion -> dentro
+       sin FechaEstimadaResolucion -> NO EVALUABLE, fuera del denominador
 
-   Cinco reglas de diferencia. Ninguna es un error: cada una se decidio a
-   proposito. Pero juntas pueden valer veinte puntos, y hasta hoy nadie habia
-   medido cuanto vale cada una.
+   Y AQUI HAY UNA AMBIGÜEDAD QUE NO PUEDO RESOLVER SOLO
 
-   Eso es lo que hace el bloque 2: una escalera que agrega las reglas del
-   correo UNA POR UNA sobre la misma poblacion, para ver cuantos puntos aporta
-   cada una. Al final de la escalera tiene que salir el numero del correo.
+   El correo NO calcula ningun porcentaje: entrega el conteo por categoria
+   (result set 6, GROUP BY Lider, Grupo, EstadoSLA). El 89% sale de que
+   alguien divide, y segun que haga con 'Tramite de compra' el numero cambia.
+   Por eso el bloque 2 lo da de las dos formas, y hay que decidir cual es la
+   que se viene usando.
 
-   Y HAY UNA SEXTA DIFERENCIA, QUE PUEDE SER LA MAS GRANDE
+   LA SEXTA DIFERENCIA, QUE PUEDE SER LA MAYOR
 
-   Las dos cosas no miden la misma poblacion:
+   El correo mide el BACKLOG ABIERTO; la pestaña mide lo RESUELTO. Un ticket
+   escalado a un proveedor, mientras sigue abierto, el correo lo cuenta como
+   Dentro SLA por su subestado. Cuando por fin se resuelve -tarde- entra a la
+   pestaña como vencido. Ninguno esta mal: responden preguntas distintas. El
+   bloque 5 lo mide.
 
-       el correo de Backlog mide lo que esta ABIERTO
-       la pestaña de SLA   mide lo que se RESOLVIO en el periodo
-
-   Un ticket escalado a un proveedor, mientras sigue abierto, el correo lo
-   cuenta como Dentro SLA por su subestado. Cuando por fin se resuelve -tarde-
-   entra a la pestaña como vencido. El mismo ticket cuenta bien en un lado y
-   mal en el otro, y no hay error en ninguno: responden preguntas distintas.
-
-   El bloque 5 lo mide.
-
-   OJO CON UNA COSA AL LEER EL BLOQUE 2
-
-   El subestado es el estado ACTUAL del ticket, no el que tuvo mientras se
-   trabajaba. Un ticket ya cerrado normalmente ya no dice 'Escalado/
-   Dependencia'. Asi que sobre lo RESUELTO esas reglas casi no aplican -el
-   bloque 8b del 23 solo encontro dos subestados-, y si en la escalera aportan
-   poco, no significa que no importen: significa que actuan sobre el backlog
-   abierto, que es donde el correo las usa.
+   Y OJO AL LEER EL BLOQUE 2: el subestado es el estado ACTUAL. Un ticket ya
+   cerrado rara vez sigue diciendo 'Escalado/Dependencia', asi que sobre lo
+   RESUELTO esas reglas casi no pesan. Si en la escalera aportan poco no es
+   que no importen: es que actuan sobre el backlog abierto, que es donde el
+   correo las usa. El bloque 6 ya mostro que ahi si pesan -993 de 4,207
+   tickets abiertos, casi uno de cada cuatro-.
    ===================================================================================== */
 
 USE [Tickets_Proactivanet];
@@ -61,9 +64,6 @@ GO
 
 /* =====================================================================================
    1) Cuanta materia prima hay para cada regla
-
-      Antes de medir el efecto, cuantos tickets del periodo podria tocar cada
-      regla. Si una sale en cero, ya sabemos que no explica nada.
    ===================================================================================== */
 DECLARE @FechaInicio DATE = '2026-09-01';
 DECLARE @FechaFin    DATE = '2026-09-22';
@@ -71,163 +71,155 @@ DECLARE @FechaFin    DATE = '2026-09-22';
 SELECT
     Bloque                = '1) Materia prima',
     Resueltos             = COUNT_BIG(*),
-    ConOlaUc              = SUM(CASE WHEN FechaEstimadaOlaUc IS NOT NULL THEN 1 ELSE 0 END),
-    /* De los vencidos, a cuantos los salvaria la prorroga. Este es el numero
-       que importa: tener OlaUc no sirve si igual se paso de esa fecha. */
-    VencidosQueSalvaOlaUc = SUM(CASE WHEN SlaVencido = 1
-                                      AND FechaEstimadaOlaUc IS NOT NULL
-                                      AND FechaFirmaSolucion <= FechaEstimadaOlaUc
+    ConOlaUc              = SUM(CASE WHEN t.FechaEstimadaOlaUc IS NOT NULL THEN 1 ELSE 0 END),
+    /* El numero que de verdad importa: de los vencidos, a cuantos los
+       salvaria la prorroga. Tener OlaUc no sirve si igual se paso de ella. */
+    VencidosQueSalvaOlaUc = SUM(CASE WHEN b.SlaVencido = 1
+                                      AND t.FechaEstimadaOlaUc IS NOT NULL
+                                      AND b.FechaFirmaSolucion <= t.FechaEstimadaOlaUc
                                      THEN 1 ELSE 0 END),
-    SubestadoEscalado     = SUM(CASE WHEN Subestado = N'Escalado/Dependencia' THEN 1 ELSE 0 END),
-    SubestadoCAB          = SUM(CASE WHEN Subestado = N'En espera del CAB/Autorización' THEN 1 ELSE 0 END),
-    SubestadoCompra       = SUM(CASE WHEN Subestado = N'En trámite de compra' THEN 1 ELSE 0 END),
-    SinCompromiso         = SUM(CASE WHEN FechaEstimadaResolucion IS NULL THEN 1 ELSE 0 END)
-FROM dbo.vw_Dash_ProductividadBase
-WHERE FechaFirmaSolucion >= @FechaInicio
-  AND FechaFirmaSolucion <  DATEADD(DAY, 1, @FechaFin)
-  AND EsRechazado = 0;
+    SubEscalado           = SUM(CASE WHEN b.Subestado = N'Escalado/Dependencia' THEN 1 ELSE 0 END),
+    SubCAB                = SUM(CASE WHEN b.Subestado = N'En espera del CAB/Autorización' THEN 1 ELSE 0 END),
+    SubCompra             = SUM(CASE WHEN b.Subestado = N'En trámite de compra' THEN 1 ELSE 0 END),
+    SinCompromiso         = SUM(CASE WHEN b.FechaEstimadaResolucion IS NULL THEN 1 ELSE 0 END)
+FROM dbo.vw_Dash_ProductividadBase AS b
+LEFT JOIN dbo.Tickets AS t ON t.CodigoTicket = b.CodigoTicket
+WHERE b.FechaFirmaSolucion >= @FechaInicio
+  AND b.FechaFirmaSolucion <  DATEADD(DAY, 1, @FechaFin)
+  AND b.EsRechazado = 0;
 GO
 
 /* =====================================================================================
    2) LA ESCALERA: cuanto vale cada regla, en puntos
 
-      Misma poblacion -lo resuelto en el periodo- con cinco definiciones que
-      se van soltando de a poco. La diferencia entre un escalon y el siguiente
-      es lo que cuesta esa regla.
+      Misma poblacion, soltando las reglas del correo de a una. La diferencia
+      entre un escalon y el siguiente es lo que cuesta esa regla.
 
-      a) Como lo mide la pestaña hoy.
-      b) + la prorroga OLA/UC.
-      c) + los tres subestados exentos.
-      d) + contar como cumplidos los que no tienen compromiso (en vez de
-         sacarlos del denominador).
-      e) La regla completa del correo. Aqui tiene que salir su numero.
+      Los dos ultimos renglones son la regla completa del correo, con las dos
+      lecturas posibles de 'Tramite de compra'. Al comparar con el 89% que se
+      recuerda, la que empate dice cual se viene usando.
    ===================================================================================== */
 DECLARE @FechaInicio DATE = '2026-09-01';
 DECLARE @FechaFin    DATE = '2026-09-22';
 
 ;WITH b AS (
     SELECT
-        FechaEstimadaResolucion, FechaEstimadaOlaUc, FechaFirmaSolucion, Subestado,
-        SlaEvaluable, DentroSla,
-        Exento = CASE WHEN Subestado IN (N'Escalado/Dependencia',
-                                         N'En espera del CAB/Autorización',
-                                         N'En trámite de compra')
-                      THEN 1 ELSE 0 END,
-        SalvaOlaUc = CASE WHEN FechaEstimadaOlaUc IS NOT NULL
-                           AND FechaFirmaSolucion <= FechaEstimadaOlaUc
+        b.SlaEvaluable, b.DentroSla, b.Subestado,
+        EsCompra   = CASE WHEN b.Subestado = N'En trámite de compra' THEN 1 ELSE 0 END,
+        EsExento   = CASE WHEN b.Subestado IN (N'Escalado/Dependencia',
+                                               N'En espera del CAB/Autorización')
+                          THEN 1 ELSE 0 END,
+        SalvaOlaUc = CASE WHEN t.FechaEstimadaOlaUc IS NOT NULL
+                           AND b.FechaFirmaSolucion <= t.FechaEstimadaOlaUc
                           THEN 1 ELSE 0 END
-    FROM dbo.vw_Dash_ProductividadBase
-    WHERE FechaFirmaSolucion >= @FechaInicio
-      AND FechaFirmaSolucion <  DATEADD(DAY, 1, @FechaFin)
-      AND EsRechazado = 0
+    FROM dbo.vw_Dash_ProductividadBase AS b
+    LEFT JOIN dbo.Tickets AS t ON t.CodigoTicket = b.CodigoTicket
+    WHERE b.FechaFirmaSolucion >= @FechaInicio
+      AND b.FechaFirmaSolucion <  DATEADD(DAY, 1, @FechaFin)
+      AND b.EsRechazado = 0
 ),
 e AS (
     SELECT
-        /* a) la pestaña */
-        aDen = SUM(CASE WHEN SlaEvaluable = 1 THEN 1 ELSE 0 END),
-        aNum = SUM(CASE WHEN SlaEvaluable = 1 AND DentroSla = 1 THEN 1 ELSE 0 END),
-        /* b) + prorroga */
-        bDen = SUM(CASE WHEN SlaEvaluable = 1 THEN 1 ELSE 0 END),
-        bNum = SUM(CASE WHEN SlaEvaluable = 1 AND (DentroSla = 1 OR SalvaOlaUc = 1) THEN 1 ELSE 0 END),
-        /* c) + subestados exentos */
-        cDen = SUM(CASE WHEN SlaEvaluable = 1 THEN 1 ELSE 0 END),
-        cNum = SUM(CASE WHEN SlaEvaluable = 1 AND (DentroSla = 1 OR SalvaOlaUc = 1 OR Exento = 1) THEN 1 ELSE 0 END),
-        /* d) y e) + los sin compromiso entran al denominador COMO CUMPLIDOS */
-        dDen = COUNT_BIG(*),
-        dNum = SUM(CASE WHEN SlaEvaluable = 0 THEN 1
-                        WHEN DentroSla = 1 OR SalvaOlaUc = 1 OR Exento = 1 THEN 1
-                        ELSE 0 END)
+        Total    = COUNT_BIG(*),
+        Compra   = SUM(CAST(EsCompra AS INT)),
+        EvalDen  = SUM(CASE WHEN SlaEvaluable = 1 THEN 1 ELSE 0 END),
+        N_a      = SUM(CASE WHEN SlaEvaluable = 1 AND DentroSla = 1 THEN 1 ELSE 0 END),
+        N_b      = SUM(CASE WHEN SlaEvaluable = 1 AND (DentroSla = 1 OR SalvaOlaUc = 1) THEN 1 ELSE 0 END),
+        N_c      = SUM(CASE WHEN SlaEvaluable = 1 AND (DentroSla = 1 OR SalvaOlaUc = 1 OR EsExento = 1) THEN 1 ELSE 0 END),
+        /* Regla completa: los sin compromiso entran como cumplidos. */
+        N_d      = SUM(CASE WHEN EsCompra = 1 THEN 0
+                            WHEN SlaEvaluable = 0 THEN 1
+                            WHEN DentroSla = 1 OR SalvaOlaUc = 1 OR EsExento = 1 THEN 1
+                            ELSE 0 END)
     FROM b
 )
-SELECT Bloque = '2) Escalera', Regla = 'a) Como la mide la pestaña hoy',
-       Denominador = aDen, Cumplen = aNum,
-       Pct = CAST(100.0 * aNum / NULLIF(aDen, 0) AS DECIMAL(6,2)) FROM e
-UNION ALL
-SELECT '2) Escalera', 'b) + prorroga OLA/UC', bDen, bNum,
-       CAST(100.0 * bNum / NULLIF(bDen, 0) AS DECIMAL(6,2)) FROM e
-UNION ALL
-SELECT '2) Escalera', 'c) + subestados exentos', cDen, cNum,
-       CAST(100.0 * cNum / NULLIF(cDen, 0) AS DECIMAL(6,2)) FROM e
-UNION ALL
-SELECT '2) Escalera', 'd) + sin compromiso = cumplido (regla del correo)', dDen, dNum,
-       CAST(100.0 * dNum / NULLIF(dDen, 0) AS DECIMAL(6,2)) FROM e;
+SELECT Bloque='2) Escalera', Regla='a) Como la mide la pestaña hoy',
+       Denominador=EvalDen, Cumplen=N_a,
+       Pct=CAST(100.0*N_a/NULLIF(EvalDen,0) AS DECIMAL(6,2)) FROM e
+UNION ALL SELECT '2) Escalera','b) + prorroga OLA/UC',
+       EvalDen, N_b, CAST(100.0*N_b/NULLIF(EvalDen,0) AS DECIMAL(6,2)) FROM e
+UNION ALL SELECT '2) Escalera','c) + subestados Escalado y CAB',
+       EvalDen, N_c, CAST(100.0*N_c/NULLIF(EvalDen,0) AS DECIMAL(6,2)) FROM e
+UNION ALL SELECT '2) Escalera','d) Regla del correo, Tramite de compra FUERA del denominador',
+       Total-Compra, N_d, CAST(100.0*N_d/NULLIF(Total-Compra,0) AS DECIMAL(6,2)) FROM e
+UNION ALL SELECT '2) Escalera','e) Regla del correo, Tramite de compra COMO CUMPLIDO',
+       Total, N_d+Compra, CAST(100.0*(N_d+Compra)/NULLIF(Total,0) AS DECIMAL(6,2)) FROM e;
 GO
 
 /* =====================================================================================
-   3) La misma escalera, mes a mes
+   3) EL BLOQUE QUE DECIDE: quince meses con las dos reglas
 
-      LA PREGUNTA QUE DECIDE TODO: con la definicion indulgente del correo,
-      ¿la caida de 91% a 68% sigue ahi?
-
-      Si con la regla del correo la serie se mantiene plana cerca de 89%, la
-      caida es puramente definicional y el servicio no empeoro.
+      Si con la regla indulgente del correo la serie se mantiene plana cerca
+      de 89%, la caida de 91% a 68% es puramente definicional y el servicio no
+      empeoro.
 
       Si con la regla del correo TAMBIEN baja -aunque sea desde mas arriba-,
       el deterioro es real y lo unico que cambia es desde que altura se mide.
-      Esa es la respuesta que hay que llevar a una reunion.
    ===================================================================================== */
 DECLARE @FechaFin DATE = '2026-09-22';
 
 ;WITH b AS (
     SELECT
-        Mes = CONVERT(CHAR(7), FechaFirmaSolucion, 126),
-        SlaEvaluable, DentroSla,
-        Exento = CASE WHEN Subestado IN (N'Escalado/Dependencia',
-                                         N'En espera del CAB/Autorización',
-                                         N'En trámite de compra')
-                      THEN 1 ELSE 0 END,
-        SalvaOlaUc = CASE WHEN FechaEstimadaOlaUc IS NOT NULL
-                           AND FechaFirmaSolucion <= FechaEstimadaOlaUc
+        Mes = CONVERT(CHAR(7), b.FechaFirmaSolucion, 126),
+        b.SlaEvaluable, b.DentroSla,
+        EsCompra   = CASE WHEN b.Subestado = N'En trámite de compra' THEN 1 ELSE 0 END,
+        EsExento   = CASE WHEN b.Subestado IN (N'Escalado/Dependencia',
+                                               N'En espera del CAB/Autorización')
+                          THEN 1 ELSE 0 END,
+        SalvaOlaUc = CASE WHEN t.FechaEstimadaOlaUc IS NOT NULL
+                           AND b.FechaFirmaSolucion <= t.FechaEstimadaOlaUc
                           THEN 1 ELSE 0 END
-    FROM dbo.vw_Dash_ProductividadBase
-    WHERE FechaFirmaSolucion >= DATEADD(MONTH, -15, @FechaFin)
-      AND FechaFirmaSolucion <  DATEADD(DAY, 1, @FechaFin)
-      AND EsRechazado = 0
+    FROM dbo.vw_Dash_ProductividadBase AS b
+    LEFT JOIN dbo.Tickets AS t ON t.CodigoTicket = b.CodigoTicket
+    WHERE b.FechaFirmaSolucion >= DATEADD(MONTH, -15, @FechaFin)
+      AND b.FechaFirmaSolucion <  DATEADD(DAY, 1, @FechaFin)
+      AND b.EsRechazado = 0
 )
 SELECT
-    Bloque      = '3) Las dos reglas, mes a mes',
+    Bloque     = '3) Las dos reglas, mes a mes',
     Mes,
-    Resueltos   = COUNT_BIG(*),
-    PctPestana  = CAST(100.0 * SUM(CASE WHEN SlaEvaluable = 1 AND DentroSla = 1 THEN 1 ELSE 0 END)
-                       / NULLIF(SUM(CASE WHEN SlaEvaluable = 1 THEN 1 ELSE 0 END), 0) AS DECIMAL(6,2)),
-    PctCorreo   = CAST(100.0 * SUM(CASE WHEN SlaEvaluable = 0 THEN 1
-                                        WHEN DentroSla = 1 OR SalvaOlaUc = 1 OR Exento = 1 THEN 1
-                                        ELSE 0 END)
-                       / NULLIF(COUNT_BIG(*), 0) AS DECIMAL(6,2))
+    Resueltos  = COUNT_BIG(*),
+    PctPestana = CAST(100.0 * SUM(CASE WHEN SlaEvaluable = 1 AND DentroSla = 1 THEN 1 ELSE 0 END)
+                      / NULLIF(SUM(CASE WHEN SlaEvaluable = 1 THEN 1 ELSE 0 END), 0) AS DECIMAL(6,2)),
+    PctCorreo  = CAST(100.0 * SUM(CASE WHEN EsCompra = 1 THEN 0
+                                       WHEN SlaEvaluable = 0 THEN 1
+                                       WHEN DentroSla = 1 OR SalvaOlaUc = 1 OR EsExento = 1 THEN 1
+                                       ELSE 0 END)
+                      / NULLIF(COUNT_BIG(*) - SUM(CAST(EsCompra AS INT)), 0) AS DECIMAL(6,2))
 FROM b
 GROUP BY Mes
 ORDER BY Mes;
 GO
 
 /* =====================================================================================
-   4) Los cinco grupos que concentran los vencidos, con las dos reglas
+   4) Los grupos que concentran los vencidos, con las dos reglas
 
-      Del 23: RODHE 17%, Banamex 0.31%, Fenicia 2.35%, Soporte N3 WMS 5.88%,
-      Berkel 8.33%. Entre los cinco, el 60% de todos los vencidos.
+      Del 23: RODHE 17%, Banamex 0.31%, Fenicia 2.35%, N3 WMS 5.88%, Berkel
+      8.33%. Entre los cinco, el 60% de todos los vencidos.
 
-      Si con la regla del correo se recuperan, entonces esos tickets estaban
-      amparados por una prorroga o un subestado y el problema era de lectura.
-      Si siguen igual de abajo, es operacion: se estan pasando de la fecha
-      comprometida y de la prorroga tambien.
+      Si con la regla del correo se recuperan, esos tickets estaban amparados
+      por prorroga o subestado y era un problema de lectura. Si siguen abajo,
+      es operacion: se pasan de la fecha comprometida y de la prorroga tambien.
    ===================================================================================== */
 DECLARE @FechaInicio DATE = '2026-09-01';
 DECLARE @FechaFin    DATE = '2026-09-22';
 
 ;WITH b AS (
     SELECT
-        Grupo = ISNULL(NULLIF(LTRIM(RTRIM(Grupo)), N''), N'(sin grupo)'),
-        SlaEvaluable, DentroSla,
-        Exento = CASE WHEN Subestado IN (N'Escalado/Dependencia',
-                                         N'En espera del CAB/Autorización',
-                                         N'En trámite de compra')
-                      THEN 1 ELSE 0 END,
-        SalvaOlaUc = CASE WHEN FechaEstimadaOlaUc IS NOT NULL
-                           AND FechaFirmaSolucion <= FechaEstimadaOlaUc
+        Grupo = ISNULL(NULLIF(LTRIM(RTRIM(b.Grupo)), N''), N'(sin grupo)'),
+        b.SlaEvaluable, b.DentroSla,
+        EsCompra   = CASE WHEN b.Subestado = N'En trámite de compra' THEN 1 ELSE 0 END,
+        EsExento   = CASE WHEN b.Subestado IN (N'Escalado/Dependencia',
+                                               N'En espera del CAB/Autorización')
+                          THEN 1 ELSE 0 END,
+        SalvaOlaUc = CASE WHEN t.FechaEstimadaOlaUc IS NOT NULL
+                           AND b.FechaFirmaSolucion <= t.FechaEstimadaOlaUc
                           THEN 1 ELSE 0 END
-    FROM dbo.vw_Dash_ProductividadBase
-    WHERE FechaFirmaSolucion >= @FechaInicio
-      AND FechaFirmaSolucion <  DATEADD(DAY, 1, @FechaFin)
-      AND EsRechazado = 0
+    FROM dbo.vw_Dash_ProductividadBase AS b
+    LEFT JOIN dbo.Tickets AS t ON t.CodigoTicket = b.CodigoTicket
+    WHERE b.FechaFirmaSolucion >= @FechaInicio
+      AND b.FechaFirmaSolucion <  DATEADD(DAY, 1, @FechaFin)
+      AND b.EsRechazado = 0
 )
 SELECT TOP (20)
     Bloque     = '4) Por grupo, las dos reglas',
@@ -235,10 +227,11 @@ SELECT TOP (20)
     Resueltos  = COUNT_BIG(*),
     PctPestana = CAST(100.0 * SUM(CASE WHEN SlaEvaluable = 1 AND DentroSla = 1 THEN 1 ELSE 0 END)
                       / NULLIF(SUM(CASE WHEN SlaEvaluable = 1 THEN 1 ELSE 0 END), 0) AS DECIMAL(6,2)),
-    PctCorreo  = CAST(100.0 * SUM(CASE WHEN SlaEvaluable = 0 THEN 1
-                                       WHEN DentroSla = 1 OR SalvaOlaUc = 1 OR Exento = 1 THEN 1
+    PctCorreo  = CAST(100.0 * SUM(CASE WHEN EsCompra = 1 THEN 0
+                                       WHEN SlaEvaluable = 0 THEN 1
+                                       WHEN DentroSla = 1 OR SalvaOlaUc = 1 OR EsExento = 1 THEN 1
                                        ELSE 0 END)
-                      / NULLIF(COUNT_BIG(*), 0) AS DECIMAL(6,2))
+                      / NULLIF(COUNT_BIG(*) - SUM(CAST(EsCompra AS INT)), 0) AS DECIMAL(6,2))
 FROM b
 GROUP BY Grupo
 HAVING COUNT_BIG(*) >= 20
@@ -248,84 +241,53 @@ GO
 /* =====================================================================================
    5) LA SEXTA DIFERENCIA: no miden la misma poblacion
 
-      El correo mide el BACKLOG ABIERTO al corte; la pestaña mide lo RESUELTO
-      en el periodo. Aqui salen los dos, lado a lado, con la regla del correo
-      aplicada a los dos, para que la unica diferencia sea la poblacion.
+      Las dos poblaciones, con la MISMA regla del correo aplicada a ambas, para
+      que la unica diferencia sea a quien se le aplica.
 
-      Si el backlog abierto da ~89% con la regla del correo y lo resuelto da
-      mucho menos con la misma regla, entonces la brecha no es de definicion:
-      es que los tickets que se quedan abiertos estan amparados por su
-      subestado, y solo se revelan como vencidos cuando por fin se resuelven.
-
-      Es, probablemente, la explicacion de fondo de por que los dos numeros
-      nunca se van a parecer.
+      Si el backlog abierto se acerca al 89% y lo resuelto no, la brecha no es
+      de definicion: es que los tickets que se quedan abiertos estan amparados
+      por su subestado, y solo se revelan como vencidos cuando se resuelven.
    ===================================================================================== */
 DECLARE @FechaInicio DATE = '2026-09-01';
 DECLARE @FechaFin    DATE = '2026-09-22';
 
 ;WITH regla AS (
     SELECT
-        Poblacion = CASE WHEN FechaFirmaSolucion IS NULL THEN N'b) Abierto hoy'
+        Poblacion = CASE WHEN b.FechaFirmaSolucion IS NULL THEN N'b) Abierto hoy'
                          ELSE N'a) Resuelto en el periodo' END,
-        SlaEvaluable = CASE WHEN FechaEstimadaResolucion IS NOT NULL THEN 1 ELSE 0 END,
-        /* Para lo abierto, "cumple" es que todavia no se haya pasado la fecha. */
+        EsCompra = CASE WHEN b.Subestado = N'En trámite de compra' THEN 1 ELSE 0 END,
         Cumple = CASE
-            WHEN Subestado IN (N'Escalado/Dependencia',
-                               N'En espera del CAB/Autorización',
-                               N'En trámite de compra') THEN 1
-            WHEN FechaEstimadaResolucion IS NULL THEN 1
-            WHEN FechaFirmaSolucion IS NOT NULL
-                 AND FechaFirmaSolucion <= FechaEstimadaResolucion THEN 1
-            WHEN FechaFirmaSolucion IS NOT NULL
-                 AND FechaEstimadaOlaUc IS NOT NULL
-                 AND FechaFirmaSolucion <= FechaEstimadaOlaUc THEN 1
-            WHEN FechaFirmaSolucion IS NULL
-                 AND SYSDATETIME() <= FechaEstimadaResolucion THEN 1
+            WHEN b.Subestado IN (N'Escalado/Dependencia',
+                                 N'En espera del CAB/Autorización') THEN 1
+            WHEN b.FechaEstimadaResolucion IS NULL THEN 1
+            WHEN b.FechaFirmaSolucion IS NOT NULL
+                 AND b.FechaFirmaSolucion <= b.FechaEstimadaResolucion THEN 1
+            WHEN b.FechaFirmaSolucion IS NOT NULL
+                 AND t.FechaEstimadaOlaUc IS NOT NULL
+                 AND b.FechaFirmaSolucion <= t.FechaEstimadaOlaUc THEN 1
+            /* Para lo abierto, "cumple" es no haberse pasado todavia. */
+            WHEN b.FechaFirmaSolucion IS NULL
+                 AND SYSDATETIME() <= b.FechaEstimadaResolucion THEN 1
             ELSE 0
         END
-    FROM dbo.vw_Dash_ProductividadBase
-    WHERE EsRechazado = 0
+    FROM dbo.vw_Dash_ProductividadBase AS b
+    LEFT JOIN dbo.Tickets AS t ON t.CodigoTicket = b.CodigoTicket
+    WHERE b.EsRechazado = 0
       AND (
-            (FechaFirmaSolucion >= @FechaInicio AND FechaFirmaSolucion < DATEADD(DAY, 1, @FechaFin))
-         OR (FechaFirmaSolucion IS NULL AND FechaRegistro < DATEADD(DAY, 1, @FechaFin))
+            (b.FechaFirmaSolucion >= @FechaInicio AND b.FechaFirmaSolucion < DATEADD(DAY, 1, @FechaFin))
+         OR (b.FechaFirmaSolucion IS NULL AND b.FechaRegistro < DATEADD(DAY, 1, @FechaFin))
           )
 )
 SELECT
     Bloque    = '5) Poblaciones, misma regla',
     Poblacion,
     Tickets   = COUNT_BIG(*),
-    Cumplen   = SUM(Cumple),
-    PctCorreo = CAST(100.0 * SUM(Cumple) / NULLIF(COUNT_BIG(*), 0) AS DECIMAL(6,2))
+    Cumplen   = SUM(CASE WHEN EsCompra = 1 THEN 0 ELSE Cumple END),
+    PctCorreo = CAST(100.0 * SUM(CASE WHEN EsCompra = 1 THEN 0 ELSE Cumple END)
+                     / NULLIF(COUNT_BIG(*) - SUM(CAST(EsCompra AS INT)), 0) AS DECIMAL(6,2))
 FROM regla
 GROUP BY Poblacion
 ORDER BY Poblacion;
-GO
-
-/* =====================================================================================
-   6) Subestados del backlog abierto
-
-      Cuantos de los que siguen abiertos estan amparados por un subestado
-      exento. Si es una porcion grande, el ~89% del correo se explica sobre
-      todo por ahi, y conviene saberlo antes de publicar cualquiera de los dos
-      numeros como "el" cumplimiento.
-   ===================================================================================== */
-SELECT TOP (20)
-    Bloque    = '6) Subestados del backlog',
-    Subestado = ISNULL(NULLIF(LTRIM(RTRIM(Subestado)), N''), N'(sin subestado)'),
-    Exento    = CASE WHEN Subestado IN (N'Escalado/Dependencia',
-                                        N'En espera del CAB/Autorización',
-                                        N'En trámite de compra')
-                     THEN N'SI' ELSE N'no' END,
-    Tickets   = COUNT_BIG(*)
-FROM dbo.vw_Dash_ProductividadBase
-WHERE FechaFirmaSolucion IS NULL
-  AND EsRechazado = 0
-GROUP BY ISNULL(NULLIF(LTRIM(RTRIM(Subestado)), N''), N'(sin subestado)'),
-         CASE WHEN Subestado IN (N'Escalado/Dependencia',
-                                 N'En espera del CAB/Autorización',
-                                 N'En trámite de compra')
-              THEN N'SI' ELSE N'no' END
-ORDER BY Tickets DESC;
 GO
 
 PRINT N'Hora de finalizacion: ' + CONVERT(NVARCHAR(40), SYSDATETIMEOFFSET(), 127);
