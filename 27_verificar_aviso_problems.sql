@@ -187,7 +187,7 @@ GO
    OJO CON EL CAMPO. Hay DOS "Service Owner" y no son el mismo:
 
      dbo.Problem.OwnerServicio            el de la iniciativa (rol 2 del
-                                          diagnostico 25)
+                                          diagnostico 28)
      dbo.CatCategoriaDueno.ServiceOwner   el de la CATEGORIA (rol 5)
 
    El nombre que no cruzaba, 'Lomas Malacara Luis Gerardo', esta en el

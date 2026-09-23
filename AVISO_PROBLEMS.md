@@ -248,7 +248,7 @@ Owner en copia.
 
 | | |
 |---|---|
-| `dbo.Problem.OwnerServicio` | el de la iniciativa (rol 2 del diagnostico `25`) |
+| `dbo.Problem.OwnerServicio` | el de la iniciativa (rol 2 del diagnostico `28`) |
 | `dbo.CatCategoriaDueno.ServiceOwner` | el de la **categoria** (rol 5) |
 
 El nombre que no cruzaba esta en el **segundo**. La primera version de la
@@ -278,6 +278,11 @@ En SSMS, contra `Tickets_Proactivanet`, en este orden:
 2. 16_cruce_llamadas_tickets.sql       (si no esta: crea fn_ClaveNombre)
 3. 26_aviso_problems_vencidos.sql      <-- crea los objetos
 4. 27_verificar_aviso_problems.sql     <-- mide lo que mandaria, sin mandar
+
+(28_diagnostico_problems_vencidos.sql es el diagnostico previo, de solo
+lectura. Ya no hace falta para instalar: se conserva porque documenta como se
+midio todo esto contra la base. Se llamaba 25 y se renombro cuando ese numero
+lo tomo 25_tickets_proveedor.sql.)
 ```
 
 `26` avisa con un `RAISERROR` claro si le falta alguna dependencia. No imprime
@@ -325,23 +330,37 @@ Con `"modo_prueba": true` (viene asi en el ejemplo), **todos** los correos se
 redirigen a `destinatario_prueba`. El log dice a quien habrian ido. Deja el
 modo prueba encendido hasta ver un correo completo y correcto.
 
-### e) Programador de tareas: lunes y jueves
-
-- Programa: `powershell.exe`
-- Argumentos: `-NoProfile -ExecutionPolicy Bypass -File "C:\ruta\Enviar_AvisoProblems.ps1"`
-- Iniciar en: la carpeta donde estan los cuatro archivos de arriba.
-- Desencadenador: **semanal**, lunes y jueves.
-
-Desde una linea de comandos, sin pasar por la interfaz:
+### e) Programador de tareas: lunes y jueves a las 12:00
 
 ```text
-schtasks /Create /TN "AvisoProblemsVencidos" /SC WEEKLY /D MON,THU /ST 09:00 ^
-  /TR "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"C:\ruta\Enviar_AvisoProblems.ps1\"" ^
+schtasks /Create /TN "AvisoProblemsVencidos" /SC WEEKLY /D MON,THU /ST 12:00 ^
+  /TR "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File \"C:\ruta\Enviar_AvisoProblems.ps1\"" ^
   /RL LIMITED /F
 ```
 
+Sustituye `C:\ruta` por la carpeta real. **Las comillas dobles de adentro van
+escapadas con `\"`**: si la ruta lleva espacios -y la de OneDrive los lleva-,
+sin eso `schtasks` corta el argumento y la tarea se crea apuntando a un
+archivo que no existe, sin quejarse hasta que le toca correr.
+
+`schtasks` **no hereda el directorio de trabajo**, y el script busca
+`config.json` y `config_aviso_problems.json` junto a si mismo -con
+`$MyInvocation.MyCommand.Path`-, asi que eso funciona. Lo que no hereda es
+nada mas: si algun dia se agrega algo que dependa del directorio actual,
+habra que fijar "Iniciar en" desde la interfaz, porque la linea de comandos de
+`schtasks` no tiene con que decirlo.
+
+Para comprobar que quedo, y para correrla a mano sin esperar al lunes:
+
+```text
+schtasks /Query /TN "AvisoProblemsVencidos" /V /FO LIST
+schtasks /Run   /TN "AvisoProblemsVencidos"
+```
+
 La cuenta necesita acceso a SQL Server, permiso de escritura en la carpeta
-(para `Logs\`) y acceso al relay SMTP.
+(para `Logs\`) y acceso al relay SMTP. `/RL LIMITED` es a proposito: esto no
+necesita privilegios elevados, y pedirlos de mas es pedir que algun dia alguien
+los use para otra cosa.
 
 **No hay control de repeticion.** Cada corrida manda la lista completa, haya
 cambiado o no desde la anterior. Es lo pedido: el correo es un recordatorio, y
@@ -450,7 +469,7 @@ pagar cuatro recorridos de una tabla de millones de filas a cambio de nada.
 
 ## 10) Verificacion contra el correo real
 
-El `.msg` del 19 de agosto listo diez iniciativas. `25_diagnostico_problems_vencidos.sql`
+El `.msg` del 19 de agosto listo diez iniciativas. `28_diagnostico_problems_vencidos.sql`
 (bloque 8) las busca por codigo y aplica la regla **con la fecha de aquel
 dia**. Resultado contra produccion:
 

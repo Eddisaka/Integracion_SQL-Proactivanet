@@ -73,6 +73,14 @@
    millones de filas a cambio de nada. Aqui se repite SOLO el join de duenos.
    SI SE TOCA LA VISTA, HAY QUE TOCAR EL BLOQUE 4 DE ESTE ARCHIVO.
 
+   SE LLAMABA 25
+   -------------
+   Se renombro a 28 el 23 de septiembre: el 25 ya lo ocupaba
+   25_tickets_proveedor.sql, del tablero de SLA. Las dos numeraciones
+   avanzaban en paralelo en ramas distintas y chocaron. La salida que hay en
+   salidas/ conserva su nombre original, 20260922_salida_25.rpt, porque
+   renombrar un archivo que ya se genero seria falsear de donde salio.
+
    COMO CORRERLO
    -------------
    Completo y de una vez, en SSMS, con "Results to Text" (Ctrl+T). Los

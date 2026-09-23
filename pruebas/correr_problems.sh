@@ -1,6 +1,6 @@
 #!/bin/sh
 # Corre contra un SQL Server de verdad los tres .sql del correo de PRBs
-# vencidos: 25_diagnostico_problems_vencidos.sql,
+# vencidos: 28_diagnostico_problems_vencidos.sql,
 # 26_aviso_problems_vencidos.sql y 27_verificar_aviso_problems.sql.
 #
 # POR QUE EXISTE
@@ -289,8 +289,8 @@ fi
 echo "   bien"
 
 # ------------------------------------------------------------- el diagnostico
-echo "== 25_diagnostico_problems_vencidos.sql =="
-docker cp "$REPO/25_diagnostico_problems_vencidos.sql" "$CONTENEDOR:/tmp/x.sql" >/dev/null
+echo "== 28_diagnostico_problems_vencidos.sql =="
+docker cp "$REPO/28_diagnostico_problems_vencidos.sql" "$CONTENEDOR:/tmp/x.sql" >/dev/null
 salida=$(sqlcmd -d Tickets_Proactivanet -i /tmp/x.sql 2>&1 || true)
 printf '%s\n' "$salida" > "$TMP/salida.txt"
 
