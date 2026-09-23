@@ -132,6 +132,15 @@ MODO PRUEBA: Laura Graciela Cardenas Gonzalez
 > verificar contra nada no sirve para revisar destinatarios, que es justo para
 > lo que existe `modo_prueba`; y `-Listar` escribia a pantalla y no al log, asi
 > que habia que copiar de la consola para poder compartirlo.
+>
+> Y habia un segundo fallo, peor, que solo se vio al correr las dos cosas
+> juntas: **`-Listar` se ejecutaba DESPUES de la sustitucion de
+> `modo_prueba`**, asi que reportaba `Para: <destinatario_prueba>` y
+> `Copia: (ninguna)`. La herramienta que existe para revisar a quien le va a
+> llegar el correo mostraba lo contrario de lo que se queria revisar, y sin
+> avisar. Ahora `-Listar` va primero, y una asercion sobre el arbol de
+> sintaxis vigila ese orden -no es una funcion que se pueda llamar, es el
+> orden de dos bloques, asi que se comprueba leyendo el codigo-.
 
 La copia fija del equipo de Problem Management va en el `.json` y no sale del
 catalogo, porque `dbo.CatPersona.Rol` solo trae *Service Owner*, *Product
@@ -401,7 +410,7 @@ Excel: un nombre colado en una lista de correos haria fallar el envio
 # DDL extraido de los archivos versionados. 23 aserciones.
 sh pruebas/correr_problems.sh
 
-# PowerShell: 58 comprobaciones, sin base, sin red y sin mandar nada.
+# PowerShell: 60 comprobaciones, sin base, sin red y sin mandar nada.
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File pruebas\Prueba_AvisoProblems.ps1
 ```
 

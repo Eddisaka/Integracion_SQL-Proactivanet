@@ -297,6 +297,26 @@ try {
         # veces y el relay lo cuenta como dos destinatarios.
         $copia = New-Object System.Collections.ArrayList (,@(@($copia) | Where-Object { $para -notcontains $_ }))
 
+        # -Listar va ANTES de modo prueba, y el orden NO es cosmetico.
+        # Cuando estaba despues, la sustitucion de modo prueba ya habia
+        # reemplazado $para y vaciado $copia, asi que -Listar reportaba
+        # "Para: <destinatario_prueba>" y "Copia: (ninguna)" en vez de los
+        # destinatarios de verdad. O sea: la herramienta que existe para
+        # revisar a quien le va a llegar mostraba lo contrario de lo que se
+        # queria revisar, y sin decir que estaba haciendo eso.
+        if ($Listar) {
+            # Va al LOG y no solo a pantalla. Escribirlo solo a pantalla
+            # obliga a copiar y pegar de la consola para poder revisarlo o
+            # compartirlo, y lo que se quiere revisar antes de la primera
+            # corrida de verdad es justo esta lista.
+            Write-Log ("LISTADO: {0} -- {1} vencida(s), {2} sin fecha" -f
+                       $owner, $vencidas.Count, $sinFecha.Count)
+            Write-Log ("   Para : {0}" -f ($para -join '; '))
+            Write-Log ("   Copia: {0}" -f
+                       $(if ($copia.Count -gt 0) { $copia -join '; ' } else { '(ninguna)' }))
+            continue
+        }
+
         if ($modoPrueba) {
             $destino = [string]$cfg.destinatario_prueba
             # Las direcciones de la copia se escriben COMPLETAS, no solo su
@@ -339,19 +359,6 @@ try {
         [void]$partes.Append("</div>")
 
         $asunto = ([string]$cfg.asunto) -replace '\{fecha\}', (Get-Date -Format 'dd/MM/yyyy')
-
-        if ($Listar) {
-            # Va al LOG y no solo a pantalla. Escribirlo solo a pantalla
-            # obliga a copiar y pegar de la consola para poder revisarlo o
-            # compartirlo, y lo que se quiere revisar antes de la primera
-            # corrida de verdad es justo esta lista.
-            Write-Log ("LISTADO: {0} -- {1} vencida(s), {2} sin fecha" -f
-                       $owner, $vencidas.Count, $sinFecha.Count)
-            Write-Log ("   Para : {0}" -f ($para -join '; '))
-            Write-Log ("   Copia: {0}" -f
-                       $(if ($copia.Count -gt 0) { $copia -join '; ' } else { '(ninguna)' }))
-            continue
-        }
 
         # --- envio, en tres intentos ---------------------------------------
         $enviado = $false

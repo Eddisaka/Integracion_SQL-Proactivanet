@@ -287,6 +287,35 @@ Comprobar "la encuentra aunque venga envuelta" `
 Comprobar "sin rechazos nombrados da lista vacia" `
     ((Get-DestinatariosRechazados (New-Object Exception "cualquier cosa")).Count) 0
 
+# ---- 2b. El ORDEN de -Listar y modo prueba -------------------------------
+# No es una funcion, es el orden de dos bloques en el cuerpo del script, y por
+# eso se comprueba con el arbol de sintaxis y no ejecutando.
+#
+# Cuando -Listar iba DESPUES de modo prueba, la sustitucion ya habia
+# reemplazado $para por destinatario_prueba y vaciado $copia, asi que -Listar
+# reportaba "Para: <tu correo>" y "Copia: (ninguna)". La herramienta que
+# existe para revisar a quien le va a llegar el correo mostraba exactamente lo
+# contrario de lo que se queria revisar, y sin avisar que lo estaba haciendo.
+Write-Host "Orden de -Listar y modo prueba"
+$errOrden = $null; $tokOrden = $null
+$arbolPs = [System.Management.Automation.Language.Parser]::ParseFile($script, [ref]$tokOrden, [ref]$errOrden)
+$ifs = $arbolPs.FindAll({
+    param($n) $n -is [System.Management.Automation.Language.IfStatementAst]
+}, $true)
+
+function OffsetDe([string]$queCondicion) {
+    foreach ($i in $ifs) {
+        $cond = $i.Clauses[0].Item1.Extent.Text
+        if ($cond -eq $queCondicion) { return $i.Extent.StartOffset }
+    }
+    return -1
+}
+$oListar  = OffsetDe '$Listar'
+$oPrueba  = OffsetDe '$modoPrueba'
+Comprobar "se encontraron los dos bloques" (($oListar -ge 0) -and ($oPrueba -ge 0)) $true
+Comprobar "-Listar va ANTES de la sustitucion de modo prueba" `
+    ($oListar -lt $oPrueba) $true
+
 # ---- 3. Que los .ps1 no tengan acentos ----------------------------------
 # Windows PowerShell 5.1 lee los .ps1 sin BOM en ANSI: un acento rompe el
 # parseo del archivo completo con errores que no apuntan a la linea real.
