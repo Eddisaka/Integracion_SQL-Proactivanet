@@ -299,8 +299,16 @@ try {
 
         if ($modoPrueba) {
             $destino = [string]$cfg.destinatario_prueba
-            Write-Log ("MODO PRUEBA: {0} habria ido a {1} (+{2} en copia); va a {3}." -f
-                       $owner, ($para -join ';'), $copia.Count, $destino)
+            # Las direcciones de la copia se escriben COMPLETAS, no solo su
+            # cuenta. Antes decia "(+7 en copia)" y con eso no hay forma de
+            # revisar a quien le va a llegar: el numero no se puede verificar
+            # contra nada. Y revisar la copia antes de apagar modo_prueba es
+            # justo para lo que existe modo_prueba.
+            Write-Log ("MODO PRUEBA: {0}" -f $owner)
+            Write-Log ("   Para habria sido : {0}" -f ($para -join '; '))
+            Write-Log ("   Copia habria sido: {0}" -f
+                       $(if ($copia.Count -gt 0) { $copia -join '; ' } else { '(ninguna)' }))
+            Write-Log ("   Va a             : {0}" -f $destino)
             $para  = New-Object System.Collections.ArrayList (,@($destino))
             $copia = New-Object System.Collections.ArrayList
         }
@@ -333,11 +341,15 @@ try {
         $asunto = ([string]$cfg.asunto) -replace '\{fecha\}', (Get-Date -Format 'dd/MM/yyyy')
 
         if ($Listar) {
-            Write-Host ''
-            Write-Host ("=== {0}" -f $owner)
-            Write-Host ("    Para : {0}" -f ($para -join '; '))
-            Write-Host ("    Copia: {0}" -f ($copia -join '; '))
-            Write-Host ("    {0} vencida(s), {1} sin fecha" -f $vencidas.Count, $sinFecha.Count)
+            # Va al LOG y no solo a pantalla. Escribirlo solo a pantalla
+            # obliga a copiar y pegar de la consola para poder revisarlo o
+            # compartirlo, y lo que se quiere revisar antes de la primera
+            # corrida de verdad es justo esta lista.
+            Write-Log ("LISTADO: {0} -- {1} vencida(s), {2} sin fecha" -f
+                       $owner, $vencidas.Count, $sinFecha.Count)
+            Write-Log ("   Para : {0}" -f ($para -join '; '))
+            Write-Log ("   Copia: {0}" -f
+                       $(if ($copia.Count -gt 0) { $copia -join '; ' } else { '(ninguna)' }))
             continue
         }
 

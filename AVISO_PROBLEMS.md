@@ -97,6 +97,42 @@ El lider que se copia es el **Director** y no el Manager: de los 18 Owner
 Problem que hay en produccion, los 18 traen Director capturado y solo 2 traen
 Manager.
 
+**La copia se acumula por FILA, no por persona.** Se recorren todas las
+iniciativas de ese Owner Problem y de cada una se suman su Owner del Servicio,
+su Direccion y los duenos de las categorias que ataca. Un mismo Owner Problem
+puede tener iniciativas de servicios distintos, y cada una arrastra a los
+suyos. Por eso el tamano de la copia no sigue al numero de filas: Bendrix Zuir
+Rios llega a 13 direcciones con 24 iniciativas, y Adriana Lydia Lozano Leal
+llega a 9 con **una sola**, porque esa unica iniciativa ataca varias
+categorias y cada una tiene sus tres duenos.
+
+Al final se agrega `copia_fija`, se quitan duplicados y se saca del CC a quien
+ya este en el "Para" -si no, Outlook lo muestra dos veces y el relay lo cuenta
+como dos destinatarios-.
+
+### Como ver a quien le va a llegar, antes de que llegue
+
+Las dos formas escriben al log, asi que se pueden subir al repositorio:
+
+```powershell
+# No manda nada. Una entrada por Owner Problem con su Para y su Copia.
+.\Enviar_AvisoProblems.ps1 -Listar
+```
+
+Y con `modo_prueba` en true, cada correo deja en el log las tres lineas:
+
+```text
+MODO PRUEBA: Laura Graciela Cardenas Gonzalez
+   Para habria sido : lauragcg@soriana.com
+   Copia habria sido: eduardool@soriana.com; javierch@soriana.com; ...
+   Va a             : TU_CORREO@soriana.com
+```
+
+> Antes esa linea decia solo `(+7 en copia)`. Un numero que no se puede
+> verificar contra nada no sirve para revisar destinatarios, que es justo para
+> lo que existe `modo_prueba`; y `-Listar` escribia a pantalla y no al log, asi
+> que habia que copiar de la consola para poder compartirlo.
+
 La copia fija del equipo de Problem Management va en el `.json` y no sale del
 catalogo, porque `dbo.CatPersona.Rol` solo trae *Service Owner*, *Product
 Owner* y *Director*: no existe un rol de Problem Management.
