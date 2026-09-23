@@ -8,6 +8,10 @@ config*.json
 !config_aviso_problems.ejemplo.json
 *.log
 logs/
+registros/
+# Estado local del programador: la hora y los dias con que se
+# instalo la tarea EN ESA MAQUINA. No se versiona.
+estado_aviso.json
 extraccion_*.json
 respuesta.json
 __pycache__/

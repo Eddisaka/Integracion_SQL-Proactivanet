@@ -330,41 +330,102 @@ Con `"modo_prueba": true` (viene asi en el ejemplo), **todos** los correos se
 redirigen a `destinatario_prueba`. El log dice a quien habrian ido. Deja el
 modo prueba encendido hasta ver un correo completo y correcto.
 
-### e) Programador de tareas: lunes y jueves a las 12:00
+### e) Programarlo, y que SOBREVIVA a que se recicle la VDI
 
 ```text
-schtasks /Create /TN "AvisoProblemsVencidos" /SC WEEKLY /D MON,THU /ST 12:00 ^
-  /TR "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File \"C:\ruta\Enviar_AvisoProblems.ps1\"" ^
-  /RL LIMITED /F
+programar_instalar.cmd
 ```
 
-Sustituye `C:\ruta` por la carpeta real. **Las comillas dobles de adentro van
-escapadas con `\"`**: si la ruta lleva espacios -y la de OneDrive los lleva-,
-sin eso `schtasks` corta el argumento y la tarea se crea apuntando a un
-archivo que no existe, sin quejarse hasta que le toca correr.
-
-`schtasks` **no hereda el directorio de trabajo**, y el script busca
-`config.json` y `config_aviso_problems.json` junto a si mismo -con
-`$MyInvocation.MyCommand.Path`-, asi que eso funciona. Lo que no hereda es
-nada mas: si algun dia se agrega algo que dependa del directorio actual,
-habra que fijar "Iniciar en" desde la interfaz, porque la linea de comandos de
-`schtasks` no tiene con que decirlo.
-
-Para comprobar que quedo, y para correrla a mano sin esperar al lunes:
+Eso es todo. Por omision deja la tarea los **lunes y jueves a las 12:00**.
+Para otro horario:
 
 ```text
-schtasks /Query /TN "AvisoProblemsVencidos" /V /FO LIST
-schtasks /Run   /TN "AvisoProblemsVencidos"
+programar_instalar.cmd --hora 9 --dias MON,WED,FRI
 ```
+
+Comprobar y desinstalar:
+
+```text
+programar_estado.cmd          codigo 1 si la tarea NO esta
+programar_desinstalar.cmd
+```
+
+#### Por que no basta un `schtasks` a secas
+
+Las tareas programadas viven en `C:\Windows\System32\Tasks`, que es **del
+sistema**. En un escritorio virtual que se recicla, la tarea **desaparece**
+aunque el perfil del usuario sobreviva. Un `schtasks /create` deja el correo
+funcionando hasta el primer reciclado y a partir de ahi deja de salir **sin
+que nadie se entere**, que es la peor forma de fallar: nadie echa en falta un
+correo que nunca llego.
+
+La carpeta de Inicio **si** vive en el perfil. Por eso `programar_instalar`
+hace dos cosas, no una:
+
+1. crea la tarea `AvisoProblemsVencidos`;
+2. deja en Inicio algo que, cada vez que esa persona entra, comprueba que la
+   tarea siga ahi y **la repone** si no esta, con el mismo horario con que se
+   instalo.
+
+Es el mismo mecanismo que lleva semanas corriendo para el agente de tickets
+del otro proyecto (`agente_tickets/programar/tarea.py`). Va aparte y no
+reusando aquel archivo porque **esta tarea corre en otra maquina**, que no
+tiene el agente: llevarle `tarea.py` seria arrastrar su `estado.json`, sus
+pasos y sus avisos a un equipo que no los usa.
+
+#### El re-armado son dos piezas, y el reparto no es capricho
+
+| | |
+|---|---|
+| `Inicio\AvisoProblems_al_iniciar.cmd` | **ASCII puro**, solo nombra al de abajo |
+| `%LOCALAPPDATA%\AvisoProblems\al_iniciar.py` | el que hace el trabajo |
+
+**cmd.exe no lee los `.cmd` en UTF-8**: los lee en la pagina de codigos OEM
+del sistema. La carpeta de este proyecto vive bajo `OneDrive - soriana.com` y
+rutas asi suelen llevar acentos; un `.cmd` que la nombrara le llegaria a
+cmd.exe con los acentos rotos, no encontraria el archivo, y **no pasaria
+absolutamente nada**. Eso ya ocurrio en el otro proyecto y costo una manana
+entera de encontrar, justamente porque fallaba en silencio. Con este reparto
+los acentos se quedan del lado de Python, que si sabe leerlos. Una asercion
+comprueba que ese `.cmd` no nombre nunca la carpeta del proyecto.
+
+El puente ademas **espera** si el proyecto no se ve todavia: vive en OneDrive,
+que al iniciar sesion puede tardar en montar la carpeta. Reintenta diez
+minutos antes de rendirse. Y pase lo que pase **deja rastro** en
+`registros\arranque_AAAAMMDD.log`.
+
+#### Por que la tarea se crea con XML y no con banderas
+
+Por un ajuste que las banderas de `schtasks` no saben expresar:
+**`StartWhenAvailable`**. Si el equipo esta apagado a las 12:00 del lunes, la
+pasada se recupera al encender; sin eso, ese lunes simplemente no sale correo
+y nadie lo sabe hasta el jueves.
+
+Si Windows rechazara el XML, el instalador **ensena el error y cae a las
+banderas sueltas, diciendo que se perdio ese ajuste**. Nunca toma el camino
+corto en silencio.
+
+> **Lo que las pruebas NO pueden comprobar.** `pruebas/prueba_programar_aviso.py`
+> corre en Linux: verifica que el XML sea valido, que sus elementos vayan en
+> el orden que exige el esquema -que es donde se cuela el error que Windows
+> rechaza sin decir cual elemento esta mal-, que el `.cmd` sea ASCII y que el
+> puente compile. Lo que **no** puede es comprobar que el Programador de
+> tareas acepte ese XML: eso solo lo dice Windows. Por eso el instalador
+> muestra la respuesta de Windows en vez de callarla, y por eso conviene
+> correr `programar_estado.cmd` justo despues de instalar.
+
+#### Comprobar sin esperar al lunes
+
+```text
+schtasks /Run /TN "AvisoProblemsVencidos"
+```
+
+Y revisar `Logs\AvisoProblems_AAAAMMDD.log`. Es la unica forma de confirmar
+que la ruta quedo bien antes de que toque de verdad.
 
 La cuenta necesita acceso a SQL Server, permiso de escritura en la carpeta
-(para `Logs\`) y acceso al relay SMTP. `/RL LIMITED` es a proposito: esto no
-necesita privilegios elevados, y pedirlos de mas es pedir que algun dia alguien
-los use para otra cosa.
-
-**No hay control de repeticion.** Cada corrida manda la lista completa, haya
-cambiado o no desde la anterior. Es lo pedido: el correo es un recordatorio, y
-una iniciativa que sigue vencida el jueves tiene que volver a aparecer.
+(para `Logs\` y `registros\`) y acceso al relay SMTP. No hacen falta
+permisos de administrador.
 
 ### Codigos de salida
 
@@ -431,6 +492,9 @@ sh pruebas/correr_problems.sh
 
 # PowerShell: 60 comprobaciones, sin base, sin red y sin mandar nada.
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File pruebas\Prueba_AvisoProblems.ps1
+
+# El programador: 45 comprobaciones. Corre en cualquier sitio, sin Windows.
+python pruebas\prueba_programar_aviso.py
 ```
 
 Las pruebas de PowerShell **no copian** las funciones: las leen del propio
