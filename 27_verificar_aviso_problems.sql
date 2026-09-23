@@ -182,13 +182,45 @@ GO
 
 /* La persona que SOLO cruza por clave ordenada. Antes de fn_ClaveNombreOrdenada
    sus 32 iniciativas se quedaban sin Service Owner en copia. Tiene que traer
-   correo, no NULL. */
-SELECT TOP (5)
-       Codigo        = CAST(a.Codigo AS NVARCHAR(20)),
-       OwnerServicio = CAST(a.OwnerServicio AS NVARCHAR(32)),
-       Correo        = CAST(a.CorreoOwnerServicio AS NVARCHAR(40))
+   correo, no NULL.
+
+   OJO CON EL CAMPO. Hay DOS "Service Owner" y no son el mismo:
+
+     dbo.Problem.OwnerServicio            el de la iniciativa (rol 2 del
+                                          diagnostico 25)
+     dbo.CatCategoriaDueno.ServiceOwner   el de la CATEGORIA (rol 5)
+
+   El nombre que no cruzaba, 'Lomas Malacara Luis Gerardo', esta en el
+   SEGUNDO. La primera version de esta consulta miraba el primero y devolvia
+   cero filas, que se lee como "no hay caso" cuando en realidad era la
+   consulta la que estaba mal. Por eso ahora se miran los dos. */
+SELECT Fuente        = N'Problem.OwnerServicio',
+       Nombre        = CAST(a.OwnerServicio AS NVARCHAR(32)),
+       Correo        = CAST(a.CorreoOwnerServicio AS NVARCHAR(40)),
+       Iniciativas   = COUNT(*)
 FROM dbo.vw_ProblemVencidoAviso AS a
-WHERE dbo.fn_ClaveNombre(a.OwnerServicio) = N'LOMASMALACARALUISGERARDO';
+WHERE dbo.fn_ClaveNombreOrdenada(a.OwnerServicio) = dbo.fn_ClaveNombreOrdenada(N'Lomas Malacara Luis Gerardo')
+GROUP BY a.OwnerServicio, a.CorreoOwnerServicio
+UNION ALL
+SELECT N'CatCategoriaDueno.ServiceOwner',
+       CAST(d.Dueno AS NVARCHAR(32)),
+       CAST(d.Correo AS NVARCHAR(40)),
+       COUNT(*)
+FROM dbo.vw_ProblemDuenoCorreo AS d
+WHERE dbo.fn_ClaveNombreOrdenada(d.Dueno) = dbo.fn_ClaveNombreOrdenada(N'Lomas Malacara Luis Gerardo')
+GROUP BY d.Dueno, d.Correo;
+GO
+
+/* Y en general: cuantos duenos por categoria se quedan SIN correo, y quienes.
+   Si la clave ordenada esta haciendo su trabajo, esto sale casi vacio. */
+SELECT TOP (20)
+       Rol    = CAST(d.Rol AS NVARCHAR(14)),
+       Dueno  = CAST(d.Dueno AS NVARCHAR(40)),
+       Filas  = COUNT(*)
+FROM dbo.vw_ProblemDuenoCorreo AS d
+WHERE d.Correo IS NULL
+GROUP BY d.Rol, d.Dueno
+ORDER BY COUNT(*) DESC;
 GO
 
 /* Si una iniciativa saliera dos veces, el OUTER APPLY TOP (1) se rompio y el

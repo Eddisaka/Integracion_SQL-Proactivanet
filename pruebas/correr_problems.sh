@@ -270,6 +270,11 @@ VALUES (N'Persona  Problem, Uno', N'problem.uno@ejemplo.com',  N'Problem Owner',
        (N'Persona PO Uno',        N'po.uno@ejemplo.com',       N'Product Owner', NULL, NULL,                 NULL),
        (N'Persona PO Dos',        N'po.dos@ejemplo.com',       N'Product Owner', NULL, NULL,                 NULL),
        (N'Persona SO Uno',        N'so.uno@ejemplo.com',       N'Service Owner', NULL, NULL,                 NULL),
+       -- Al reves, como 'Lomas Malacara Luis Gerardo' contra
+       -- 'Luis Gerardo Lomas Malacara' en produccion. Es un dueno POR
+       -- CATEGORIA, no el OwnerServicio de la iniciativa: son dos campos
+       -- distintos y el que no cruzaba era este.
+       (N'SO Dos, Persona',       N'so.dos@ejemplo.com',       N'Service Owner', NULL, NULL,                 NULL),
        (N'Persona Dir Uno',       N'dir.uno@ejemplo.com',      N'Director',      NULL, NULL,                 NULL);
 GO
 DATOS
@@ -477,6 +482,16 @@ afirmar "el lider resuelto es el Director" \
     "SELECT a.LiderOwnerProblem + N'/' + a.CorreoLiderOwnerProblem
      FROM dbo.vw_ProblemVencidoAviso a WHERE a.Codigo = N'PRB 2026-000124';" \
     "PersonaDirUno/dir.uno@ejemplo.com"
+
+# 12b. El dueno POR CATEGORIA que solo cruza por clave ordenada. En
+#      produccion es 'Lomas Malacara Luis Gerardo' contra 'Luis Gerardo Lomas
+#      Malacara', y arrastra 32 iniciativas que se quedarian sin Service Owner
+#      en copia. Ojo: es CatCategoriaDueno.ServiceOwner, NO
+#      Problem.OwnerServicio; son dos campos distintos.
+afirmar "el dueno por categoria al reves si resuelve correo" \
+    "SELECT ISNULL(MAX(d.Correo), N'(ninguno)') FROM dbo.vw_ProblemDuenoCorreo d
+     WHERE d.Rol = N'ServiceOwner' AND d.Dueno = N'Persona SO Dos';" \
+    "so.dos@ejemplo.com"
 
 # 13a. REGLA: RTI y REQ no generan correo aunque esten vencidos.
 afirmar "RTI y REQ salen vencidos pero no se avisan" \

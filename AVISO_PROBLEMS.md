@@ -118,15 +118,24 @@ Corrida del 22 de septiembre (`salidas/20260922_salida_25.rpt`):
 | Filas en total | 341 |
 | Owner Problem sin correo | ninguno |
 
-Esas cifras son **antes** de la regla de prefijos, que se agrego despues de
-esa medicion. Las de vencidas y sin fecha no cambian -el veredicto es sobre
-las fechas-, pero las de correos y filas bajan. La comprobacion `a2` del
-script `26` mide exactamente cuanto quita: agrupa por prefijo y pone lado a
-lado lo vencido y lo que de verdad se avisa. RTI pesa: las cuatro iniciativas
-mas atrasadas de la muestra, todas de un mismo Owner Problem, son RTI.
+Esas cifras son **antes** de la regla de prefijos. El veredicto no cambia con
+ella -es sobre las fechas-, pero lo que de verdad se manda si. Medido el 22 de
+septiembre con la regla puesta (`salidas/20260922_salida_27.rpt`):
 
-De las 309 en analisis, **185 nunca han tenido fecha de analisis capturada**.
-Esa es, de lejos, la historia que va a contar el correo.
+| Prefijo | Vencidas | Sin fecha | Se avisan |
+|---|---|---|---|
+| RTI | 9 | **165** | 0 |
+| REQ | 1 | 17 | 0 |
+| los otros siete | 146 | 3 | **149** |
+
+La regla quita **192 de 341 filas, el 56% del correo**, y deja **18 correos y
+149 filas**, el mayor de 41.
+
+El desglose corrige una lectura equivocada que estuvo un rato en este
+documento. Las 185 "sin fecha" parecian un problema de captura -"185
+iniciativas sin compromiso"- y no lo son: **182 de las 185 son RTI y REQ**, o
+sea tipos que por definicion no llevan control de fecha. Descontandolos
+quedan **tres**. No hay tal problema de captura.
 
 ---
 
@@ -166,6 +175,17 @@ CatPersona.Nombre       'Luis Gerardo Lomas Malacara'
 
 Es la misma persona y arrastra **32 iniciativas** que se quedarian sin Service
 Owner en copia.
+
+**Ojo con el campo**, que hay dos "Service Owner" y no son el mismo:
+
+| | |
+|---|---|
+| `dbo.Problem.OwnerServicio` | el de la iniciativa (rol 2 del diagnostico `25`) |
+| `dbo.CatCategoriaDueno.ServiceOwner` | el de la **categoria** (rol 5) |
+
+El nombre que no cruzaba esta en el **segundo**. La primera version de la
+comprobacion del `27` miraba el primero y devolvia cero filas, que se lee como
+"no hay caso" cuando lo que fallaba era la consulta. Ahora mira los dos.
 
 La clave ordenada empata las dos, y se usa **solo como segunda opcion**:
 primero se intenta el cruce exacto y nada mas si ese falla se prueba la
@@ -319,7 +339,7 @@ Excel: un nombre colado en una lista de correos haria fallar el envio
 
 ```sh
 # SQL: compila y corre 25, 26 y 27 contra un SQL Server de verdad, con el
-# DDL extraido de los archivos versionados. 21 aserciones.
+# DDL extraido de los archivos versionados. 22 aserciones.
 sh pruebas/correr_problems.sh
 
 # PowerShell: 50 comprobaciones, sin base, sin red y sin mandar nada.
