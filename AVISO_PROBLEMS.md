@@ -188,10 +188,20 @@ En SSMS, contra `Tickets_Proactivanet`, en este orden:
 ```text
 1. 13_experiencia_usuario.sql          (si no esta: crea Problem, CatPersona...)
 2. 16_cruce_llamadas_tickets.sql       (si no esta: crea fn_ClaveNombre)
-3. 26_aviso_problems_vencidos.sql      <-- este
+3. 26_aviso_problems_vencidos.sql      <-- crea los objetos
+4. 27_verificar_aviso_problems.sql     <-- mide lo que mandaria, sin mandar
 ```
 
-`26` avisa con un `RAISERROR` claro si le falta alguna dependencia.
+`26` avisa con un `RAISERROR` claro si le falta alguna dependencia. No imprime
+nada mas que "comandos completados": sus comprobaciones van comentadas a
+proposito, para que desplegar no vuelque media docena de tablas de
+resultados.
+
+Esa mitad es `27_verificar_aviso_problems.sql`, que es de **solo lectura** y si
+imprime. Contesta, antes de que salga un correo: cuanto quita la regla de RTI
+y REQ, que ninguna cerrada se cuele, cuantos correos salen y de que tamano, y
+si el correo del 19 de agosto se sigue reproduciendo. Su ultimo bloque enseña
+el correo mas grande tal como lo veria quien lo recibe, y a quien le llegaria.
 
 > **Ojo con `13_experiencia_usuario.sql`**: `dbo.Problem` lleva una columna
 > calculada `PERSISTED`, y crear esa tabla exige `SET QUOTED_IDENTIFIER ON`.
@@ -308,8 +318,8 @@ Excel: un nombre colado en una lista de correos haria fallar el envio
 ## 8) Pruebas
 
 ```sh
-# SQL: compila y corre 25 y 26 contra un SQL Server de verdad, con el DDL
-# extraido de los archivos versionados. 21 aserciones.
+# SQL: compila y corre 25, 26 y 27 contra un SQL Server de verdad, con el
+# DDL extraido de los archivos versionados. 21 aserciones.
 sh pruebas/correr_problems.sh
 
 # PowerShell: 50 comprobaciones, sin base, sin red y sin mandar nada.
