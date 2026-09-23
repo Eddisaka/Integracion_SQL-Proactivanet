@@ -38,6 +38,24 @@
        18 Owner Problem distintos, los 18 con correo en el catalogo
        341 filas en total
 
+   DOS REGLAS DE QUIEN SI Y QUIEN NO
+   ---------------------------------
+   1. Los prefijos RTI y REQ no llevan control de fecha y NO generan correo,
+      aunque la fecha que traigan ya haya pasado. Vive en la tabla
+      dbo.CatPrefijoProblem, no en un NOT IN dentro de una vista.
+
+   2. Una iniciativa CERRADA no genera correo nunca, tenga o no FechaCierre
+      capturada. Esto no se programa aparte: el mapa de estado -> fecha solo
+      tiene entrada para los tres estados vivos, asi que 'Cerrado' cae en
+      'NO APLICA' por el estado y FechaCierre no interviene en la decision.
+      Las 136 cerradas sin FechaCierre que hay en produccion no se avisan.
+
+   Las dos van en GeneraAviso, una columna APARTE de Veredicto. El veredicto
+   dice si la iniciativa esta vencida -un hecho sobre sus fechas-; GeneraAviso
+   dice si se manda correo -una decision de Problem Management sobre ese
+   hecho-. Mezclarlos haria que "cuantas hay vencidas" dependiera de a quien
+   se le avisa, y el tablero dejaria de cuadrar con el correo.
+
    VERIFICADO CONTRA UN RESULTADO CONOCIDO
    ---------------------------------------
    Las diez iniciativas que listo el correo del 19 de agosto dan las diez
@@ -47,6 +65,11 @@
    Servicio, y Eduardo Andres Ortiz y Yuri Vladimir Lopez -las dos
    Direcciones- en copia. El BLOQUE de comprobacion al final lo vuelve a
    correr.
+
+   OJO: una de aquellas diez, RTI 2026-000148, es un RTI. Con la regla de
+   prefijos HOY ya no generaria correo. Sigue saliendo 'VENCIDA' -la regla de
+   fechas no cambio- pero con GeneraAviso = 0. Por eso las dos columnas van
+   separadas: si se hubieran mezclado, esta verificacion se habria perdido.
 
    POR QUE EXISTE fn_ClaveNombreOrdenada
    -------------------------------------
@@ -82,6 +105,7 @@
    -------
    - dbo.fn_ClaveNombreOrdenada       clave con las palabras ordenadas
    - dbo.vw_CatPersonaClave           el catalogo con sus dos claves
+   - dbo.CatPrefijoProblem            que prefijos llevan control de fecha
    - dbo.vw_ProblemVencido            una fila por iniciativa, con veredicto
    - dbo.vw_ProblemVencidoAviso       lo mismo, con personas y correos
    - dbo.usp_AvisoProblems_Pendientes lo que lee el .ps1
@@ -179,7 +203,63 @@ WHERE cp.VigenteEnOrigen = 1;
 GO
 
 /* =====================================================================================
-   3) El veredicto, una fila por iniciativa
+   3) Que prefijos llevan control de fecha
+
+      No todas las iniciativas se gestionan igual. RTI (requerimiento de TI a
+      TI) y REQ (requerimiento) NO llevan control de fecha: no se les exige
+      compromiso y por lo tanto no se les avisa, aunque la fecha que tengan ya
+      haya pasado.
+
+      Va en tabla y no en un NOT IN dentro de la vista por lo mismo que
+      CatServicioCategoria o CatCuentaNoPersona: cambiar la regla el dia que
+      Problem Management decida que SKB tambien entra -o que REQ vuelve a
+      entrar- tiene que ser un UPDATE, no editar una vista y volver a
+      desplegar.
+
+      Los nueve prefijos son los que documenta 13_experiencia_usuario.sql:27-29.
+      La semilla NO pisa lo que ya este capturado: solo agrega los que falten,
+      para que un cambio hecho a mano sobreviva a volver a correr el script.
+
+      Un prefijo que aparezca en los datos y NO este en esta tabla se trata
+      como CON control de fecha. Es a proposito: ante algo que no conocemos,
+      avisar de mas es recuperable -alguien lo lee y lo dice- y avisar de
+      menos no, porque nadie echa en falta un correo que nunca llego. La
+      comprobacion (d) del final los lista.
+   ===================================================================================== */
+IF OBJECT_ID('dbo.CatPrefijoProblem', 'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.CatPrefijoProblem
+    (
+        Prefijo        NVARCHAR(10)  NOT NULL,
+        Descripcion    NVARCHAR(100) NULL,
+        ControlDeFecha BIT NOT NULL CONSTRAINT DF_CatPrefijoProblem_Ctrl DEFAULT (1),
+        Nota           NVARCHAR(400) NULL,
+        FechaAltaDW    DATETIME2(0) NOT NULL CONSTRAINT DF_CatPrefijoProblem_Alta DEFAULT (SYSDATETIME()),
+        CONSTRAINT PK_CatPrefijoProblem PRIMARY KEY CLUSTERED (Prefijo)
+    );
+END;
+GO
+
+INSERT INTO dbo.CatPrefijoProblem (Prefijo, Descripcion, ControlDeFecha, Nota)
+SELECT s.Prefijo, s.Descripcion, s.ControlDeFecha, s.Nota
+FROM (VALUES
+        (N'PRB', N'Problem',                    CONVERT(BIT, 1), NULL),
+        (N'MAP', N'Mejora aplicativo',          CONVERT(BIT, 1), NULL),
+        (N'ADO', N'Adopcion',                   CONVERT(BIT, 1), NULL),
+        (N'SKB', N'SorIA KB',                   CONVERT(BIT, 1), NULL),
+        (N'SOR', N'SorIA',                      CONVERT(BIT, 1), NULL),
+        (N'HAR', N'Hardware',                   CONVERT(BIT, 1), NULL),
+        (N'S2L', N'Segunda linea',              CONVERT(BIT, 1), NULL),
+        (N'RTI', N'Requerimiento de TI a TI',   CONVERT(BIT, 0),
+         N'No lleva compromiso de fecha, asi que no se avisa.'),
+        (N'REQ', N'Requerimiento',              CONVERT(BIT, 0),
+         N'No lleva compromiso de fecha, asi que no se avisa.')
+     ) AS s (Prefijo, Descripcion, ControlDeFecha, Nota)
+WHERE NOT EXISTS (SELECT 1 FROM dbo.CatPrefijoProblem AS c WHERE c.Prefijo = s.Prefijo);
+GO
+
+/* =====================================================================================
+   4) El veredicto, una fila por iniciativa
 
       Es la traduccion literal de Semaforo(). El CASE de la fecha se saca con
       CROSS APPLY para escribirlo UNA vez: una columna calculada no se puede
@@ -218,10 +298,40 @@ SELECT p.Codigo,
                           WHEN rige.Fecha   IS NULL THEN N'SIN FECHA'
                           WHEN rige.Fecha < CONVERT(DATE, SYSDATETIME()) THEN N'VENCIDA'
                           ELSE N'AL CORRIENTE'
+                     END,
+
+       -- Un prefijo que no este en el catalogo se trata como CON control:
+       -- ante algo desconocido, avisar de mas es recuperable y avisar de
+       -- menos no.
+       ControlDeFecha = ISNULL(pre.ControlDeFecha, CONVERT(BIT, 1)),
+
+       -- Si se manda o no. Va APARTE del veredicto, y no mezclado dentro,
+       -- por dos razones:
+       --
+       --   1. El veredicto dice si la iniciativa esta vencida, que es un
+       --      hecho sobre sus fechas. Si se manda correo o no es una
+       --      decision de Problem Management sobre ese hecho. Mezclarlas
+       --      haria que "cuantas hay vencidas" dependiera de a quien se le
+       --      avisa, y el tablero dejaria de cuadrar con el correo.
+       --   2. Deja verificable el correo del 19 de agosto, que si listaba un
+       --      RTI: aquellas diez siguen saliendo VENCIDA aunque una ya no
+       --      genere aviso.
+       GeneraAviso = CASE
+                        WHEN ISNULL(pre.ControlDeFecha, CONVERT(BIT, 1)) = 0 THEN 0
+                        WHEN rige.Columna IS NULL THEN 0
+                        WHEN rige.Fecha IS NULL THEN 1
+                        WHEN rige.Fecha < CONVERT(DATE, SYSDATETIME()) THEN 1
+                        ELSE 0
                      END
 FROM dbo.Problem AS p
 CROSS APPLY (SELECT Clave = dbo.fn_ClaveNombre(ISNULL(p.Estado, N''))) AS est
 CROSS APPLY (
+    -- EL ESTADO CERRADO NO TIENE ENTRADA AQUI, Y ESO ES LA REGLA, NO UN
+    -- OLVIDO: una iniciativa cerrada no genera correo NUNCA, tenga o no
+    -- FechaCierre capturada. Sin columna que rija no hay fecha que vencer,
+    -- asi que cae en 'NO APLICA' por el estado y FechaCierre no interviene
+    -- en la decision. Lo mismo para cualquier estado que aparezca manana y
+    -- no este listado.
     SELECT Columna = CASE est.Clave WHEN N'ENANALISIS'  THEN N'FechaAnalisis'
                                     WHEN N'ENSOLUCION'  THEN N'FechaSolucion'
                                     WHEN N'ENMONITOREO' THEN N'FechaCierre' END,
@@ -229,11 +339,12 @@ CROSS APPLY (
                                     WHEN N'ENSOLUCION'  THEN p.FechaSolucion
                                     WHEN N'ENMONITOREO' THEN p.FechaCierre END
 ) AS rige
+LEFT JOIN dbo.CatPrefijoProblem AS pre ON pre.Prefijo = p.Prefijo
 WHERE p.VigenteEnOrigen = 1;
 GO
 
 /* =====================================================================================
-   4) Con personas y correos resueltos
+   5) Con personas y correos resueltos
 
       Cada persona se resuelve con OUTER APPLY TOP (1) y no con LEFT JOIN. Es
       deliberado: si dos filas del catalogo dieran la misma clave, un JOIN
@@ -305,6 +416,8 @@ SELECT v.Codigo,
        v.ColumnaRige,
        v.DiasVencida,
        v.Veredicto,
+       v.ControlDeFecha,
+       v.GeneraAviso,
        v.FechaAnalisis,
        v.FechaSolucion,
        v.FechaCierre,
@@ -396,7 +509,7 @@ OUTER APPLY (
 GO
 
 /* =====================================================================================
-   5) Lo que lee el .ps1
+   6) Lo que lee el .ps1
 
       Devuelve SOLO lo reportable -vencidas y sin fecha-, ya ordenado como se
       va a imprimir: primero lo mas atrasado. El agrupar por Owner Problem lo
@@ -439,7 +552,9 @@ BEGIN
            a.DirectoresPO,
            a.CorreosDuenos
     FROM dbo.vw_ProblemVencidoAviso AS a
-    WHERE a.Veredicto IN (N'VENCIDA', N'SIN FECHA')
+    -- GeneraAviso y no Veredicto: ya trae dentro que el estado este vivo,
+    -- que haya algo que reclamar, y que el prefijo lleve control de fecha.
+    WHERE a.GeneraAviso = 1
       AND (@Veredicto IS NULL OR a.Veredicto = @Veredicto)
     ORDER BY a.OwnerProblem,
              -- Vencidas primero, y dentro de cada tabla lo mas atrasado
@@ -453,21 +568,43 @@ END;
 GO
 
 /* =====================================================================================
-   6) Comprobaciones
+   7) Comprobaciones
    =====================================================================================
 
 -- a) Contra lo que midio el diagnostico el 22 de septiembre:
 --    156 vencidas, 185 sin fecha, 42 al corriente, 544 no aplica.
+--    Esas cifras NO cambian con la regla de prefijos: el veredicto es sobre
+--    las fechas. Lo que cambia es GeneraAviso.
 SELECT Veredicto, Iniciativas = COUNT(*)
 FROM dbo.vw_ProblemVencido GROUP BY Veredicto ORDER BY Veredicto;
 
--- b) 18 correos, 341 filas, ninguno sin correo.
+-- a2) Cuanto quita la regla de RTI y REQ. La diferencia entre las dos
+--     columnas es lo que se deja de avisar.
+SELECT Prefijo = v.Prefijo,
+       ControlDeFecha = MAX(CONVERT(INT, v.ControlDeFecha)),
+       Vencidas   = SUM(CASE WHEN v.Veredicto = N'VENCIDA'   THEN 1 ELSE 0 END),
+       SinFecha   = SUM(CASE WHEN v.Veredicto = N'SIN FECHA' THEN 1 ELSE 0 END),
+       SeAvisan   = SUM(CONVERT(INT, v.GeneraAviso))
+FROM dbo.vw_ProblemVencido AS v
+GROUP BY v.Prefijo
+ORDER BY SeAvisan DESC, v.Prefijo;
+
+-- a3) Que una CERRADA no se avise nunca, tenga o no FechaCierre. Las dos
+--     columnas deben dar cero.
+SELECT CerradasQueSeAvisarian = SUM(CONVERT(INT, v.GeneraAviso)),
+       CerradasSinFechaCierre = SUM(CASE WHEN v.FechaCierre IS NULL THEN 1 ELSE 0 END),
+       Cerradas = COUNT(*)
+FROM dbo.vw_ProblemVencido AS v
+WHERE dbo.fn_ClaveNombre(v.Estado) = N'CERRADO';
+
+-- b) Correos, filas y nadie sin correo. Con la regla de prefijos esto da
+--    MENOS de los 341 que midio el diagnostico del 22 de septiembre.
 SELECT Correos      = COUNT(DISTINCT a.OwnerProblem),
        Filas        = COUNT(*),
        SinCorreo    = SUM(CASE WHEN a.CorreoOwnerProblem IS NULL THEN 1 ELSE 0 END),
        SinLider     = SUM(CASE WHEN a.CorreoLiderOwnerProblem IS NULL THEN 1 ELSE 0 END)
 FROM dbo.vw_ProblemVencidoAviso AS a
-WHERE a.Veredicto IN (N'VENCIDA', N'SIN FECHA');
+WHERE a.GeneraAviso = 1;
 
 -- c) La persona que solo cruza por clave ordenada. Antes de esta vista, las
 --    32 iniciativas de 'Lomas Malacara Luis Gerardo' se quedaban sin Service
@@ -476,9 +613,20 @@ SELECT TOP (5) a.Codigo, a.OwnerServicio, a.CorreoOwnerServicio
 FROM dbo.vw_ProblemVencidoAviso AS a
 WHERE dbo.fn_ClaveNombre(a.OwnerServicio) = N'LOMASMALACARALUISGERARDO';
 
+-- c2) Prefijos que aparecen en los datos y NO estan en el catalogo. Se
+--     tratan como CON control de fecha, o sea que SI se avisan. Si sale
+--     alguno, hay que decidir y darlo de alta.
+SELECT Prefijo = p.Prefijo, Iniciativas = COUNT(*)
+FROM dbo.Problem AS p
+WHERE p.VigenteEnOrigen = 1
+  AND NOT EXISTS (SELECT 1 FROM dbo.CatPrefijoProblem AS c WHERE c.Prefijo = p.Prefijo)
+GROUP BY p.Prefijo ORDER BY COUNT(*) DESC;
+
 -- d) Reproducir el correo del 19 de agosto: las diez, todas VENCIDA hoy, y
---    con los mismos responsables que llevaba aquel correo.
-SELECT a.Codigo, a.Veredicto, a.Estado, a.Compromiso,
+--    con los mismos responsables que llevaba aquel correo. RTI 2026-000148
+--    sale VENCIDA pero con GeneraAviso = 0: es la que la regla de prefijos
+--    deja fuera.
+SELECT a.Codigo, a.Veredicto, a.GeneraAviso, a.Estado, a.Compromiso,
        a.OwnerProblem, a.OwnerServicio, a.Direccion
 FROM dbo.vw_ProblemVencidoAviso AS a
 WHERE a.Codigo IN (N'PRB 2026-000124', N'HAR 2026-000008', N'HAR 2026-000023',
@@ -499,8 +647,9 @@ EXEC dbo.usp_AvisoProblems_Pendientes;
 */
 
 /* =====================================================================================
-   7) Permisos
+   8) Permisos
    =====================================================================================
+GRANT SELECT  ON dbo.CatPrefijoProblem            TO [PROACTIVANETAD];
 GRANT SELECT  ON dbo.vw_ProblemVencido            TO [PROACTIVANETAD];
 GRANT SELECT  ON dbo.vw_ProblemVencidoAviso       TO [PROACTIVANETAD];
 GRANT EXECUTE ON dbo.usp_AvisoProblems_Pendientes TO [PROACTIVANETAD];

@@ -195,6 +195,18 @@ VALUES
     (N'PRB 2026-000902', N'Ya no viene en el Excel', @Analisis, N'/S-Logistica/Hardware/Tres',
      N'Persona Servicio Dos', N'Persona Problem Tres', N'Persona Direccion Dos',
      @Ayer, @Ayer, NULL, NULL, NULL, 0, 0),
+    -- REQ: vencida de fecha, pero su prefijo no lleva control, asi que no se
+    -- avisa. El otro caso de la regla, RTI, ya esta arriba: RTI 2026-000148,
+    -- que ademas iba en el correo real del 19 de agosto.
+    (N'REQ 2026-000910', N'Requerimiento vencido', @Analisis, N'/S-Logistica/Hardware/Tres',
+     N'Persona Servicio Uno', N'Persona Problem Uno', N'Persona Direccion Uno',
+     @Ayer, @Ayer, NULL, NULL, NULL, 0, 1),
+    -- Cerrada y SIN FechaCierre: el caso exacto que preocupaba. No se avisa,
+    -- y no porque le falte la fecha sino porque el estado no tiene columna
+    -- que rija.
+    (N'PRB 2026-000911', N'Cerrada sin fecha de cierre', N'Cerrado', N'/S-Logistica/Hardware/Tres',
+     N'Persona Servicio Dos', N'Persona Problem Uno', N'Persona Direccion Dos',
+     @Ayer, @Ayer, @Ayer, NULL, NULL, 0, 1),
 
     -- Casos que SI debe listar, pero en la tabla de 'sin fecha'
     (N'PRB 2026-000903', N'Sin fecha de analisis', @Analisis, N'/S-Logistica/Hardware/Tres',
@@ -393,8 +405,12 @@ afirmar "la consulta de candidatos si propone la pareja" \
 # Aqui no basta con que compile: son las vistas que arman el correo.
 
 # 6. El veredicto de la vista tiene que dar lo mismo que el diagnostico.
-afirmar "vw_ProblemVencido: 11 vencidas" \
-    "SELECT COUNT(*) FROM dbo.vw_ProblemVencido WHERE Veredicto = N'VENCIDA';" "11"
+# El veredicto es sobre las FECHAS y no mira el prefijo: las 12 incluyen el
+# RTI y el REQ, que estan vencidos aunque no se avisen. Si esto bajara a 10,
+# la regla de prefijos se habria colado en el veredicto y el tablero dejaria
+# de cuadrar con el correo.
+afirmar "vw_ProblemVencido: 12 vencidas (incluye RTI y REQ)" \
+    "SELECT COUNT(*) FROM dbo.vw_ProblemVencido WHERE Veredicto = N'VENCIDA';" "12"
 afirmar "vw_ProblemVencido: 2 sin fecha" \
     "SELECT COUNT(*) FROM dbo.vw_ProblemVencido WHERE Veredicto = N'SIN FECHA';" "2"
 
@@ -441,16 +457,61 @@ afirmar "el abanico de duenos junta las dos categorias" \
 
 # 12. El lider que se usa es el Director, que es el que produccion trae
 #     capturado.
+# Atada a un codigo concreto y no al conteo de filas de 'Persona Problem
+# Uno': asi agregar un caso al andamio no rompe una asercion que no habla de
+# eso.
 afirmar "el lider resuelto es el Director" \
-    "SELECT COUNT(DISTINCT a.Codigo) FROM dbo.vw_ProblemVencidoAviso a
-     WHERE a.OwnerProblem = N'Persona Problem Uno'
-       AND a.LiderOwnerProblem = N'Persona Dir Uno'
-       AND a.CorreoLiderOwnerProblem = N'dir.uno@ejemplo.com';" \
+    "SELECT a.LiderOwnerProblem + N'/' + a.CorreoLiderOwnerProblem
+     FROM dbo.vw_ProblemVencidoAviso a WHERE a.Codigo = N'PRB 2026-000124';" \
+    "PersonaDirUno/dir.uno@ejemplo.com"
+
+# 13a. REGLA: RTI y REQ no generan correo aunque esten vencidos.
+afirmar "RTI y REQ salen vencidos pero no se avisan" \
+    "SELECT CONVERT(NVARCHAR(20), SUM(CASE WHEN Veredicto = N'VENCIDA' THEN 1 ELSE 0 END))
+          + N'/' + CONVERT(NVARCHAR(20), SUM(CONVERT(INT, GeneraAviso)))
+     FROM dbo.vw_ProblemVencido WHERE Prefijo IN (N'RTI', N'REQ');" \
+    "2/0"
+
+# 13b. Y en concreto la del correo del 19 de agosto: sigue VENCIDA -la regla
+#      de fechas no cambio- pero ya no genera aviso.
+afirmar "RTI 2026-000148 sigue vencida pero no se avisa" \
+    "SELECT Veredicto + N'/' + CONVERT(NVARCHAR(2), GeneraAviso)
+     FROM dbo.vw_ProblemVencido WHERE Codigo = N'RTI 2026-000148';" \
+    "VENCIDA/0"
+
+# 13c. REGLA: una cerrada no se avisa NUNCA, tenga o no FechaCierre. El caso
+#      que importa es la que NO la tiene: si el estado se ignorara y solo se
+#      mirara la fecha, caeria en 'SIN FECHA' y se avisaria.
+afirmar "cerrada sin FechaCierre no se avisa" \
+    "SELECT Veredicto + N'/' + CONVERT(NVARCHAR(2), GeneraAviso)
+     FROM dbo.vw_ProblemVencido WHERE Codigo = N'PRB 2026-000911';" \
+    "NOAPLICA/0"
+
+afirmar "ninguna cerrada se avisa" \
+    "SELECT ISNULL(SUM(CONVERT(INT, GeneraAviso)), 0) FROM dbo.vw_ProblemVencido
+     WHERE dbo.fn_ClaveNombre(Estado) = N'CERRADO';" \
+    "0"
+
+# 13d. Un prefijo que NO este en el catalogo se avisa igual. Es deliberado:
+#      ante algo desconocido, avisar de mas es recuperable y avisar de menos
+#      no. 'MAP' y 'HAR' si estan; 'ADO' tambien. Se prueba con uno inventado.
+afirmar "un prefijo desconocido se sigue avisando" \
+    "INSERT INTO dbo.Problem (Codigo, Titulo, Estado, OwnerProblem, VigenteEnOrigen,
+        FechaCreacion, FechaAnalisis)
+     VALUES (N'ZZZ 2026-000001', N'Prefijo que nadie dio de alta',
+        N'En Analisis', N'Persona Problem Uno', 1, '2026-01-01', '2026-02-01');
+     DECLARE @r NVARCHAR(2) = (SELECT CONVERT(NVARCHAR(2), GeneraAviso)
+        FROM dbo.vw_ProblemVencido WHERE Codigo = N'ZZZ 2026-000001');
+     -- Se borra lo que se metio: una asercion que deja basura en la base
+     -- desplaza los conteos de las que vienen despues, y el fallo aparece
+     -- en OTRA asercion, que es donde mas cuesta encontrarlo.
+     DELETE FROM dbo.Problem WHERE Codigo = N'ZZZ 2026-000001';
+     SELECT @r;" \
     "1"
 
 # 13. El procedimiento solo devuelve lo reportable: nada cerrado ni al
 #     corriente se puede colar en el correo.
-afirmar "el procedimiento devuelve 13 filas" \
+afirmar "el procedimiento devuelve 12 filas" \
     "CREATE TABLE #r (Veredicto NVARCHAR(20), Codigo NVARCHAR(100), Prefijo NVARCHAR(10),
         Titulo NVARCHAR(MAX), Estado NVARCHAR(100), FechaCreacion DATETIME2(0),
         ColumnaRige NVARCHAR(30), Compromiso DATETIME2(0), DiasVencida INT,
@@ -464,7 +525,7 @@ afirmar "el procedimiento devuelve 13 filas" \
         DirectoresPO NVARCHAR(MAX), CorreosDuenos NVARCHAR(MAX));
      INSERT INTO #r EXEC dbo.usp_AvisoProblems_Pendientes;
      SELECT COUNT(*) FROM #r;" \
-    "13"
+    "12"
 
 echo
 if [ "$FALLOS" -eq 0 ]; then echo "TODO BIEN"; else echo "$FALLOS problema(s)"; fi

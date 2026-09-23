@@ -26,6 +26,43 @@ Van separadas a proposito, por dos razones:
    sea que sin fecha no hay rojo). Si el correo las juntara, correo y tablero
    darian numeros distintos para lo mismo y nadie sabria cual creer.
 
+### Quien NO recibe correo
+
+Dos reglas, las dos en la columna `GeneraAviso`:
+
+1. **Prefijos `RTI` y `REQ`.** No llevan control de fecha -no se les exige
+   compromiso-, asi que no se avisan aunque su fecha ya haya pasado. La regla
+   vive en la tabla `dbo.CatPrefijoProblem`, no en un `NOT IN` dentro de una
+   vista: el dia que Problem Management decida que `SKB` tambien entra, o que
+   `REQ` vuelve a entrar, es un `UPDATE`.
+
+   Un prefijo que aparezca en los datos y **no** este en esa tabla se trata
+   como **con** control de fecha, o sea que si se avisa. Es a proposito: ante
+   algo desconocido, avisar de mas es recuperable -alguien lo lee y lo dice- y
+   avisar de menos no, porque nadie echa en falta un correo que nunca llego.
+   La comprobacion `c2` del script los lista.
+
+2. **Estado `Cerrado`.** No genera correo nunca, **tenga o no `FechaCierre`
+   capturada**. Esto no esta programado aparte: el mapa de estado a fecha solo
+   tiene entrada para los tres estados vivos, asi que `Cerrado` cae en
+   `NO APLICA` por el **estado**, y `FechaCierre` no interviene en la
+   decision. Las 136 cerradas sin `FechaCierre` que hay en produccion no se
+   avisan. Hay dos pruebas que lo fijan, para que nadie lo rompa despues.
+
+`GeneraAviso` va **aparte** de `Veredicto`, no mezclado dentro. El veredicto
+dice si la iniciativa esta vencida, que es un hecho sobre sus fechas;
+`GeneraAviso` dice si se manda correo, que es una decision de Problem
+Management sobre ese hecho. Mezclarlos haria que "cuantas hay vencidas"
+dependiera de a quien se le avisa, y el tablero dejaria de cuadrar con el
+correo.
+
+> **Ojo con el correo de referencia.** Una de las diez iniciativas del `.msg`
+> del 19 de agosto, `RTI 2026-000148` ("Falla Fisica PinPad"), **es un RTI**.
+> Con la regla de prefijos de hoy ya no generaria correo. Sigue saliendo
+> `VENCIDA` -la regla de fechas no cambio- pero con `GeneraAviso = 0`. Si
+> algun dia se quiere volver a avisar de los RTI, es un `UPDATE` sobre
+> `dbo.CatPrefijoProblem`.
+
 ### Destinatarios
 
 | | Quien |
@@ -80,6 +117,13 @@ Corrida del 22 de septiembre (`salidas/20260922_salida_25.rpt`):
 | Correos que saldrian | 18 |
 | Filas en total | 341 |
 | Owner Problem sin correo | ninguno |
+
+Esas cifras son **antes** de la regla de prefijos, que se agrego despues de
+esa medicion. Las de vencidas y sin fecha no cambian -el veredicto es sobre
+las fechas-, pero las de correos y filas bajan. La comprobacion `a2` del
+script `26` mide exactamente cuanto quita: agrupa por prefijo y pone lado a
+lado lo vencido y lo que de verdad se avisa. RTI pesa: las cuatro iniciativas
+mas atrasadas de la muestra, todas de un mismo Owner Problem, son RTI.
 
 De las 309 en analisis, **185 nunca han tenido fecha de analisis capturada**.
 Esa es, de lejos, la historia que va a contar el correo.
@@ -265,7 +309,7 @@ Excel: un nombre colado en una lista de correos haria fallar el envio
 
 ```sh
 # SQL: compila y corre 25 y 26 contra un SQL Server de verdad, con el DDL
-# extraido de los archivos versionados. 16 aserciones.
+# extraido de los archivos versionados. 21 aserciones.
 sh pruebas/correr_problems.sh
 
 # PowerShell: 50 comprobaciones, sin base, sin red y sin mandar nada.
@@ -291,6 +335,7 @@ excepcion singular antes que la plural- y las tres se cazaron.
 |---|---|
 | `dbo.fn_ClaveNombreOrdenada` | clave de nombre con las palabras ordenadas |
 | `dbo.vw_CatPersonaClave` | el catalogo de personas con sus dos claves |
+| `dbo.CatPrefijoProblem` | que prefijos llevan control de fecha (RTI y REQ no) |
 | `dbo.vw_ProblemVencido` | una fila por iniciativa, con veredicto |
 | `dbo.vw_ProblemDueno` | duenos por categoria (N2 exacto, o heredado del C1) |
 | `dbo.vw_ProblemDuenoCorreo` | los mismos, ya vueltos correo |
