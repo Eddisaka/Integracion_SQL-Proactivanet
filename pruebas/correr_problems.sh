@@ -1,7 +1,7 @@
 #!/bin/sh
-# Corre contra un SQL Server de verdad los dos .sql del correo de PRBs
-# vencidos: 25_diagnostico_problems_vencidos.sql y
-# 26_aviso_problems_vencidos.sql.
+# Corre contra un SQL Server de verdad los tres .sql del correo de PRBs
+# vencidos: 25_diagnostico_problems_vencidos.sql,
+# 26_aviso_problems_vencidos.sql y 27_verificar_aviso_problems.sql.
 #
 # POR QUE EXISTE
 #
@@ -308,6 +308,19 @@ err26=$(printf '%s' "$salida26" | grep -cE '^(Msg|Mens)[. ]' || true)
 if [ "$err26" -gt 0 ]; then
     echo "   FALLA con $err26 error(es):"
     printf '%s\n' "$salida26" | grep -E '^(Msg|Mens)[. ]' -A2 | head -30 | sed 's/^/      /'
+    FALLOS=$((FALLOS+1))
+else
+    echo "   bien   sin errores de SQL"
+fi
+
+# ------------------------------------------------------- la verificacion
+echo "== 27_verificar_aviso_problems.sql =="
+docker cp "$REPO/27_verificar_aviso_problems.sql" "$CONTENEDOR:/tmp/z.sql" >/dev/null
+salida27=$(sqlcmd -d Tickets_Proactivanet -i /tmp/z.sql 2>&1 || true)
+err27=$(printf '%s' "$salida27" | grep -cE '^(Msg|Mens)[. ]' || true)
+if [ "$err27" -gt 0 ]; then
+    echo "   FALLA con $err27 error(es):"
+    printf '%s\n' "$salida27" | grep -E '^(Msg|Mens)[. ]' -A2 | head -30 | sed 's/^/      /'
     FALLOS=$((FALLOS+1))
 else
     echo "   bien   sin errores de SQL"
