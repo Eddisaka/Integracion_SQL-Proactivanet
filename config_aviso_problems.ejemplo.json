@@ -18,8 +18,6 @@
 
   "_copia_fija": "El equipo de Problem Management, que va en copia de TODOS los correos. No sale del catalogo: dbo.CatPersona.Rol solo trae Service Owner, Product Owner y Director, no hay un rol de Problem Management. Pon aqui las direcciones reales en tu config_aviso_problems.json.",
   "copia_fija": [
-    "alguien@ejemplo.com",
-    "otro@ejemplo.com"
   ],
 
   "_smtp": "Relay SMTP interno de Soriana, sin SSL ni usuario. Si algun dia pidiera usuario, la CLAVE NO VA AQUI: se exporta en la variable de entorno PVNET_SMTP_PASS. Una clave en un .json acaba en un repositorio tarde o temprano.",
