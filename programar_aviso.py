@@ -59,6 +59,7 @@ import datetime
 import io
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -333,7 +334,26 @@ def tarea_existe(correr_orden=None):
     return codigo == 0
 
 
-def crear_tarea(hora, dias, informar=print, correr_orden=None):
+def primer_dia(hora, ahora=None):
+    """El dia desde el que arranca la tarea: hoy si aun no es la hora, si no manana.
+
+    Con la hora ya pasada, la tarea arranca manana a proposito. Asi Windows no
+    tiene ninguna ejecucion de hoy que pueda considerar "perdida" y lanzar por
+    su cuenta con StartWhenAvailable: si hoy hay que recuperar el aviso, lo
+    decide recuperar_ultimo_aviso() y lo manda UNA vez. Dos mecanismos
+    mandando el mismo correo seria la duplicacion que se quiere evitar.
+
+    (El 2026-09-24 hubo una prueba involuntaria: la tarea se creo con la hora
+    de ese dia ya pasada y Windows no la lanzo. No se depende de eso: se evita.)
+    """
+    ahora = ahora or datetime.datetime.now()
+    hoy = ahora.date()
+    if (ahora.hour, ahora.minute, ahora.second) >= (hora, 0, 0):
+        hoy = hoy + datetime.timedelta(days=1)
+    return hoy.isoformat()
+
+
+def crear_tarea(hora, dias, informar=print, correr_orden=None, ahora=None):
     """Crea o reemplaza la tarea. Devuelve True si Windows la acepto.
 
     Si el XML fuera rechazado, se intenta con las banderas sueltas de
@@ -349,7 +369,8 @@ def crear_tarea(hora, dias, informar=print, correr_orden=None):
 
     powershell = ruta_de_powershell()
     xml = xml_de_la_tarea(hora, dias, powershell,
-                          argumentos_de_powershell(ps1), AQUI)
+                          argumentos_de_powershell(ps1), AQUI,
+                          desde=primer_dia(hora, ahora))
 
     # El XML va en UTF-16 porque asi lo declara su propia cabecera. Escribirlo
     # en UTF-8 con esa declaracion hace que schtasks lo rechace sin explicar
@@ -513,14 +534,15 @@ def poner_en_inicio(informar=print):
 
 
 # ------------------------------------------------------------- las ordenes --
-def instalar(hora=None, dias=None, informar=print, correr_orden=None):
+def instalar(hora=None, dias=None, informar=print, correr_orden=None, ahora=None):
     memoria = leer_estado()
     if hora is None:
         hora = memoria.get("hora", HORA_POR_OMISION)
     if dias is None:
         dias = memoria.get("dias") or leer_dias(DIAS_POR_OMISION)
 
-    if not crear_tarea(hora, dias, informar=informar, correr_orden=correr_orden):
+    if not crear_tarea(hora, dias, informar=informar, correr_orden=correr_orden,
+                       ahora=ahora):
         return 1
 
     guardar_estado({"hora": hora, "dias": dias})
@@ -748,15 +770,156 @@ def desinstalar(informar=print, correr_orden=None):
     return 0
 
 
-def al_iniciar(informar=print, correr_orden=None):
-    """Lo que corre al iniciar sesion. Repone la tarea si no esta."""
+def al_iniciar(informar=print, correr_orden=None, ahora=None):
+    """Lo que corre al iniciar sesion. Repone la tarea si no esta, y si al
+    reponerla se perdio el ultimo aviso, lo manda UNA vez.
+
+    La recuperacion solo va por aqui, cuando la tarea FALTABA. Si la tarea
+    seguia puesta, Windows tiene su propio mecanismo para lo que se perdio
+    (StartWhenAvailable) y meter un segundo seria arriesgarse a mandar dos
+    veces el mismo correo.
+    """
+    ahora = ahora or datetime.datetime.now()
     if tarea_existe(correr_orden=correr_orden):
         informar("La tarea sigue programada; no hay nada que reponer.")
         return 0
     informar("La tarea NO estaba (se reciclo la VDI?). Se repone.")
     memoria = leer_estado()
-    return instalar(hora=memoria.get("hora"), dias=memoria.get("dias"),
-                    informar=informar, correr_orden=correr_orden)
+    codigo = instalar(hora=memoria.get("hora"), dias=memoria.get("dias"),
+                      informar=informar, correr_orden=correr_orden, ahora=ahora)
+    # instalar() puede salir con 1 aunque la tarea SI haya quedado -por
+    # ejemplo si fallo el re-armado de Inicio-. Lo que decide si se puede
+    # recuperar es que la tarea exista, no ese codigo.
+    if tarea_existe(correr_orden=correr_orden):
+        recuperar_ultimo_aviso(informar=informar, correr_orden=correr_orden,
+                               ahora=ahora)
+    return codigo
+
+
+# ---------------------------------------------------------- la recuperacion --
+DIAS_HABILES = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday")
+
+# Una linea de inicio del envio: '2026-09-24 12:00:05 [INFO] Inicio. ...'
+_LINEA_DE_INICIO = re.compile(
+    r"^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) \[\w+\] Inicio\.")
+
+
+def ultima_ocurrencia(dias, hora, ahora):
+    """La ultima vez que tocaba el aviso, a su hora, sin pasar de 'ahora'."""
+    for atras in range(0, 8):
+        dia = (ahora - datetime.timedelta(days=atras)).date()
+        if DIAS_EN_ORDEN[dia.weekday()] not in dias:
+            continue
+        momento = datetime.datetime(dia.year, dia.month, dia.day, hora)
+        if momento <= ahora:
+            return momento
+    return None
+
+
+def intentos_en_el_registro(desde, hasta):
+    r"""Cuantos envios ARRANCARON entre 'desde' y 'hasta', segun Logs\.
+
+    Se cuenta la linea 'Inicio.' de Enviar_AvisoProblems.ps1, que se escribe
+    antes de tocar SQL. Por eso cuenta tambien un envio que despues fallo: lo
+    acordado es que un intento fallido NO se repite, porque un error a mitad
+    del envio puede haber mandado ya a una parte de los responsables.
+
+    NO cuenta una revision con -Listar, que tambien escribe 'Inicio.' pero no
+    manda nada: la distingue su 'Listar: True'. Los registros anteriores a esa
+    marca no la traen y cuentan como intento; en la duda, no se reenvia.
+
+    Se miran los archivos de TODOS los dias entre 'desde' y 'hasta', no solo
+    el del dia que tocaba: la propia recuperacion escribe en el registro del
+    dia en que corre, y el siguiente inicio de sesion tiene que verla.
+
+    Devuelve None si algun archivo existe pero no se puede leer: sin poder
+    mirar no se afirma nada, y quien llama lo trata como "no mandar".
+    """
+    carpeta = carpeta_logs_del_envio()
+    # Sin la carpeta no se puede saber nada. Pasa en una instalacion nueva, y
+    # tambien justo despues de un reciclado si OneDrive todavia no ha puesto
+    # la carpeta del proyecto completa: contar cero ahi seria reenviar un
+    # correo que a lo mejor ya salio.
+    if not os.path.isdir(carpeta):
+        return None
+    cuantos = 0
+    dia = desde.date()
+    while dia <= hasta.date():
+        ruta = os.path.join(carpeta, "AvisoProblems_%s.log" % dia.strftime("%Y%m%d"))
+        if os.path.isfile(ruta):
+            try:
+                with io.open(ruta, encoding="utf-8-sig", errors="replace") as archivo:
+                    for linea in archivo:
+                        encontrada = _LINEA_DE_INICIO.match(linea.strip())
+                        if not encontrada or "Listar: True" in linea:
+                            continue
+                        momento = datetime.datetime.strptime(encontrada.group(1),
+                                                             "%Y-%m-%d %H:%M:%S")
+                        if desde <= momento <= hasta:
+                            cuantos += 1
+            except (IOError, OSError):
+                return None
+        dia += datetime.timedelta(days=1)
+    return cuantos
+
+
+def decidir_recuperacion(memoria, ahora):
+    """(mandar, motivo). Nunca mas de UN aviso, y solo el mas reciente.
+
+    Lo acordado el 2026-09-24:
+      - solo en dias habiles: un sabado no se manda el del jueves;
+      - solo el ultimo que tocaba, aunque se hayan perdido varios;
+      - si hoy toca y aun no es la hora, no se recupera nada: la tarea lo
+        manda a su hora, y recuperar ahora seria mandar dos el mismo dia;
+      - si el ultimo ya se intento, aunque fallara, no se repite.
+    """
+    dias = memoria.get("dias") or []
+    hora = memoria.get("hora")
+    if hora is None or not dias:
+        return False, "no se sabe el horario instalado; no se recupera nada."
+    hoy = DIAS_EN_ORDEN[ahora.weekday()]
+    if hoy not in DIAS_HABILES:
+        return False, "es fin de semana; se espera al siguiente aviso programado."
+    if hoy in dias and ahora < ahora.replace(hour=hora, minute=0, second=0,
+                                               microsecond=0):
+        return False, ("hoy toca a las %02d:00 y aun no es la hora; lo manda la "
+                       "tarea." % hora)
+    ultima = ultima_ocurrencia(dias, hora, ahora)
+    if ultima is None:
+        return False, "no hay ningun aviso anterior que recuperar."
+    intentos = intentos_en_el_registro(ultima, ahora)
+    if intentos is None:
+        return False, ("no se pudo leer el registro del envio; sin saber si el "
+                       "del %s salio, no se manda." % ultima.strftime("%Y-%m-%d %H:%M"))
+    if intentos:
+        return False, ("el aviso del %s ya se intento; no se repite."
+                       % ultima.strftime("%Y-%m-%d %H:%M"))
+    return True, ("el aviso del %s no salio; se manda ahora, una sola vez."
+                  % ultima.strftime("%Y-%m-%d %H:%M"))
+
+
+def recuperar_ultimo_aviso(informar=print, correr_orden=None, ahora=None):
+    """Si el ultimo aviso programado no salio, lo lanza. Devuelve True si lo lanzo.
+
+    Se lanza la TAREA con 'schtasks /Run', no el guion directamente: corre
+    igual que a su hora, queda como ultima ejecucion para 'estado', y si por lo
+    que sea ya hubiera una en marcha, MultipleInstancesPolicy=IgnoreNew impide
+    que salgan dos.
+    """
+    correr_orden = correr_orden or _correr_orden
+    ahora = ahora or datetime.datetime.now()
+    mandar, motivo = decidir_recuperacion(leer_estado(), ahora)
+    informar("Recuperacion: %s" % motivo)
+    if not mandar:
+        return False
+    codigo, salida = correr_orden(["schtasks", "/Run", "/TN", NOMBRE_TAREA])
+    if codigo != 0:
+        informar("   No se pudo lanzar la tarea:")
+        for linea in (salida or "").strip().splitlines():
+            informar("      " + linea)
+        return False
+    informar("   Lanzada. El resultado queda en %s" % carpeta_logs_del_envio())
+    return True
 
 
 def principal(argv=None):

@@ -240,8 +240,14 @@ try {
     # un repositorio.
     $smtpPass = [Environment]::GetEnvironmentVariable('PVNET_SMTP_PASS')
 
-    Write-Log ("Inicio. Config: {0}. Veredicto: {1}. ModoPrueba: {2}." -f
-               $RutaCorreo, $(if ($Veredicto) { $Veredicto } else { 'los dos' }), $modoPrueba)
+    # 'Listar: True' distingue una revision a mano de un envio. El re-armado
+    # de programar_aviso.py lee esta linea para saber si el ultimo aviso
+    # programado ya se intento, y una revision con -Listar no manda nada: no
+    # debe contar como si el correo hubiera salido. No se cambie el formato
+    # sin cambiar tambien intentos_en_el_registro() de alla.
+    Write-Log ("Inicio. Config: {0}. Veredicto: {1}. ModoPrueba: {2}. Listar: {3}." -f
+               $RutaCorreo, $(if ($Veredicto) { $Veredicto } else { 'los dos' }), $modoPrueba,
+               [bool]$Listar)
 
     $script:Conexion = New-Object System.Data.SqlClient.SqlConnection (Get-ConnectionString $cnf)
     $script:Conexion.Open()

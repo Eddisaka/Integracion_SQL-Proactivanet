@@ -381,6 +381,55 @@ Hay **dos registros** y dicen cosas distintas:
 El primero prueba que la tarea **estaba** a la hora; solo el segundo prueba que
 **corrio**.
 
+#### Si al entrar ya paso la hora: se recupera UN aviso
+
+Cuando la VDI se recicla y se entra **despues** de la hora de un dia que tocaba,
+el re-armado repone la tarea para la siguiente fecha, y sin mas ese dia no
+saldria correo. Por eso, al reponerla, el re-armado mira si el ultimo aviso
+programado salio y, si no, lo manda en ese momento. Reglas, acordadas el
+2026-09-24:
+
+| Situacion | Que hace |
+|---|---|
+| jueves 13:30, el de las 12:00 no salio | lo manda ahora |
+| martes, el del lunes no salio | manda el del lunes |
+| viernes, no salieron ni el del lunes ni el del jueves | manda **uno**, el del jueves |
+| sabado o domingo | nada; se espera al lunes |
+| jueves 09:00, el del lunes no salio | nada; el de las 12:00 lo manda la tarea |
+| el ultimo arranco pero fallo | nada; un intento fallido **no** se repite |
+| la tarea seguia puesta (no hubo reciclado) | nada; ver abajo |
+
+- **Nunca se encolan**: aunque se hayan perdido varios, sale uno solo, el mas
+  reciente. El correo se arma con los datos del momento, asi que ese uno ya
+  trae todo lo pendiente.
+- Un intento que fallo no se repite porque un error a mitad del envio puede
+  haber mandado ya a una parte de los responsables.
+- Para saber si el ultimo salio se lee `Logs\AvisoProblems_*.log`, desde el dia
+  que tocaba hasta hoy: la linea `Inicio.` del envio. Una revision con
+  `-Listar` no cuenta (su linea dice `Listar: True`). Si la carpeta `Logs\`
+  no esta o un archivo no se puede leer, **no se manda**: sin poder mirar no se
+  afirma nada.
+- Se lanza la propia tarea (`schtasks /Run`), asi que `estado` la ve como la
+  ultima ejecucion.
+- Al reponerla despues de la hora, la tarea arranca **manana**, para que
+  Windows no tenga una ejecucion "perdida" de hoy que lance por su cuenta: solo
+  la recuperacion decide, y lo decide una vez.
+
+Lo que queda en `registros\arranque_*.log`:
+
+```text
+  La tarea NO estaba (se reciclo la VDI?). Se repone.
+  Tarea 'AvisoProblemsVencidos' programada: Monday, Thursday a las 12:00.
+  Recuperacion: el aviso del 2026-09-24 12:00 no salio; se manda ahora, una sola vez.
+     Lanzada. El resultado queda en ...\Logs
+```
+
+**Lo que no cubre:** si la tarea **no** desaparecio y se entra despues de la
+hora, la recuperacion no hace nada, a proposito. Windows tiene su propio
+mecanismo para eso (`StartWhenAvailable`), y sumarle otro arriesga mandar el
+mismo correo dos veces. Si ese dia no salio, `estado` lo dice con
+`HOY NO CORRIO`.
+
 #### La zona horaria del escritorio virtual
 
 El jueves 2026-09-24 la tarea estaba instalada "para las 12:00" y Windows la

@@ -381,6 +381,243 @@ try:
 finally:
     pa.AQUI = original
 
+# ------------------------------------------ la recuperacion del ultimo aviso
+# Acordado el 2026-09-24: si al iniciar sesion la tarea faltaba y el ultimo
+# aviso programado no salio, se manda UNO, el mas reciente, solo en dia
+# habil. Un intento que fallo cuenta como corrido. Nunca se encolan los de
+# dias atras.
+print("la recuperacion")
+
+LUN_1200 = datetime.datetime(2026, 9, 21, 12, 0)
+MAR_0900 = datetime.datetime(2026, 9, 22, 9, 0)
+JUE_0900 = datetime.datetime(2026, 9, 24, 9, 0)
+JUE_1200 = datetime.datetime(2026, 9, 24, 12, 0)
+JUE_1330 = datetime.datetime(2026, 9, 24, 13, 30)
+VIE_0900 = datetime.datetime(2026, 9, 25, 9, 0)
+SAB_1000 = datetime.datetime(2026, 9, 26, 10, 0)
+HORARIO = {"hora": 12, "dias": ["Monday", "Thursday"]}
+
+# --- primer_dia: con la hora pasada, la tarea arranca manana
+comprobar("antes de la hora arranca hoy", pa.primer_dia(12, JUE_0900), "2026-09-24")
+comprobar("a la hora justa ya arranca manana", pa.primer_dia(12, JUE_1200), "2026-09-25")
+comprobar("despues de la hora, manana", pa.primer_dia(12, JUE_1330), "2026-09-25")
+
+# y crear_tarea de verdad se lo pasa al XML
+capturado = {}
+_xml_original = pa.xml_de_la_tarea
+
+
+def _espia(*a, **k):
+    capturado.update(k)
+    return _xml_original(*a, **k)
+
+
+carpeta = tempfile.mkdtemp()
+original = pa.AQUI
+try:
+    pa.AQUI = carpeta
+    io.open(os.path.join(carpeta, pa.GUION), "w").close()
+    pa.xml_de_la_tarea = _espia
+    pa.crear_tarea(12, ["Monday"], informar=lambda *_: None,
+                   correr_orden=Doble([(0, "")]), ahora=JUE_1330)
+    comprobar("crear_tarea usa primer_dia", capturado.get("desde"), "2026-09-25")
+finally:
+    pa.xml_de_la_tarea = _xml_original
+    pa.AQUI = original
+
+# --- ultima_ocurrencia
+dias = HORARIO["dias"]
+comprobar("jueves 13:30 -> la de hoy", pa.ultima_ocurrencia(dias, 12, JUE_1330), JUE_1200)
+comprobar("jueves 09:00 -> la del lunes", pa.ultima_ocurrencia(dias, 12, JUE_0900), LUN_1200)
+comprobar("martes -> la del lunes", pa.ultima_ocurrencia(dias, 12, MAR_0900), LUN_1200)
+comprobar("sabado -> la del jueves", pa.ultima_ocurrencia(dias, 12, SAB_1000), JUE_1200)
+
+
+def con_registros(archivos, prueba):
+    """Corre 'prueba' con un AQUI de mentira, su estado y sus Logs\\."""
+    carpeta = tempfile.mkdtemp()
+    original = pa.AQUI
+    try:
+        pa.AQUI = carpeta
+        pa.guardar_estado(HORARIO)
+        os.makedirs(os.path.join(carpeta, "Logs"))
+        for nombre, lineas in archivos.items():
+            # Con BOM, como lo deja Add-Content -Encoding UTF8 de PowerShell 5.1.
+            with io.open(os.path.join(carpeta, "Logs", nombre), "w",
+                         encoding="utf-8-sig") as f:
+                f.write(u"\r\n".join(lineas) + u"\r\n")
+        return prueba()
+    finally:
+        pa.AQUI = original
+
+
+def inicio(momento, listar=None):
+    extra = "" if listar is None else " Listar: %s." % listar
+    return u"%s [INFO] Inicio. Config: c.json. Veredicto: los dos. ModoPrueba: False.%s" % (
+        momento.strftime("%Y-%m-%d %H:%M:%S"), extra)
+
+
+def decidir(ahora, archivos):
+    return con_registros(archivos, lambda: pa.decidir_recuperacion(pa.leer_estado(), ahora))
+
+
+# --- que cuenta como "ya se intento"
+mandar, motivo = decidir(JUE_1330, {})
+comprobar("jueves tarde sin registro: se manda", mandar, True)
+comprobar("   y dice cual", "2026-09-24 12:00" in motivo, True)
+
+hoy = "AvisoProblems_20260924.log"
+mandar, _ = decidir(JUE_1330, {hoy: [inicio(datetime.datetime(2026, 9, 24, 12, 0, 5), "False")]})
+comprobar("si hoy arranco a las 12, no se repite", mandar, False)
+
+# Un intento que fallo tambien cuenta: pudo haber mandado ya a una parte.
+mandar, motivo = decidir(JUE_1330, {hoy: [
+    inicio(datetime.datetime(2026, 9, 24, 12, 0, 5), "False"),
+    u"2026-09-24 12:00:09 [ERROR] System.Data.SqlClient.SqlException: timeout"]})
+comprobar("un intento que fallo NO se repite", mandar, False)
+comprobar("   y lo dice", "ya se intento" in motivo, True)
+
+# Una revision con -Listar no manda nada: no cuenta.
+mandar, _ = decidir(JUE_1330, {hoy: [inicio(datetime.datetime(2026, 9, 24, 12, 30), "True")]})
+comprobar("una revision con -Listar no cuenta como envio", mandar, True)
+
+# Un registro de antes de la marca 'Listar:' cuenta como intento: en la duda,
+# no se reenvia.
+mandar, _ = decidir(JUE_1330, {hoy: [inicio(datetime.datetime(2026, 9, 24, 12, 0, 5))]})
+comprobar("un registro sin la marca cuenta como intento", mandar, False)
+
+# Lo de la manana no cuenta para el aviso de las 12.
+mandar, _ = decidir(JUE_1330, {hoy: [inicio(datetime.datetime(2026, 9, 24, 9, 27), "False")]})
+comprobar("un envio de las 09:27 no cubre el de las 12", mandar, True)
+
+# --- cuando NO se recupera
+mandar, motivo = decidir(JUE_0900, {})
+comprobar("jueves 09:00 con el lunes perdido: no, hoy toca a las 12", mandar, False)
+comprobar("   y lo dice", "aun no es la hora" in motivo, True)
+mandar, motivo = decidir(SAB_1000, {})
+comprobar("sabado: no se manda el del jueves", mandar, False)
+comprobar("   y lo dice", "fin de semana" in motivo, True)
+comprobar("sin horario instalado no se hace nada",
+          con_registros({}, lambda: pa.decidir_recuperacion({}, JUE_1330))[0], False)
+
+# --- dia habil despues de uno perdido
+mandar, motivo = decidir(MAR_0900, {})
+comprobar("martes: recupera el del lunes", mandar, True)
+comprobar("   el del lunes", "2026-09-21 12:00" in motivo, True)
+# El siguiente inicio de sesion del martes tiene que ver la recuperacion, que
+# quedo en el registro del MARTES y no en el del lunes.
+mandar, _ = decidir(datetime.datetime(2026, 9, 22, 15, 0), {
+    "AvisoProblems_20260922.log": [inicio(datetime.datetime(2026, 9, 22, 9, 1), "False")]})
+comprobar("la recuperacion ya hecha se ve al otro dia: no se repite", mandar, False)
+
+# Viernes con el lunes Y el jueves perdidos: uno solo, el del jueves.
+mandar, motivo = decidir(VIE_0900, {})
+comprobar("viernes con dos perdidos: se manda", mandar, True)
+comprobar("   solo el mas reciente, el del jueves", "2026-09-24 12:00" in motivo, True)
+comprobar("   y no el del lunes", "2026-09-21" in motivo, False)
+
+# Un registro que no se puede leer: no se afirma nada, no se manda.
+_open = io.open
+
+
+def _abrir_falla(ruta, *a, **k):
+    if ruta.endswith(hoy):
+        raise IOError("bloqueado por OneDrive")
+    return _open(ruta, *a, **k)
+
+
+def _decidir_bloqueado():
+    io.open = _abrir_falla
+    try:
+        return pa.decidir_recuperacion(pa.leer_estado(), JUE_1330)
+    finally:
+        io.open = _open
+
+
+# Sin carpeta Logs\ -instalacion nueva, u OneDrive aun sin poner la carpeta
+# despues de un reciclado- no se sabe nada: no se manda.
+def _sin_carpeta():
+    import shutil
+    shutil.rmtree(os.path.join(pa.AQUI, "Logs"))
+    return pa.decidir_recuperacion(pa.leer_estado(), JUE_1330)
+
+
+mandar, motivo = con_registros({}, _sin_carpeta)
+comprobar("sin carpeta Logs no se manda", mandar, False)
+comprobar("   y lo dice", "no se pudo leer" in motivo, True)
+
+mandar, motivo = con_registros({hoy: [u"x"]}, _decidir_bloqueado)
+comprobar("registro ilegible: no se manda", mandar, False)
+comprobar("   y lo dice", "no se pudo leer" in motivo, True)
+
+# --- recuperar_ultimo_aviso lanza LA TAREA, una vez
+doble = Doble([(0, "CORRECTO")])
+lanzo = con_registros({}, lambda: pa.recuperar_ultimo_aviso(
+    informar=lambda *_: None, correr_orden=doble, ahora=JUE_1330))
+comprobar("si toca, se lanza", lanzo, True)
+comprobar("   con schtasks /Run sobre la tarea",
+          doble.ordenes, [["schtasks", "/Run", "/TN", "AvisoProblemsVencidos"]])
+
+doble = Doble()
+lanzo = con_registros({hoy: [inicio(datetime.datetime(2026, 9, 24, 12, 0, 5), "False")]},
+                      lambda: pa.recuperar_ultimo_aviso(
+                          informar=lambda *_: None, correr_orden=doble, ahora=JUE_1330))
+comprobar("si no toca, no se ejecuta NADA", doble.ordenes, [])
+
+avisos = []
+lanzo = con_registros({}, lambda: pa.recuperar_ultimo_aviso(
+    informar=avisos.append, correr_orden=Doble([(1, "ERROR: acceso denegado")]),
+    ahora=JUE_1330))
+comprobar("si /Run falla, se dice", lanzo, False)
+comprobar("   con lo que contesto Windows", any("acceso denegado" in a for a in avisos), True)
+
+# --- al_iniciar de punta a punta
+entorno = {k: os.environ.get(k) for k in ("APPDATA", "LOCALAPPDATA")}
+perfil = tempfile.mkdtemp()
+os.environ["APPDATA"] = os.path.join(perfil, "Roaming")
+os.environ["LOCALAPPDATA"] = os.path.join(perfil, "Local")
+os.makedirs(pa.carpeta_de_inicio())
+try:
+    def iniciar(respuestas, ahora, archivos):
+        doble = Doble(respuestas)
+        avisos = []
+
+        def prueba():
+            io.open(os.path.join(pa.AQUI, pa.GUION), "w").close()
+            pa.al_iniciar(informar=avisos.append, correr_orden=doble, ahora=ahora)
+        con_registros(archivos, prueba)
+        return doble, "\n".join(avisos)
+
+    corridas = lambda d: [o for o in d.ordenes if o[:2] == ["schtasks", "/Run"]]
+
+    # La tarea faltaba (1), se crea (0), ya existe (0), se lanza (0).
+    doble, texto = iniciar([(1, ""), (0, ""), (0, ""), (0, "")], JUE_1330, {})
+    comprobar("reciclada y entrando tarde: se repone Y se manda una vez",
+              len(corridas(doble)), 1)
+    comprobar("   y queda en el registro de arranque", "no salio; se manda" in texto, True)
+
+    # Entrando tarde con la tarea puesta: nada. Windows tiene su mecanismo.
+    doble, texto = iniciar([(0, "")], JUE_1330, {})
+    comprobar("con la tarea puesta no se recupera nada", len(corridas(doble)), 0)
+    comprobar("   ni se pregunta nada mas", len(doble.ordenes), 1)
+
+    # Entrando temprano: se repone, y la de las 12 la manda la tarea.
+    doble, texto = iniciar([(1, ""), (0, ""), (0, "")], JUE_0900, {})
+    comprobar("reciclada y entrando temprano: no se manda nada extra",
+              len(corridas(doble)), 0)
+
+    # Segundo reciclado el mismo dia, despues de la recuperacion: no se repite.
+    doble, texto = iniciar([(1, ""), (0, ""), (0, "")], datetime.datetime(2026, 9, 24, 16, 0),
+                           {hoy: [inicio(datetime.datetime(2026, 9, 24, 13, 30, 40), "False")]})
+    comprobar("otro reciclado despues de recuperar: no se manda otra vez",
+              len(corridas(doble)), 0)
+finally:
+    for k, v in entorno.items():
+        if v is None:
+            os.environ.pop(k, None)
+        else:
+            os.environ[k] = v
+
 # ============================================ el .cmd de Inicio y el puente
 print("el arranque")
 guion = pa.guion_de_arranque(r"C:\Users\x\AppData\Local\AvisoProblems\al_iniciar.py")
