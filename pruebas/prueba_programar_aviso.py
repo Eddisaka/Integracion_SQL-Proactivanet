@@ -26,6 +26,7 @@ USO
     python3 pruebas/prueba_programar_aviso.py
 """
 
+import datetime
 import io
 import os
 import sys
@@ -87,7 +88,8 @@ print("xml_de_la_tarea")
 xml = pa.xml_de_la_tarea(12, ["Monday", "Thursday"],
                          r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
                          '-NoProfile -File "C:\\ruta con espacios\\x.ps1"',
-                         r"C:\ruta con espacios", desde="2026-09-23")
+                         r"C:\ruta con espacios", desde="2026-09-23",
+                         desfase="-06:00")
 raiz = ET.fromstring(xml)
 comprobar("es XML valido", raiz.tag, ESPACIO + "Task")
 
@@ -100,8 +102,43 @@ comprobar("orden dentro de ScheduleByWeek", hijos(semana),
           ["DaysOfWeek", "WeeksInterval"])
 comprobar("los dos dias", hijos(semana.find(ESPACIO + "DaysOfWeek")),
           ["Monday", "Thursday"])
-comprobar("la hora", disparador.find(ESPACIO + "StartBoundary").text,
-          "2026-09-23T12:00:00")
+# CON SU DESFASE. El 2026-09-24 una tarea escrita '12:00' sin zona quedo a las
+# 06:00: Windows la leyo en la zona del equipo -UTC en la VDI- y no en la de
+# la sesion. Con el desfase escrito no hay nada que interpretar.
+comprobar("la hora lleva su desfase", disparador.find(ESPACIO + "StartBoundary").text,
+          "2026-09-23T12:00:00-06:00")
+
+print("desfase_local")
+
+
+class _Zona(datetime.tzinfo):
+    def __init__(self, minutos):
+        self.minutos = minutos
+
+    def utcoffset(self, _):
+        return datetime.timedelta(minutes=self.minutos)
+
+    def dst(self, _):
+        return datetime.timedelta(0)
+
+    def tzname(self, _):
+        return "prueba"
+
+
+comprobar("Mexico", pa.desfase_local(datetime.datetime(2026, 9, 24, 9, 15,
+                                                         tzinfo=_Zona(-360))), "-06:00")
+comprobar("UTC", pa.desfase_local(datetime.datetime(2026, 9, 24, 9, 15,
+                                                      tzinfo=_Zona(0))), "+00:00")
+comprobar("media hora de desfase", pa.desfase_local(datetime.datetime(
+    2026, 9, 24, 9, 15, tzinfo=_Zona(330))), "+05:30")
+comprobar("y negativa con minutos", pa.desfase_local(datetime.datetime(
+    2026, 9, 24, 9, 15, tzinfo=_Zona(-210))), "-03:30")
+# Sin desfase explicito, el XML usa el de la sesion: nunca sale sin zona.
+sin_decir = ET.fromstring(pa.xml_de_la_tarea(
+    12, ["Monday"], "C:\\p.exe", "-a", "C:\\x", desde="2026-09-24"))
+inicio = sin_decir.find(".//" + ESPACIO + "StartBoundary").text
+comprobar("por omision tambien lleva desfase",
+          inicio[:19] == "2026-09-24T12:00:00" and inicio[19:20] in ("+", "-"), True)
 
 ajustes = raiz.find(ESPACIO + "Settings")
 orden = hijos(ajustes)
@@ -185,6 +222,133 @@ codigo = pa.estado(informar=avisos.append, correr_orden=doble)
 comprobar("sin tarea, estado sale con 1", codigo, 1)
 comprobar("y lo dice con todas sus letras",
           any("NO ESTA PROGRAMADA" in a for a in avisos), True)
+
+# ------------------------------ estado: corrio o no corrio, no solo "existe"
+# La primera vez que hizo falta -jueves 2026-09-24, la VDI se reciclo de noche
+# y la tarea se repuso a las 09:15- la pregunta era si el correo de las 12:00
+# habia salido, y 'estado' solo sabia decir "programada".
+print("estado: la ultima ejecucion")
+
+
+def info_windows(ultima, resultado, proxima="2026-09-28 12:00:00", perdidas=0):
+    """La linea que devuelve CONSULTA_INFO en PowerShell."""
+    return (0, "INFO|%s|%s|%s|%s\r\n" % (ultima, resultado, proxima, perdidas))
+
+
+JUEVES_1230 = datetime.datetime(2026, 9, 24, 12, 30)
+JUEVES_0930 = datetime.datetime(2026, 9, 24, 9, 30)
+VIERNES = datetime.datetime(2026, 9, 25, 12, 30)
+
+carpeta = tempfile.mkdtemp()
+original = pa.AQUI
+try:
+    pa.AQUI = carpeta
+    pa.guardar_estado({"hora": 12, "dias": ["Monday", "Thursday"]})
+
+    def correr_estado(respuesta_info, ahora):
+        doble = Doble([(0, ""), respuesta_info])
+        avisos = []
+        codigo = pa.estado(informar=avisos.append, correr_orden=doble, ahora=ahora)
+        return codigo, "\n".join(avisos), doble
+
+    codigo, texto, doble = correr_estado(
+        info_windows("2026-09-24 12:00:04", 0), JUEVES_1230)
+    comprobar("si corrio hoy a las 12, lo dice", "Hoy SI corrio, a las 12:00" in texto, True)
+    comprobar("y como termino", "termino bien" in texto, True)
+    comprobar("y cuando vuelve", "Proxima: 2026-09-28 12:00" in texto, True)
+    comprobar("estado sigue saliendo con 0", codigo, 0)
+    # Se le pregunta a PowerShell y no a schtasks: las etiquetas de schtasks
+    # vienen traducidas al idioma de cada VDI.
+    comprobar("la segunda orden es Get-ScheduledTaskInfo",
+              "Get-ScheduledTaskInfo" in " ".join(doble.ordenes[1]), True)
+    comprobar("por su nombre",
+              "AvisoProblemsVencidos" in " ".join(doble.ordenes[1]), True)
+
+    # EL CASO QUE IMPORTA: tocaba y no salio.
+    codigo, texto, _ = correr_estado(
+        info_windows("2026-09-21 12:00:02", 0), JUEVES_1230)
+    comprobar("si tocaba hoy y la ultima es del lunes: HOY NO CORRIO",
+              "HOY NO CORRIO" in texto, True)
+    comprobar("   diciendo cual fue la ultima", "2026-09-21 12:00" in texto, True)
+
+    # Recien repuesta por el re-armado, sin haber corrido nunca: Windows
+    # devuelve 30/11/1999 y el codigo 0x41303.
+    codigo, texto, _ = correr_estado(
+        info_windows("1999-11-30 00:00:00", 267011), JUEVES_1230)
+    comprobar("la fecha de 1999 se lee como 'nunca'", "Ultima ejecucion: nunca" in texto, True)
+    comprobar("el 0x41303 se traduce", "todavia no ha corrido" in texto, True)
+    comprobar("y si hoy tocaba, lo marca", "HOY NO CORRIO" in texto, True)
+
+    codigo, texto, _ = correr_estado(info_windows("2026-09-24 12:00:04", 4), JUEVES_1230)
+    comprobar("el codigo 4 del envio dice que fallo un correo",
+              "al menos un correo FALLO" in texto, True)
+    codigo, texto, _ = correr_estado(info_windows("2026-09-24 12:00:04", 5), JUEVES_1230)
+    comprobar("el codigo 5 manda al registro", "detalle esta en su registro" in texto, True)
+    codigo, texto, _ = correr_estado(info_windows("2026-09-24 12:00:04", 77), JUEVES_1230)
+    comprobar("un codigo desconocido se ensena tal cual", "codigo 77" in texto, True)
+
+    codigo, texto, _ = correr_estado(info_windows("2026-09-21 12:00:02", 0), JUEVES_0930)
+    comprobar("antes de las 12 no acusa a nadie", "todavia no es hora" in texto, True)
+    codigo, texto, _ = correr_estado(info_windows("2026-09-24 12:00:04", 0), VIERNES)
+    comprobar("un viernes no toca", "Hoy no toca" in texto, True)
+
+    codigo, texto, _ = correr_estado(info_windows("2026-09-21 12:00:02", 0, perdidas=1),
+                                     JUEVES_1230)
+    comprobar("las ejecuciones perdidas se cuentan", "perdidas segun Windows: 1" in texto, True)
+
+    # LA SALIDA DEL 2026-09-24, tal cual: nunca corrio, proxima el lunes a las
+    # 06:00, instalada para las 12. 'estado' tiene que gritarlo.
+    codigo, texto, _ = correr_estado(
+        info_windows("1999-11-29 18:00:00", 267011, proxima="2026-09-28 06:00:00"),
+        JUEVES_1230)
+    comprobar("proxima a las 06:00 instalada a las 12: se avisa",
+              "Windows la tiene para las 06:00 y se instalo para las 12:00" in texto, True)
+    comprobar("   explicando la zona horaria", "zona horaria" in texto, True)
+    comprobar("   y diciendo que hacer", "programar_instalar.cmd" in texto, True)
+    comprobar("   y ademas: hoy no corrio", "HOY NO CORRIO" in texto, True)
+    comprobar("   con la fecha rara de 1999 leida como nunca",
+              "Ultima ejecucion: nunca" in texto, True)
+    codigo, texto, _ = correr_estado(info_windows("2026-09-24 12:00:04", 0), JUEVES_1230)
+    comprobar("a la hora correcta no se avisa nada", "OJO" in texto, False)
+
+    # Si PowerShell no contesta, se dice; no se inventa un 'todo bien'.
+    codigo, texto, _ = correr_estado((1, "Get-ScheduledTaskInfo : no existe"), JUEVES_1230)
+    comprobar("si Windows no contesta, se dice", "no se pudo preguntar a Windows" in texto, True)
+    comprobar("   y no emite veredicto", "SI corrio" in texto or "NO CORRIO" in texto, False)
+    codigo, texto, _ = correr_estado((0, "basura sin la marca\r\n"), JUEVES_1230)
+    comprobar("una salida sin la linea INFO| tampoco se interpreta",
+              "no se pudo preguntar a Windows" in texto, True)
+
+    # El registro del propio envio: Logs\AvisoProblems_*.log, el mas reciente.
+    os.makedirs(os.path.join(carpeta, "Logs"))
+    for nombre, lineas in (
+            ("AvisoProblems_20260923.log",
+             [u"2026-09-23 11:28:40 [OK] Fin. 18 enviado(s), 0 fallido(s)."]),
+            ("AvisoProblems_20260924.log",
+             [u"2026-09-24 12:00:05 [INFO] Arranca.",
+              u"2026-09-24 12:01:10 [OK] Fin. 17 enviado(s), 1 fallido(s).",
+              u""])):
+        # Con BOM, como lo deja Add-Content -Encoding UTF8 de PowerShell 5.1.
+        with io.open(os.path.join(carpeta, "Logs", nombre), "w",
+                     encoding="utf-8-sig") as f:
+            f.write(u"\r\n".join(lineas))
+    codigo, texto, _ = correr_estado(info_windows("2026-09-24 12:00:04", 4), JUEVES_1230)
+    comprobar("ensena el registro de hoy, no el de ayer",
+              "AvisoProblems_20260924.log" in texto, True)
+    comprobar("   con su ultima linea con texto",
+              "Fin. 17 enviado(s), 1 fallido(s)." in texto, True)
+    comprobar("   sin el BOM pegado", u"﻿" in texto, False)
+
+    # Sin tarea no se pregunta nada mas a Windows, pero el registro si se
+    # ensena: dice si el ultimo correo salio antes de que la tarea desapareciera.
+    doble = Doble([(1, "ERROR: no existe")])
+    avisos = []
+    pa.estado(informar=avisos.append, correr_orden=doble, ahora=JUEVES_1230)
+    comprobar("sin tarea, solo se hace la consulta de existencia", len(doble.ordenes), 1)
+    comprobar("   pero el registro del envio si sale",
+              any("AvisoProblems_20260924.log" in a for a in avisos), True)
+finally:
+    pa.AQUI = original
 
 # ============================================ el .cmd de Inicio y el puente
 print("el arranque")
