@@ -181,7 +181,40 @@ def leer_hora(texto):
 
 
 # ------------------------------------------------------------------- XML --
-def xml_de_la_tarea(hora, dias, interprete, argumentos, carpeta, desde=None):
+def desfase_local(ahora=None):
+    """El desfase de la hora de ESTA sesion respecto a UTC: '-06:00'.
+
+    Existe por el jueves 2026-09-24. La tarea se escribio para las 12:00 sin
+    zona, y Windows la programo para las 06:00. Lo mas probable es que el
+    equipo este en UTC y solo la sesion en hora de Mexico: es comun en
+    escritorios virtuales, que redirigen la zona del usuario pero dejan el
+    sistema en UTC. El Programador de tareas es un servicio del sistema, asi
+    que lee '12:00' en SU reloj y dispara seis horas antes.
+
+    Con el desfase escrito no tiene que adivinar nada. Se toma de la sesion
+    porque es la hora que ve quien instala -la de la barra de tareas- y la
+    que espera que llegue el correo.
+    """
+    ahora = ahora or datetime.datetime.now()
+    try:
+        # Una fecha sin zona se ancla a la de la sesion. Una que ya trae zona
+        # se respeta: astimezone() sin argumento la convertiria a la del
+        # equipo, que es justo el error que esta funcion existe para evitar.
+        if ahora.tzinfo is None or ahora.utcoffset() is None:
+            ahora = ahora.astimezone()
+        desfase = ahora.utcoffset()
+    except (ValueError, OSError, OverflowError):
+        return ""
+    if desfase is None:
+        return ""
+    minutos = int(desfase.total_seconds() // 60)
+    signo = "-" if minutos < 0 else "+"
+    minutos = abs(minutos)
+    return "%s%02d:%02d" % (signo, minutos // 60, minutos % 60)
+
+
+def xml_de_la_tarea(hora, dias, interprete, argumentos, carpeta, desde=None,
+                    desfase=None):
     """La definicion de la tarea.
 
     Se usa XML y no las banderas sueltas de schtasks por UN ajuste que no se
@@ -205,8 +238,17 @@ def xml_de_la_tarea(hora, dias, interprete, argumentos, carpeta, desde=None):
       StartBoundary va ANTES de Enabled, y Enabled antes de ScheduleByWeek.
       Dentro de ScheduleByWeek, DaysOfWeek va ANTES de WeeksInterval.
       Dentro de Settings, Enabled va ANTES de ExecutionTimeLimit.
+
+    LA HORA LLEVA SU DESFASE ('2026-09-24T12:00:00-06:00'). Sin el, Windows la
+    interpreta en la zona del EQUIPO, que en una VDI puede no ser la de quien
+    instala: el 2026-09-24 una tarea escrita para las 12:00 quedo a las 06:00.
+    Ver desfase_local(). Es lo mismo que marca la casilla "Sincronizar entre
+    zonas horarias" del Programador de tareas. Mexico no cambia de horario en
+    verano desde 2022, asi que un desfase fijo no se mueve a lo largo del ano.
     """
     desde = desde or datetime.date.today().isoformat()
+    if desfase is None:
+        desfase = desfase_local()
     marcas = "".join("        <%s />\n" % dia for dia in dias)
     return (
         '<?xml version="1.0" encoding="UTF-16"?>\n'
@@ -217,7 +259,7 @@ def xml_de_la_tarea(hora, dias, interprete, argumentos, carpeta, desde=None):
         '  </RegistrationInfo>\n'
         '  <Triggers>\n'
         '    <CalendarTrigger>\n'
-        '      <StartBoundary>%sT%02d:00:00</StartBoundary>\n'
+        '      <StartBoundary>%sT%02d:00:00%s</StartBoundary>\n'
         '      <Enabled>true</Enabled>\n'
         '      <ScheduleByWeek>\n'
         '        <DaysOfWeek>\n'
@@ -259,7 +301,7 @@ def xml_de_la_tarea(hora, dias, interprete, argumentos, carpeta, desde=None):
         '      <WorkingDirectory>%s</WorkingDirectory>\n'
         '    </Exec>\n'
         '  </Actions>\n'
-        '</Task>\n' % (desde, hora, marcas, _escapar(interprete),
+        '</Task>\n' % (desde, hora, desfase, marcas, _escapar(interprete),
                        _escapar(argumentos), _escapar(carpeta)))
 
 
@@ -349,6 +391,9 @@ def crear_tarea(hora, dias, informar=print, correr_orden=None):
     informar("     omitido'. Si el equipo esta apagado a las %02d:00, ese dia" % hora)
     informar("     NO sale correo. Activalo a mano en el Programador de tareas,")
     informar("     pestana Condiciones.")
+    informar("OJO: y la hora queda en la zona horaria del EQUIPO, que en una VDI")
+    informar("     puede no ser la de la sesion. Corra 'estado': si la proxima")
+    informar("     ejecucion no cae a las %02d:00, lo dira." % hora)
     return True
 
 
@@ -567,6 +612,28 @@ def texto_del_resultado(codigo):
     return RESULTADOS.get(codigo, "termino con el codigo %d" % codigo)
 
 
+def aviso_de_hora(memoria, proxima):
+    """Lineas de aviso si Windows la tiene a otra hora que la instalada.
+
+    El 2026-09-24 la tarea se instalo para las 12:00 y Windows la tenia para
+    las 06:00. 'estado' decia "programada" y nadie lo vio hasta que el correo
+    del jueves no salio. Esta es la comprobacion que lo habria visto el
+    primer dia.
+    """
+    hora = memoria.get("hora")
+    if hora is None or proxima is None:
+        return None
+    if proxima.hour == hora and proxima.minute == 0:
+        return None
+    return [
+        "OJO: Windows la tiene para las %s y se instalo para las %02d:00."
+        % (proxima.strftime("%H:%M"), hora),
+        "     Lo mas probable es que el equipo este en otra zona horaria que",
+        "     la sesion (UTC, en muchas VDI). Reinstale con",
+        "     programar_instalar.cmd: la hora se escribe ahora con su desfase.",
+    ]
+
+
 def veredicto_de_hoy(memoria, ultima, ahora):
     """La pregunta que de verdad se hace: corrio hoy, si hoy tocaba?"""
     dias = memoria.get("dias") or []
@@ -646,6 +713,10 @@ def estado(informar=print, correr_orden=None, ahora=None):
             informar("Resultado: %s" % texto_del_resultado(info["resultado"]))
             if info["proxima"]:
                 informar("Proxima: %s" % info["proxima"].strftime("%Y-%m-%d %H:%M"))
+                aviso = aviso_de_hora(memoria, info["proxima"])
+                if aviso:
+                    for linea in aviso:
+                        informar(linea)
             if info["perdidas"]:
                 informar("Ejecuciones perdidas segun Windows: %d" % info["perdidas"])
             veredicto = veredicto_de_hoy(memoria, ultima, ahora)

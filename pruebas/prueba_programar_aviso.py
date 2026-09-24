@@ -88,7 +88,8 @@ print("xml_de_la_tarea")
 xml = pa.xml_de_la_tarea(12, ["Monday", "Thursday"],
                          r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
                          '-NoProfile -File "C:\\ruta con espacios\\x.ps1"',
-                         r"C:\ruta con espacios", desde="2026-09-23")
+                         r"C:\ruta con espacios", desde="2026-09-23",
+                         desfase="-06:00")
 raiz = ET.fromstring(xml)
 comprobar("es XML valido", raiz.tag, ESPACIO + "Task")
 
@@ -101,8 +102,43 @@ comprobar("orden dentro de ScheduleByWeek", hijos(semana),
           ["DaysOfWeek", "WeeksInterval"])
 comprobar("los dos dias", hijos(semana.find(ESPACIO + "DaysOfWeek")),
           ["Monday", "Thursday"])
-comprobar("la hora", disparador.find(ESPACIO + "StartBoundary").text,
-          "2026-09-23T12:00:00")
+# CON SU DESFASE. El 2026-09-24 una tarea escrita '12:00' sin zona quedo a las
+# 06:00: Windows la leyo en la zona del equipo -UTC en la VDI- y no en la de
+# la sesion. Con el desfase escrito no hay nada que interpretar.
+comprobar("la hora lleva su desfase", disparador.find(ESPACIO + "StartBoundary").text,
+          "2026-09-23T12:00:00-06:00")
+
+print("desfase_local")
+
+
+class _Zona(datetime.tzinfo):
+    def __init__(self, minutos):
+        self.minutos = minutos
+
+    def utcoffset(self, _):
+        return datetime.timedelta(minutes=self.minutos)
+
+    def dst(self, _):
+        return datetime.timedelta(0)
+
+    def tzname(self, _):
+        return "prueba"
+
+
+comprobar("Mexico", pa.desfase_local(datetime.datetime(2026, 9, 24, 9, 15,
+                                                         tzinfo=_Zona(-360))), "-06:00")
+comprobar("UTC", pa.desfase_local(datetime.datetime(2026, 9, 24, 9, 15,
+                                                      tzinfo=_Zona(0))), "+00:00")
+comprobar("media hora de desfase", pa.desfase_local(datetime.datetime(
+    2026, 9, 24, 9, 15, tzinfo=_Zona(330))), "+05:30")
+comprobar("y negativa con minutos", pa.desfase_local(datetime.datetime(
+    2026, 9, 24, 9, 15, tzinfo=_Zona(-210))), "-03:30")
+# Sin desfase explicito, el XML usa el de la sesion: nunca sale sin zona.
+sin_decir = ET.fromstring(pa.xml_de_la_tarea(
+    12, ["Monday"], "C:\\p.exe", "-a", "C:\\x", desde="2026-09-24"))
+inicio = sin_decir.find(".//" + ESPACIO + "StartBoundary").text
+comprobar("por omision tambien lleva desfase",
+          inicio[:19] == "2026-09-24T12:00:00" and inicio[19:20] in ("+", "-"), True)
 
 ajustes = raiz.find(ESPACIO + "Settings")
 orden = hijos(ajustes)
@@ -259,6 +295,21 @@ try:
     codigo, texto, _ = correr_estado(info_windows("2026-09-21 12:00:02", 0, perdidas=1),
                                      JUEVES_1230)
     comprobar("las ejecuciones perdidas se cuentan", "perdidas segun Windows: 1" in texto, True)
+
+    # LA SALIDA DEL 2026-09-24, tal cual: nunca corrio, proxima el lunes a las
+    # 06:00, instalada para las 12. 'estado' tiene que gritarlo.
+    codigo, texto, _ = correr_estado(
+        info_windows("1999-11-29 18:00:00", 267011, proxima="2026-09-28 06:00:00"),
+        JUEVES_1230)
+    comprobar("proxima a las 06:00 instalada a las 12: se avisa",
+              "Windows la tiene para las 06:00 y se instalo para las 12:00" in texto, True)
+    comprobar("   explicando la zona horaria", "zona horaria" in texto, True)
+    comprobar("   y diciendo que hacer", "programar_instalar.cmd" in texto, True)
+    comprobar("   y ademas: hoy no corrio", "HOY NO CORRIO" in texto, True)
+    comprobar("   con la fecha rara de 1999 leida como nunca",
+              "Ultima ejecucion: nunca" in texto, True)
+    codigo, texto, _ = correr_estado(info_windows("2026-09-24 12:00:04", 0), JUEVES_1230)
+    comprobar("a la hora correcta no se avisa nada", "OJO" in texto, False)
 
     # Si PowerShell no contesta, se dice; no se inventa un 'todo bien'.
     codigo, texto, _ = correr_estado((1, "Get-ScheduledTaskInfo : no existe"), JUEVES_1230)

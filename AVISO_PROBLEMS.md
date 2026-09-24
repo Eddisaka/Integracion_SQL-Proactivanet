@@ -381,6 +381,33 @@ Hay **dos registros** y dicen cosas distintas:
 El primero prueba que la tarea **estaba** a la hora; solo el segundo prueba que
 **corrio**.
 
+#### La zona horaria del escritorio virtual
+
+El jueves 2026-09-24 la tarea estaba instalada "para las 12:00" y Windows la
+tenia para las **06:00**. Ese dia la VDI se reciclo, el re-armado la repuso a
+las 09:15, las 06:00 ya habian pasado, y el correo no salio.
+
+Lo mas probable: **el equipo esta en UTC y solo la sesion en hora de Mexico**,
+algo comun en escritorios virtuales, que redirigen la zona del usuario pero
+dejan el sistema en UTC. El Programador de tareas es un servicio del sistema y
+lee una hora sin zona en *su* reloj: 12:00 UTC son las 06:00 en Mexico.
+
+Desde entonces la hora se escribe con su desfase (`2026-09-24T12:00:00-06:00`),
+tomado de la sesion de quien instala, y `estado` avisa si la proxima ejecucion
+no cae a la hora instalada. **Una instalacion anterior a ese cambio hay que
+repetirla** con `programar_instalar.cmd`; el re-armado solo reinstala cuando la
+tarea falta, asi que no la corrige solo.
+
+Para ver las dos zonas:
+
+```text
+Get-TimeZone
+reg query "HKLM\SYSTEM\CurrentControlSet\Control\TimeZoneInformation" /v TimeZoneKeyName
+```
+
+La primera es la de la sesion; la segunda, la del equipo. Si no coinciden, cualquier
+tarea de esa VDI programada a una hora fija sin desfase dispara corrida.
+
 #### Por que no basta un `schtasks` a secas
 
 Las tareas programadas viven en `C:\Windows\System32\Tasks`, que es **del
