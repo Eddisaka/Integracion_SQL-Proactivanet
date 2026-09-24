@@ -104,7 +104,7 @@ def ruta_del_guion():
 
 
 def carpeta_logs_del_envio():
-    """Donde deja su registro Enviar_AvisoProblems.ps1: Logs\ junto al guion.
+    r"""Donde deja su registro Enviar_AvisoProblems.ps1: Logs\ junto al guion.
 
     No confundir con registros\, que es donde queda el rastro del RE-ARMADO.
     Son dos preguntas distintas: registros\arranque_*.log dice si la tarea
