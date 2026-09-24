@@ -103,6 +103,22 @@ def ruta_del_guion():
     return os.path.join(AQUI, GUION)
 
 
+def carpeta_logs_del_envio():
+    """Donde deja su registro Enviar_AvisoProblems.ps1: Logs\ junto al guion.
+
+    No confundir con registros\, que es donde queda el rastro del RE-ARMADO.
+    Son dos preguntas distintas: registros\arranque_*.log dice si la tarea
+    se repuso al iniciar sesion; Logs\AvisoProblems_*.log dice si el correo
+    salio.
+    """
+    return os.path.join(AQUI, "Logs")
+
+
+def ruta_de_powershell():
+    return os.path.join(os.environ.get("SystemRoot", "C:\\Windows"),
+                        "System32", "WindowsPowerShell", "v1.0", "powershell.exe")
+
+
 # ----------------------------------------------------------------- estado --
 def leer_estado():
     """Lo que se guardo al instalar. Sirve para que el re-armado reponga la
@@ -289,9 +305,7 @@ def crear_tarea(hora, dias, informar=print, correr_orden=None):
         informar("No se encontro %s junto a este archivo." % GUION)
         return False
 
-    powershell = os.path.join(os.environ.get("SystemRoot", "C:\\Windows"),
-                              "System32", "WindowsPowerShell", "v1.0",
-                              "powershell.exe")
+    powershell = ruta_de_powershell()
     xml = xml_de_la_tarea(hora, dias, powershell,
                           argumentos_de_powershell(ps1), AQUI)
 
@@ -480,14 +494,134 @@ def instalar(hora=None, dias=None, informar=print, correr_orden=None):
     return 0
 
 
-def estado(informar=print, correr_orden=None):
+# Lo que Windows sabe de la ultima ejecucion. Se pregunta con
+# Get-ScheduledTaskInfo y NO con 'schtasks /query /v': schtasks traduce sus
+# etiquetas al idioma del equipo ("Hora de la ultima ejecucion", "Ultimo
+# resultado") y leerlas seria adivinar en que idioma esta cada VDI. Las
+# propiedades de PowerShell se llaman igual en todos. Las fechas salen ya como
+# texto porque ConvertTo-Json de PowerShell 5.1 las escribe como /Date(...)/.
+# La linea empieza con INFO| para no confundirla con cualquier otra salida.
+CONSULTA_INFO = (
+    "$i = Get-ScheduledTaskInfo -TaskName '%s' -ErrorAction Stop; "
+    "$u = ''; if ($i.LastRunTime) { $u = $i.LastRunTime.ToString('yyyy-MM-dd HH:mm:ss') }; "
+    "$p = ''; if ($i.NextRunTime) { $p = $i.NextRunTime.ToString('yyyy-MM-dd HH:mm:ss') }; "
+    "'INFO|{0}|{1}|{2}|{3}' -f $u, $i.LastTaskResult, $p, $i.NumberOfMissedRuns"
+    % NOMBRE_TAREA)
+
+# Lo que significa LastTaskResult. Los primeros son los codigos de salida de
+# Enviar_AvisoProblems.ps1; los hexadecimales, los del Programador de tareas.
+RESULTADOS = {
+    0: "termino bien",
+    4: "termino, pero al menos un correo FALLO (codigo 4 del envio)",
+    5: "FALLO con un error (codigo 5 del envio); el detalle esta en su registro",
+    0x41301: "se esta ejecutando en este momento",
+    0x41303: "todavia no ha corrido ni una vez",
+    0x41306: "la detuvo alguien a mano",
+    0x8004131F: "no arranco: ya habia otra ejecucion en curso",
+    0x80070002: "no arranco: Windows no encontro el archivo a ejecutar",
+}
+
+DIAS_EN_ORDEN = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday",
+                 "Saturday", "Sunday"]
+
+
+def _fecha(texto):
+    """'2026-09-24 12:00:03' -> datetime. Vacio -> None.
+
+    Windows pone 30/11/1999 como ultima ejecucion de una tarea que nunca ha
+    corrido; eso tambien es None, no una fecha de hace 27 anos.
+    """
+    try:
+        valor = datetime.datetime.strptime(texto.strip(), "%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        return None
+    return None if valor.year < 2000 else valor
+
+
+def info_de_la_tarea(correr_orden=None):
+    """{ultima, resultado, proxima, perdidas} segun Windows, o None si no se pudo."""
+    correr_orden = correr_orden or _correr_orden
+    codigo, salida = correr_orden([ruta_de_powershell(), "-NoProfile",
+                                   "-NonInteractive", "-Command", CONSULTA_INFO])
+    if codigo != 0:
+        return None
+    for linea in (salida or "").splitlines():
+        partes = linea.strip().split("|")
+        if len(partes) == 5 and partes[0] == "INFO":
+            try:
+                resultado = int(partes[2])
+            except ValueError:
+                resultado = None
+            try:
+                perdidas = int(partes[4])
+            except ValueError:
+                perdidas = None
+            return {"ultima": _fecha(partes[1]), "resultado": resultado,
+                    "proxima": _fecha(partes[3]), "perdidas": perdidas}
+    return None
+
+
+def texto_del_resultado(codigo):
+    if codigo is None:
+        return "desconocido"
+    return RESULTADOS.get(codigo, "termino con el codigo %d" % codigo)
+
+
+def veredicto_de_hoy(memoria, ultima, ahora):
+    """La pregunta que de verdad se hace: corrio hoy, si hoy tocaba?"""
+    dias = memoria.get("dias") or []
+    hora = memoria.get("hora")
+    if hora is None or not dias:
+        return None
+    if DIAS_EN_ORDEN[ahora.weekday()] not in dias:
+        return "Hoy no toca."
+    programada = ahora.replace(hour=hora, minute=0, second=0, microsecond=0)
+    if ahora < programada:
+        return "Hoy toca a las %02d:00; todavia no es hora." % hora
+    if ultima is not None and ultima >= programada:
+        return "Hoy SI corrio, a las %s." % ultima.strftime("%H:%M")
+    return ("HOY NO CORRIO: tocaba a las %02d:00 y la ultima ejecucion es %s."
+            % (hora, ultima.strftime("%Y-%m-%d %H:%M") if ultima else "nunca"))
+
+
+def ultimo_registro_del_envio():
+    """(ruta, ultima linea) del Logs\\AvisoProblems_*.log mas reciente, o None."""
+    carpeta = carpeta_logs_del_envio()
+    try:
+        nombres = [n for n in os.listdir(carpeta)
+                   if n.startswith("AvisoProblems_") and n.endswith(".log")]
+    except OSError:
+        return None
+    if not nombres:
+        return None
+    # El nombre lleva la fecha como yyyyMMdd, asi que el orden alfabetico es
+    # el cronologico y no hace falta fiarse de la fecha de modificacion.
+    ruta = os.path.join(carpeta, sorted(nombres)[-1])
+    try:
+        # utf-8-sig: Add-Content -Encoding UTF8 de PowerShell 5.1 pone BOM.
+        with io.open(ruta, encoding="utf-8-sig", errors="replace") as archivo:
+            lineas = [l.rstrip() for l in archivo if l.strip()]
+    except (OSError, IOError):
+        return ruta, "(no se pudo leer)"
+    return ruta, (lineas[-1] if lineas else "(vacio)")
+
+
+def estado(informar=print, correr_orden=None, ahora=None):
     """Le pregunta a WINDOWS, no al estado_aviso.json.
 
     La diferencia importa: ese archivo lo escribio 'instalar' y sobrevive a
     que la tarea desaparezca, asi que fiarse de el diria que todo esta en
     orden justo despues de un reciclado, que es cuando mas importa saber que
     no lo esta.
+
+    Y no basta con saber que la tarea EXISTE. La primera vez que hizo falta
+    -jueves 2026-09-24: la VDI se reciclo de noche y la tarea se repuso a las
+    09:15- la pregunta era si a las 12:00 habia salido el correo, y esto solo
+    sabia decir "programada". Ahora dice cuando corrio por ultima vez, como
+    termino, si hoy tocaba y si salio, y la ultima linea del registro del
+    propio envio.
     """
+    ahora = ahora or datetime.datetime.now()
     memoria = leer_estado()
     hay = tarea_existe(correr_orden=correr_orden)
     informar("Tarea '%s': %s" % (NOMBRE_TAREA,
@@ -499,6 +633,32 @@ def estado(informar=print, correr_orden=None):
     informar("Re-armado en Inicio: %s"
              % ("si" if os.path.isfile(inicio) else "NO"))
     informar("Guion: %s" % ruta_del_guion())
+
+    if hay:
+        info = info_de_la_tarea(correr_orden=correr_orden)
+        if info is None:
+            informar("Ultima ejecucion: no se pudo preguntar a Windows "
+                     "(Get-ScheduledTaskInfo no respondio).")
+        else:
+            ultima = info["ultima"]
+            informar("Ultima ejecucion: %s"
+                     % (ultima.strftime("%Y-%m-%d %H:%M:%S") if ultima else "nunca"))
+            informar("Resultado: %s" % texto_del_resultado(info["resultado"]))
+            if info["proxima"]:
+                informar("Proxima: %s" % info["proxima"].strftime("%Y-%m-%d %H:%M"))
+            if info["perdidas"]:
+                informar("Ejecuciones perdidas segun Windows: %d" % info["perdidas"])
+            veredicto = veredicto_de_hoy(memoria, ultima, ahora)
+            if veredicto:
+                informar(veredicto)
+
+    registro = ultimo_registro_del_envio()
+    if registro is None:
+        informar("Registro del envio: no hay ninguno en %s" % carpeta_logs_del_envio())
+    else:
+        ruta, linea = registro
+        informar("Registro del envio: %s" % ruta)
+        informar("   ultima linea: %s" % linea)
     return 0 if hay else 1
 
 
