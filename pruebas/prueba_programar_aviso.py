@@ -58,6 +58,37 @@ def hijos(elemento):
     return [h.tag.replace(ESPACIO, "") for h in elemento]
 
 
+# ================================================= el propio archivo compila
+# Sin avisos, en cualquier version de Python. El 2026-09-24 un comentario con
+# 'Logs\ junto' y 'registros\arranque' hizo que Python 3.12 imprimiera un
+# SyntaxWarning cada vez que alguien corria 'estado' o 'instalar'; y el
+# '\a' metia un caracter de campana invisible en el texto. Aqui se corre en
+# 3.11, donde ese aviso sale oculto, y por eso ninguna prueba lo vio. Con los
+# avisos convertidos en errores ya no depende de la version.
+print("compila sin avisos")
+import warnings                       # noqa: E402
+
+
+def compila_sin_avisos(fuente, nombre):
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        try:
+            compile(fuente, nombre, "exec")
+            return True
+        except SyntaxError as error:
+            print("     %s: %s (linea %s)" % (nombre, error.msg, error.lineno))
+            return False
+
+
+with io.open(os.path.join(os.path.dirname(AQUI), "programar_aviso.py"),
+             encoding="utf-8") as _archivo:
+    comprobar("programar_aviso.py compila sin ningun aviso",
+              compila_sin_avisos(_archivo.read(), "programar_aviso.py"), True)
+# Y la prueba misma sabe detectarlo: si no, el verde de arriba no diria nada.
+comprobar("un escape invalido si se detecta",
+          compila_sin_avisos('x = "Logs\\ junto"', "<muestra>"),
+          False)
+
 # ======================================================== leer_dias / leer_hora
 print("leer_dias")
 comprobar("dos dias", pa.leer_dias("MON,THU"), ["Monday", "Thursday"])
@@ -374,7 +405,9 @@ puente = pa.puente_de_arranque()
 # El puente se genera como TEXTO. Un parentesis de mas no se veria hasta el
 # dia en que la VDI se recicle, que es el peor momento posible.
 try:
-    compile(puente, "<puente>", "exec")
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        compile(puente, "<puente>", "exec")
     compila = True
 except SyntaxError as error:
     compila = False
