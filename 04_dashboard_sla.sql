@@ -43,6 +43,13 @@ GO
 SET NOCOUNT ON;
 GO
 
+/* Dependencia: vw_Dash_ProductividadBase trae el Lider de dbo.CatLiderGrupo,
+   que crea 06_catalogos_excel.sql. En produccion ya existe; en una base nueva
+   hay que correr 06 antes que este. */
+IF OBJECT_ID('dbo.CatLiderGrupo', 'U') IS NULL
+    RAISERROR (N'Falta dbo.CatLiderGrupo. Ejecuta primero 06_catalogos_excel.sql.', 16, 1);
+GO
+
 /* =====================================================================================
    0) Funcion auxiliar: separa una lista "a, b, c" en filas, recortando espacios.
    ===================================================================================== */
@@ -408,9 +415,50 @@ SELECT
 
     t.FechaAltaDW,
     t.FechaUltimaCargaDW,
-    t.VersionFila
+    t.VersionFila,
+
+    /* EL LIDER DEL GRUPO, igual que en vw_Tickets y vw_Backlog.
+
+       Esta vista no lo traia en el repositorio, pero en produccion si: lo usa
+       dbo.usp_Dash_SlaLiderGrupo (33_dash_sla_lider_grupo.sql), que SQL Server
+       solo dejo crear porque la columna existia. Al volver a correr este
+       script el 2026-09-25, la version del repositorio -sin Lider- reemplazo a
+       la de produccion y ese procedimiento quedo roto. Va al final para no
+       mover las demas columnas; CatLiderGrupo tiene PK por Grupo, asi que el
+       LEFT JOIN no duplica tickets. */
+    lg.Lider
 FROM dbo.Tickets AS t
+LEFT JOIN dbo.CatLiderGrupo AS lg
+       ON lg.Grupo = t.Grupo
 WHERE t.FechaRegistro IS NOT NULL;
+GO
+
+/* Las vistas que leen de esta sin SCHEMABINDING guardan su lista de columnas
+   de cuando se crearon; sp_refreshview las pone al dia. Si alguna no se deja,
+   se dice y se sigue con las demas. */
+DECLARE @vista NVARCHAR(517);
+DECLARE vistas CURSOR LOCAL FAST_FORWARD FOR
+    SELECT DISTINCT QUOTENAME(OBJECT_SCHEMA_NAME(d.referencing_id)) + N'.'
+                  + QUOTENAME(OBJECT_NAME(d.referencing_id))
+    FROM   sys.sql_expression_dependencies AS d
+    JOIN   sys.views AS v ON v.object_id = d.referencing_id
+    WHERE  d.referenced_id = OBJECT_ID(N'dbo.vw_Dash_ProductividadBase')
+      AND  OBJECTPROPERTY(d.referencing_id, 'IsSchemaBound') = 0;
+OPEN vistas;
+FETCH NEXT FROM vistas INTO @vista;
+WHILE @@FETCH_STATUS = 0
+BEGIN
+    BEGIN TRY
+        EXEC sp_refreshview @vista;
+        PRINT N'Refrescada: ' + @vista;
+    END TRY
+    BEGIN CATCH
+        PRINT N'NO se pudo refrescar ' + @vista + N': ' + ERROR_MESSAGE();
+    END CATCH;
+    FETCH NEXT FROM vistas INTO @vista;
+END;
+CLOSE vistas;
+DEALLOCATE vistas;
 GO
 
 /* =====================================================================================

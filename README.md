@@ -59,11 +59,27 @@ del agente mide la edad de la carga contra `SYSDATETIME()` del mismo servidor.
 `pruebas/prueba_reloj_sql.py` revisa todos los `.sql` y falla si alguno vuelve
 a comparar contra el reloj del servidor.
 
-Dos vistas de produccion no las crea ningun script numerado y vivian solo en la
-base: `dbo.vw_Tickets` y `dbo.vw_Backlog`. Sus espejos, ya con la hora de
-Mexico, son `15_vw_tickets.sql` y `30_vw_backlog.sql`, en ese orden. Los dos
-llevan BOM (hay acentos que son datos) y al final refrescan las vistas que
-dependen de ellas.
+Los objetos de produccion que no creaba ningun script numerado y vivian solo
+en la base ya estan versionados, con la hora de Mexico:
+
+| Script | Objetos |
+|---|---|
+| `15_vw_tickets.sql` | `dbo.vw_Tickets` |
+| `30_vw_backlog.sql` | `dbo.vw_Backlog` (despues de 15) |
+| `31_vistas_de_produccion.sql` | `vw_Creados_15Dias`, `vw_Cerrados_15Dias`, `vw_QA_15Dias`, `vw_Tickets_Data` |
+| `32_correo_qare.sql` | los diez `usp_CorreoQARE_*` |
+| `33_dash_sla_lider_grupo.sql` | `usp_Dash_SlaLiderGrupo` |
+
+Llevan BOM (hay acentos que son datos): se abren en SSMS como archivo, sin
+copiar y pegar. Las vistas refrescan al final las que dependen de ellas.
+
+`04_dashboard_sla.sql` necesita `dbo.CatLiderGrupo`: en una base nueva, correr
+`06_catalogos_excel.sql` antes que 04.
+
+`34_diagnostico_objetos_rotos.sql` dice que procedimientos, vistas y funciones
+hacen referencia a columnas u objetos que ya no existen. Conviene correrlo
+antes y despues de aplicar scripts: asi se vio que volver a correr 04 le habia
+quitado `Lider` a `vw_Dash_ProductividadBase`.
 
 ## Lo que no se versiona
 
