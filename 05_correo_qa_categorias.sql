@@ -17,8 +17,10 @@
      '/S-Fenicia/Dispositivo PC & movil/Desbloqueo').
    - Esa Categoria define un "Grupo Correcto" (columna "Grupo incidencias /
      peticiones" del catalogo de categorias de Proactivanet).
-   - Si la Categoria no esta en el catalogo, o esta pero sin grupo
-                                                    -> Validacion = 'Sin catalogo'
+   - El grupo de la categoria es el suyo o, si no tiene, el que hereda del
+     nivel de arriba mas cercano que si lo tiene (seccion 0).
+   - Si la Categoria no esta en el catalogo, o ni ella ni ningun nivel de
+     arriba tiene grupo                             -> Validacion = 'Sin catalogo'
    - Si Tickets.Grupo = GrupoCorrecto              -> Validacion = 'OK'
    - Si no coincide pero (GrupoCorrecto, Tickets.Grupo)
      existe en la tabla de excepciones "grupos validos"
@@ -37,6 +39,8 @@
      el servidor; replicado aqui para que el repo no quede desincronizado).
 
    Objetos creados:
+   - dbo.CategoriaGrupoHeredado + dbo.usp_Categorias_HeredarGrupo (tabla y
+     procedimiento: el grupo que hereda cada categoria sin grupo propio)
    - dbo.vw_CorreoQA_CategoriaUnica (vista: una fila por RutaCompleta, para
      que el join no se duplique si dbo.Categorias trae mas de una version
      de la misma ruta -p. ej. vigente + historica-)
@@ -73,17 +77,124 @@ SET NOCOUNT ON;
 GO
 
 /* =====================================================================================
+   0) El grupo que HEREDA cada categoria.
+
+      Desde septiembre de 2026 Proactivanet solo pide poner "Grupo incidencias
+      / peticiones" en un nivel alto del arbol; los de abajo lo heredan. El
+      catalogo que carga el ETL trae el valor PROPIO de cada ruta, asi que las
+      de abajo llegan vacias. Aqui se calcula el heredado: para cada ruta sin
+      grupo se sube un nivel por vuelta ('/A/B/C' -> '/A/B' -> '/A') hasta el
+      primero que si tiene. El propio, si lo hay, siempre gana.
+
+      Se guarda en una tabla y no se calcula en cada consulta porque la vista
+      base es la consulta mas pesada de QA, y el tablero ya documenta un plan
+      de 28 s por como SQL Server cruzaba dbo.Categorias
+      (sitio/App_Code/QaDb.cs).
+
+      dbo.usp_Categorias_HeredarGrupo la vuelve a llenar completa. Corre al
+      final de este script, y conviene correrlo despues de cada carga del
+      catalogo. Si la tabla se queda atras, una categoria nueva sin grupo sale
+      'Sin catalogo' hasta el siguiente calculo: nunca Incorrecto, porque el
+      grupo propio se sigue leyendo en vivo de dbo.Categorias.
+   ===================================================================================== */
+IF OBJECT_ID(N'dbo.CategoriaGrupoHeredado', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.CategoriaGrupoHeredado
+    (
+        RutaHash      BINARY(32)     NOT NULL,   -- SHA-256 de Ruta: Ruta no cabe en una llave
+        Ruta          NVARCHAR(1000) NOT NULL,   -- normalizada igual que vw_CorreoQA_CategoriaUnica
+        GrupoPropio   NVARCHAR(255)  NULL,
+        GrupoEfectivo NVARCHAR(255)  NULL,       -- el propio, o el heredado
+        HeredadoDe    NVARCHAR(1000) NULL,       -- la ruta de la que lo tomo; NULL si es propio
+        CalculadoEn   DATETIME2(0)   NOT NULL CONSTRAINT DF_CategoriaGrupoHeredado_Calculado DEFAULT (SYSDATETIME()),
+        CONSTRAINT PK_CategoriaGrupoHeredado PRIMARY KEY CLUSTERED (RutaHash)
+    );
+END
+GO
+
+CREATE OR ALTER PROCEDURE dbo.usp_Categorias_HeredarGrupo
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    -- Una fila por ruta, con la misma eleccion que vw_CorreoQA_CategoriaUnica.
+    SELECT q.Ruta, q.GrupoPropio
+    INTO #Cat
+    FROM (
+        SELECT
+            Ruta = LTRIM(RTRIM(REPLACE(c.RutaCompleta, NCHAR(160), N' '))),
+            GrupoPropio = NULLIF(LTRIM(RTRIM(c.GrupoIncidenciasPeticiones)), N''),
+            rn = ROW_NUMBER() OVER (
+                PARTITION BY LTRIM(RTRIM(REPLACE(c.RutaCompleta, NCHAR(160), N' ')))
+                ORDER BY c.VigenteEnOrigen DESC, c.FechaUltimaCargaDW DESC
+            )
+        FROM dbo.Categorias AS c
+        WHERE c.RutaCompleta IS NOT NULL
+    ) AS q
+    WHERE q.rn = 1
+      AND q.Ruta <> N'';
+
+    SELECT
+        Ruta,
+        GrupoPropio,
+        Busca = Ruta,
+        GrupoEfectivo = GrupoPropio,
+        HeredadoDe = CAST(NULL AS NVARCHAR(1000))
+    INTO #Herencia
+    FROM #Cat;
+
+    -- Un nivel por vuelta. Si un nivel intermedio no esta en el catalogo, se
+    -- salta y se sigue subiendo. Quince vueltas sobran: el arbol mas hondo
+    -- tiene seis niveles.
+    DECLARE @Vuelta INT = 0;
+    WHILE @Vuelta < 15
+      AND EXISTS (SELECT 1 FROM #Herencia WHERE GrupoEfectivo IS NULL AND CHARINDEX(N'/', Busca, 2) > 0)
+    BEGIN
+        UPDATE h
+        SET Busca = x.Padre,
+            GrupoEfectivo = p.GrupoPropio,
+            HeredadoDe = CASE WHEN p.GrupoPropio IS NOT NULL THEN x.Padre END
+        FROM #Herencia AS h
+        CROSS APPLY (SELECT Padre = LEFT(h.Busca, LEN(h.Busca) - CHARINDEX(N'/', REVERSE(h.Busca)))) AS x
+        LEFT JOIN #Cat AS p ON p.Ruta = x.Padre
+        WHERE h.GrupoEfectivo IS NULL
+          AND CHARINDEX(N'/', h.Busca, 2) > 0;
+
+        SET @Vuelta += 1;
+    END;
+
+    BEGIN TRANSACTION;
+        DELETE FROM dbo.CategoriaGrupoHeredado;
+
+        INSERT INTO dbo.CategoriaGrupoHeredado (RutaHash, Ruta, GrupoPropio, GrupoEfectivo, HeredadoDe)
+        SELECT CONVERT(BINARY(32), HASHBYTES('SHA2_256', h.Ruta)),
+               h.Ruta, h.GrupoPropio, h.GrupoEfectivo, h.HeredadoDe
+        FROM #Herencia AS h;
+    COMMIT TRANSACTION;
+END
+GO
+
+/* =====================================================================================
    1) Una fila por categoria (RutaCompleta puede tener mas de una version en
       dbo.Categorias -p. ej. si quedo inactiva y se recreo-; sin este paso
       el LEFT JOIN de la vista base podria duplicar tickets).
+
+      GrupoIncidenciasPeticiones es el grupo que VALE: el propio de la ruta
+      o, si no tiene, el heredado (seccion 0). GrupoPropio y GrupoHeredadoDe
+      dicen de donde salio.
    ===================================================================================== */
 CREATE OR ALTER VIEW dbo.vw_CorreoQA_CategoriaUnica
 AS
-SELECT RutaCompleta, GrupoIncidenciasPeticiones
+SELECT
+    q.RutaCompleta,
+    GrupoIncidenciasPeticiones = COALESCE(q.GrupoPropio, h.GrupoEfectivo),
+    q.GrupoPropio,
+    GrupoHeredadoDe = CASE WHEN q.GrupoPropio IS NULL THEN h.HeredadoDe END
 FROM (
     SELECT
         RutaCompleta = LTRIM(RTRIM(REPLACE(c.RutaCompleta, NCHAR(160), N' '))),
-        c.GrupoIncidenciasPeticiones,
+        GrupoPropio = NULLIF(LTRIM(RTRIM(c.GrupoIncidenciasPeticiones)), N''),
         rn = ROW_NUMBER() OVER (
             PARTITION BY LTRIM(RTRIM(REPLACE(c.RutaCompleta, NCHAR(160), N' ')))
             ORDER BY c.VigenteEnOrigen DESC, c.FechaUltimaCargaDW DESC
@@ -91,6 +202,8 @@ FROM (
     FROM dbo.Categorias AS c
     WHERE c.RutaCompleta IS NOT NULL
 ) q
+LEFT JOIN dbo.CategoriaGrupoHeredado AS h
+       ON h.RutaHash = CONVERT(BINARY(32), HASHBYTES('SHA2_256', q.RutaCompleta))
 WHERE rn = 1;
 GO
 
@@ -553,6 +666,44 @@ BEGIN
     ON dbo.Tickets (FechaRegistro)
     INCLUDE (Categoria, Grupo, TecnicoSegundaLinea, FirmaSolucion, Estado, Subestado, Tipo, TipoRelacion, Titulo, Cliente, Sucursal, Tienda, CodigoTicket);
 END;
+GO
+
+/* =====================================================================================
+   9b) La herencia de grupos, calculada ahora, y las vistas que leen
+       vw_CorreoQA_CategoriaUnica fuera de este script -la de la alerta de QA,
+       14_alerta_qa_resueltos.sql- puestas al dia con sus columnas nuevas.
+   ===================================================================================== */
+EXEC dbo.usp_Categorias_HeredarGrupo;
+
+SELECT
+    Categorias = COUNT_BIG(*),
+    ConGrupoPropio = SUM(CASE WHEN GrupoPropio IS NOT NULL THEN 1 ELSE 0 END),
+    LoHeredan = SUM(CASE WHEN GrupoPropio IS NULL AND GrupoEfectivo IS NOT NULL THEN 1 ELSE 0 END),
+    SinGrupo = SUM(CASE WHEN GrupoEfectivo IS NULL THEN 1 ELSE 0 END)
+FROM dbo.CategoriaGrupoHeredado;
+
+DECLARE @vista NVARCHAR(517);
+DECLARE vistas CURSOR LOCAL FAST_FORWARD FOR
+    SELECT DISTINCT QUOTENAME(OBJECT_SCHEMA_NAME(d.referencing_id)) + N'.'
+                  + QUOTENAME(OBJECT_NAME(d.referencing_id))
+    FROM   sys.sql_expression_dependencies AS d
+    JOIN   sys.views AS v ON v.object_id = d.referencing_id
+    WHERE  d.referenced_id = OBJECT_ID(N'dbo.vw_CorreoQA_CategoriaUnica');
+OPEN vistas;
+FETCH NEXT FROM vistas INTO @vista;
+WHILE @@FETCH_STATUS = 0
+BEGIN
+    BEGIN TRY
+        EXEC sp_refreshview @vista;
+        PRINT N'Refrescada: ' + @vista;
+    END TRY
+    BEGIN CATCH
+        PRINT N'NO se pudo refrescar ' + @vista + N': ' + ERROR_MESSAGE();
+    END CATCH;
+    FETCH NEXT FROM vistas INTO @vista;
+END;
+CLOSE vistas;
+DEALLOCATE vistas;
 GO
 
 /* =====================================================================================
