@@ -44,3 +44,8 @@ sitio/orquestacion/data/*.mock.json
 # Documento generado por TableroExperiencia_v*.exe. Trae los mismos datos
 # embebidos y ademas pesa 3 MB: se copia al servidor, no se versiona.
 sitio/assets/Tablero_Experiencia.html
+# Paquetes del sitio. El 2026-09-25 subio un dashboard.zip con todo sitio/
+# adentro, incluidos los *.mock.json de arriba: la regla que los excluye mira
+# archivos sueltos, no lo que va dentro de un zip. Se quito de la historia.
+sitio/*.zip
+sitio/**/*.zip
