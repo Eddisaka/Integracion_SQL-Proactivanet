@@ -6,6 +6,7 @@ config*.json
 !config_correo_backlog_direccion.ejemplo.json
 !config_correo_servicio.ejemplo.json
 !config_aviso_problems.ejemplo.json
+!config_alerta_qa.ejemplo.json
 *.log
 logs/
 registros/

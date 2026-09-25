@@ -465,6 +465,13 @@ GO
    Si algun dia hay que modificar la vista en produccion, hay que sacarla de
    SSMS (clic derecho -> Script as -> ALTER) y editar ESA, no esta.
 
+   Desde 2026-09-18 esa ya esta versionada: 15_vw_tickets.sql. Ahi se lee lo
+   que este comentario solo describia, incluida la parte que no se mencionaba
+   y es la que mas cambia los resultados: ademas de agregar columnas, la de
+   produccion FILTRA FILAS -37 grupos, 42 categorias y TipoRelacion
+   'Dependiente'-. Quien vaya a escribir una consulta nueva sobre vw_Tickets
+   deberia leer 15 antes.
+
    Nada mas depende de las columnas que aqui se calculan: 04_dashboard_sla.sql
    y 05_correo_qa_categorias.sql definen sus propias FechaRegistroDia y
    EstaAbierto en sus vistas, no las toman de aqui.
