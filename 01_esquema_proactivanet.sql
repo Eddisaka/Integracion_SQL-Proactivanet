@@ -235,7 +235,24 @@ GO
    En una instalacion nueva: correr este script y luego 10_clave_ticket.sql,
    que vuelve a crear el procedimiento ya corregido. Si se toca algo aqui,
    hay que mover el cambio alla tambien.
+
+   Y si 10_clave_ticket.sql YA se aplico -dbo.Tickets tiene ClaveTicket-, esta
+   version NO se crea. Paso el 2026-09-25: se volvio a correr este script para
+   otro cambio, el CREATE OR ALTER regreso el procedimiento viejo encima del
+   corregido, y el ETL de esa manana fallo con
+
+       Cannot insert duplicate key row in object 'dbo.Tickets' with unique
+       index 'UQ_Tickets_ClaveTicket'. The duplicate key value is (2026-398545).
+
+   porque el viejo trataba el REQ renombrado como ticket nuevo. SET NOEXEC ON
+   compila el lote siguiente sin ejecutarlo; SET NOEXEC OFF lo apaga despues.
    ---- */
+IF COL_LENGTH('dbo.Tickets', 'ClaveTicket') IS NOT NULL
+BEGIN
+    PRINT N'usp_CargarTicketsDesdeStaging: se conserva la version de 10_clave_ticket.sql (dbo.Tickets ya tiene ClaveTicket).';
+    SET NOEXEC ON;
+END
+GO
 CREATE OR ALTER PROCEDURE dbo.usp_CargarTicketsDesdeStaging
     @LoteCarga UNIQUEIDENTIFIER = NULL
 AS
@@ -426,6 +443,8 @@ BEGIN
     DROP TABLE #T;
     SELECT FilasInsertadas = @ins, FilasActualizadas = @upd;
 END
+GO
+SET NOEXEC OFF;
 GO
 
 /* ---- Vista para Power BI / HTML ----
