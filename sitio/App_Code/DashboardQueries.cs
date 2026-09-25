@@ -293,6 +293,9 @@ OUTER APPLY (
          DentroSla        resuelto a tiempo; sin resolver y aun en tiempo
          HorasResolucion  de registro a firma de solucion; NULL si no hay
          EsReabierto      IntentosSolucion > 1 */
+    // "Ahora" en hora de Mexico: el servidor SQL va en UTC y FechaEstimadaResolucion
+    // en hora de Mexico. Con SYSDATETIME() cada ticket abierto salia vencido seis
+    // horas antes. Mismo patron que los .sql del repositorio (ver README.md).
     private const string SlaPorSolucion = @"
 CROSS APPLY (
     SELECT
@@ -301,13 +304,13 @@ CROSS APPLY (
             WHEN b.FechaEstimadaResolucion IS NULL THEN 0
             WHEN b.FechaFirmaSolucion IS NOT NULL
                 THEN CASE WHEN b.FechaFirmaSolucion > b.FechaEstimadaResolucion THEN 1 ELSE 0 END
-            WHEN SYSDATETIME() > b.FechaEstimadaResolucion THEN 1
+            WHEN DATEADD(HOUR, -6, SYSUTCDATETIME()) > b.FechaEstimadaResolucion THEN 1
             ELSE 0 END),
         DentroSla = CONVERT(bit, CASE
             WHEN b.FechaEstimadaResolucion IS NULL THEN 0
             WHEN b.FechaFirmaSolucion IS NOT NULL
                 THEN CASE WHEN b.FechaFirmaSolucion <= b.FechaEstimadaResolucion THEN 1 ELSE 0 END
-            WHEN SYSDATETIME() <= b.FechaEstimadaResolucion THEN 1
+            WHEN DATEADD(HOUR, -6, SYSUTCDATETIME()) <= b.FechaEstimadaResolucion THEN 1
             ELSE 0 END),
         HorasResolucion = CASE WHEN b.FechaFirmaSolucion IS NOT NULL
             THEN DATEDIFF(MINUTE, b.FechaRegistro, b.FechaFirmaSolucion) / 60.0 END,
