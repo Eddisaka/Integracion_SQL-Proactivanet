@@ -267,7 +267,7 @@ DECLARE @FechaFin    DATE = '2026-09-22';
                  AND b.FechaFirmaSolucion <= t.FechaEstimadaOlaUc THEN 1
             /* Para lo abierto, "cumple" es no haberse pasado todavia. */
             WHEN b.FechaFirmaSolucion IS NULL
-                 AND SYSDATETIME() <= b.FechaEstimadaResolucion THEN 1
+                 AND DATEADD(HOUR, -6, SYSUTCDATETIME()) <= b.FechaEstimadaResolucion THEN 1
             ELSE 0
         END
     FROM dbo.vw_Dash_ProductividadBase AS b

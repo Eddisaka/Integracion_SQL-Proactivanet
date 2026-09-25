@@ -293,10 +293,10 @@ SELECT p.Codigo,
        Compromiso  = rige.Fecha,
        Activa      = CASE WHEN rige.Columna IS NULL THEN 0 ELSE 1 END,
        DiasVencida = CASE WHEN rige.Fecha IS NULL THEN NULL
-                          ELSE DATEDIFF(DAY, rige.Fecha, CONVERT(DATE, SYSDATETIME())) END,
+                          ELSE DATEDIFF(DAY, rige.Fecha, CONVERT(DATE, DATEADD(HOUR, -6, SYSUTCDATETIME()))) END,
        Veredicto   = CASE WHEN rige.Columna IS NULL THEN N'NO APLICA'
                           WHEN rige.Fecha   IS NULL THEN N'SIN FECHA'
-                          WHEN rige.Fecha < CONVERT(DATE, SYSDATETIME()) THEN N'VENCIDA'
+                          WHEN rige.Fecha < CONVERT(DATE, DATEADD(HOUR, -6, SYSUTCDATETIME())) THEN N'VENCIDA'
                           ELSE N'AL CORRIENTE'
                      END,
 
@@ -320,7 +320,7 @@ SELECT p.Codigo,
                         WHEN ISNULL(pre.ControlDeFecha, CONVERT(BIT, 1)) = 0 THEN 0
                         WHEN rige.Columna IS NULL THEN 0
                         WHEN rige.Fecha IS NULL THEN 1
-                        WHEN rige.Fecha < CONVERT(DATE, SYSDATETIME()) THEN 1
+                        WHEN rige.Fecha < CONVERT(DATE, DATEADD(HOUR, -6, SYSUTCDATETIME())) THEN 1
                         ELSE 0
                      END
 FROM dbo.Problem AS p

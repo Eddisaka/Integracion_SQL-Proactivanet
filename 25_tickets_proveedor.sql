@@ -101,8 +101,8 @@ SELECT
        aun asi estos la pasaron. */
     DiasAtraso    = DATEDIFF(DAY,
                              COALESCE(t.FechaEstimadaOlaUc, b.FechaEstimadaResolucion),
-                             SYSDATETIME()),
-    DiasAbierto   = DATEDIFF(DAY, b.FechaRegistro, SYSDATETIME()),
+                             DATEADD(HOUR, -6, SYSUTCDATETIME())),
+    DiasAbierto   = DATEDIFF(DAY, b.FechaRegistro, DATEADD(HOUR, -6, SYSUTCDATETIME())),
     b.Estado,
     b.Subestado,
     b.Categoria,
@@ -116,7 +116,7 @@ LEFT JOIN dbo.TicketProactivanetId AS m ON m.CodigoTicket = b.CodigoTicket
 WHERE b.EsRechazado = 0
   AND b.FechaFirmaSolucion IS NULL
   AND b.FechaEstimadaResolucion IS NOT NULL
-  AND SYSDATETIME() > COALESCE(t.FechaEstimadaOlaUc, b.FechaEstimadaResolucion)
+  AND DATEADD(HOUR, -6, SYSUTCDATETIME()) > COALESCE(t.FechaEstimadaOlaUc, b.FechaEstimadaResolucion)
   AND b.Grupo IN (SELECT Valor FROM dbo.fn_Dash_SplitList(@Grupos))
 ORDER BY DiasAtraso DESC;
 GO
@@ -211,22 +211,22 @@ SELECT
     VencidosAbiertos = COUNT_BIG(*),
     DiasAtrasoMedio  = CAST(AVG(CAST(DATEDIFF(DAY,
                               COALESCE(t.FechaEstimadaOlaUc, b.FechaEstimadaResolucion),
-                              SYSDATETIME()) AS DECIMAL(10,2))) AS DECIMAL(10,1)),
+                              DATEADD(HOUR, -6, SYSUTCDATETIME())) AS DECIMAL(10,2))) AS DECIMAL(10,1)),
     DiasAtrasoMax    = MAX(DATEDIFF(DAY,
                               COALESCE(t.FechaEstimadaOlaUc, b.FechaEstimadaResolucion),
-                              SYSDATETIME())),
+                              DATEADD(HOUR, -6, SYSUTCDATETIME()))),
     MasDe30Dias      = SUM(CASE WHEN DATEDIFF(DAY,
                               COALESCE(t.FechaEstimadaOlaUc, b.FechaEstimadaResolucion),
-                              SYSDATETIME()) > 30 THEN 1 ELSE 0 END),
+                              DATEADD(HOUR, -6, SYSUTCDATETIME())) > 30 THEN 1 ELSE 0 END),
     MasDe90Dias      = SUM(CASE WHEN DATEDIFF(DAY,
                               COALESCE(t.FechaEstimadaOlaUc, b.FechaEstimadaResolucion),
-                              SYSDATETIME()) > 90 THEN 1 ELSE 0 END)
+                              DATEADD(HOUR, -6, SYSUTCDATETIME())) > 90 THEN 1 ELSE 0 END)
 FROM dbo.vw_Dash_ProductividadBase AS b
 LEFT JOIN dbo.Tickets AS t ON t.CodigoTicket = b.CodigoTicket
 WHERE b.EsRechazado = 0
   AND b.FechaFirmaSolucion IS NULL
   AND b.FechaEstimadaResolucion IS NOT NULL
-  AND SYSDATETIME() > COALESCE(t.FechaEstimadaOlaUc, b.FechaEstimadaResolucion)
+  AND DATEADD(HOUR, -6, SYSUTCDATETIME()) > COALESCE(t.FechaEstimadaOlaUc, b.FechaEstimadaResolucion)
   AND b.Grupo IN (SELECT Valor FROM dbo.fn_Dash_SplitList(@Grupos))
 GROUP BY b.Grupo
 ORDER BY VencidosAbiertos DESC;

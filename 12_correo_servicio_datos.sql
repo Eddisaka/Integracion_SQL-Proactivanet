@@ -203,7 +203,7 @@ BEGIN
         RETURN;
     END;
 
-    SET @FechaCorte  = ISNULL(@FechaCorte, CONVERT(DATE, SYSDATETIME()));
+    SET @FechaCorte  = ISNULL(@FechaCorte, CONVERT(DATE, DATEADD(HOUR, -6, SYSUTCDATETIME())));
     SET @DiasVentana = ISNULL(@DiasVentana, @Dias);
     DECLARE @Desde DATE = DATEADD(DAY, -@DiasVentana, @FechaCorte);
     DECLARE @DesdeAyer DATE = DATEADD(DAY, -1, @Desde);
@@ -374,7 +374,7 @@ BEGIN
     SET NOCOUNT ON;
 
     DECLARE @Dias INT = (SELECT DiasVentana FROM dbo.CatServicioCorreo WHERE Servicio = @Servicio);
-    SET @FechaCorte  = ISNULL(@FechaCorte, CONVERT(DATE, SYSDATETIME()));
+    SET @FechaCorte  = ISNULL(@FechaCorte, CONVERT(DATE, DATEADD(HOUR, -6, SYSUTCDATETIME())));
     SET @DiasVentana = ISNULL(@DiasVentana, ISNULL(@Dias, 15));
     DECLARE @Desde DATE = DATEADD(DAY, -@DiasVentana, @FechaCorte);
 
@@ -507,7 +507,7 @@ BEGIN
     SET NOCOUNT ON;
 
     DECLARE @Dias INT = (SELECT DiasVentana FROM dbo.CatServicioCorreo WHERE Servicio = @Servicio);
-    SET @FechaCorte  = ISNULL(@FechaCorte, CONVERT(DATE, SYSDATETIME()));
+    SET @FechaCorte  = ISNULL(@FechaCorte, CONVERT(DATE, DATEADD(HOUR, -6, SYSUTCDATETIME())));
     SET @DiasVentana = ISNULL(@DiasVentana, ISNULL(@Dias, 15));
     DECLARE @Desde DATE = DATEADD(DAY, -@DiasVentana, @FechaCorte);
 

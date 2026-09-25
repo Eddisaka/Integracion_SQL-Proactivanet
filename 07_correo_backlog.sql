@@ -207,7 +207,7 @@ AS
 BEGIN
     SET NOCOUNT ON;
     SET XACT_ABORT ON;
-    SET @FechaCorte = ISNULL(@FechaCorte, CONVERT(DATE, GETDATE()));
+    SET @FechaCorte = ISNULL(@FechaCorte, CONVERT(DATE, DATEADD(HOUR, -6, SYSUTCDATETIME())));
 
     IF @Forzar = 0 AND EXISTS
     (
@@ -535,7 +535,7 @@ BEGIN
     SET NOCOUNT ON;
     -- Por defecto hasta AYER: "hoy" lo debe seguir preparando
     -- usp_CorreoBacklog_PrepararCorte con datos en vivo de dbo.vw_Backlog.
-    DECLARE @Ff DATE = ISNULL(@FechaFin, DATEADD(DAY, -1, CONVERT(date, GETDATE())));
+    DECLARE @Ff DATE = ISNULL(@FechaFin, DATEADD(DAY, -1, CONVERT(date, DATEADD(HOUR, -6, SYSUTCDATETIME()))));
     DECLARE @F  DATE = @FechaInicio;
 
     WHILE @F <= @Ff

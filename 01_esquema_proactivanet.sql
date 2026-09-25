@@ -508,7 +508,7 @@ SELECT
     FechaRegistroDia = CONVERT(DATE, t.FechaRegistro),
     AnioMes          = CONVERT(CHAR(7), t.FechaRegistro, 126),
     HorasEnBacklog   = CASE WHEN t.FechaFirmaCierre IS NULL
-                          THEN DATEDIFF(MINUTE, t.FechaRegistro, SYSDATETIME())/60.0
+                          THEN DATEDIFF(MINUTE, t.FechaRegistro, DATEADD(HOUR, -6, SYSUTCDATETIME()))/60.0
                           ELSE DATEDIFF(MINUTE, t.FechaRegistro, t.FechaFirmaCierre)/60.0 END,
     EstaAbierto      = CASE WHEN t.FechaFirmaCierre IS NULL THEN 1 ELSE 0 END,
     t.FechaAltaDW, t.FechaUltimaCargaDW, t.VersionFila

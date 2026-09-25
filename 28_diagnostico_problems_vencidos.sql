@@ -189,7 +189,7 @@ SELECT Estado          = CAST(ISNULL(p.Estado, N'(NULL)') AS NVARCHAR(30)),
        ConFechaCierre  = SUM(CASE WHEN p.FechaCierre IS NOT NULL THEN 1 ELSE 0 END),
        SinFechaCierre  = SUM(CASE WHEN p.FechaCierre IS NULL     THEN 1 ELSE 0 END),
        -- La prueba decisiva: una fecha de cierre REAL nunca puede ser futura.
-       CierreEnFuturo  = SUM(CASE WHEN p.FechaCierre > SYSDATETIME() THEN 1 ELSE 0 END)
+       CierreEnFuturo  = SUM(CASE WHEN p.FechaCierre > DATEADD(HOUR, -6, SYSUTCDATETIME()) THEN 1 ELSE 0 END)
 FROM dbo.Problem AS p
 WHERE p.VigenteEnOrigen = 1
 GROUP BY p.Estado
@@ -256,7 +256,7 @@ SELECT p.Codigo,
                                   WHEN N'FechaAnalisis' THEN p.FechaAnalisis
                                   WHEN N'FechaSolucion' THEN p.FechaSolucion
                                   WHEN N'FechaCierre'   THEN p.FechaCierre
-                             END < CONVERT(DATE, SYSDATETIME()) THEN N'1-VENCIDA'
+                             END < CONVERT(DATE, DATEADD(HOUR, -6, SYSUTCDATETIME())) THEN N'1-VENCIDA'
                         ELSE N'3-AL CORRIENTE'
                      END
 INTO #Vencidas
@@ -742,14 +742,14 @@ SELECT TOP (20)
        Estado      = CAST(v.Estado      AS NVARCHAR(25)),
        ColumnaRige = CAST(v.ColumnaRige AS NVARCHAR(16)),
        v.Compromiso,
-       DiasVencida = DATEDIFF(DAY, v.Compromiso, CONVERT(DATE, SYSDATETIME())),
+       DiasVencida = DATEDIFF(DAY, v.Compromiso, CONVERT(DATE, DATEADD(HOUR, -6, SYSUTCDATETIME()))),
        OwnerProblem  = CAST(v.OwnerProblem  AS NVARCHAR(30)),
        OwnerServicio = CAST(v.OwnerServicio AS NVARCHAR(30)),
        Direccion     = CAST(v.Direccion     AS NVARCHAR(30)),
        Titulo = CAST(LEFT(ISNULL(v.Titulo, N''), 60) AS NVARCHAR(60))
 FROM #Vencidas AS v
 WHERE v.Veredicto = N'1-VENCIDA'
-ORDER BY DATEDIFF(DAY, v.Compromiso, CONVERT(DATE, SYSDATETIME())) DESC;
+ORDER BY DATEDIFF(DAY, v.Compromiso, CONVERT(DATE, DATEADD(HOUR, -6, SYSUTCDATETIME()))) DESC;
 GO
 
 PRINT N'';

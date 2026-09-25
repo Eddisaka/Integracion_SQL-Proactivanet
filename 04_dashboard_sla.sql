@@ -347,7 +347,7 @@ SELECT
              AND t.FechaFirmaSolucion > t.FechaEstimadaResolucion THEN CONVERT(bit, 1)
         -- Todavia sin resolver y ya paso la fecha: vencido desde hoy.
         WHEN t.FechaFirmaSolucion IS NULL
-             AND SYSDATETIME() > t.FechaEstimadaResolucion THEN CONVERT(bit, 1)
+             AND DATEADD(HOUR, -6, SYSUTCDATETIME()) > t.FechaEstimadaResolucion THEN CONVERT(bit, 1)
         ELSE CONVERT(bit, 0)
     END,
 
@@ -358,7 +358,7 @@ SELECT
         -- Sin resolver pero todavia en tiempo: cuenta como dentro mientras no
         -- se venza, igual que antes.
         WHEN t.FechaFirmaSolucion IS NULL
-             AND SYSDATETIME() <= t.FechaEstimadaResolucion THEN CONVERT(bit, 1)
+             AND DATEADD(HOUR, -6, SYSUTCDATETIME()) <= t.FechaEstimadaResolucion THEN CONVERT(bit, 1)
         ELSE CONVERT(bit, 0)
     END,
 
@@ -380,29 +380,29 @@ SELECT
 
     HorasAbierto = CASE
         WHEN t.FechaRegistro IS NOT NULL AND t.FechaFirmaCierre IS NULL
-        THEN DATEDIFF(MINUTE, t.FechaRegistro, SYSDATETIME()) / 60.0
+        THEN DATEDIFF(MINUTE, t.FechaRegistro, DATEADD(HOUR, -6, SYSUTCDATETIME())) / 60.0
         ELSE NULL
     END,
 
     HorasCiclo = CASE
         WHEN t.FechaRegistro IS NULL THEN NULL
-        WHEN t.FechaFirmaCierre IS NULL THEN DATEDIFF(MINUTE, t.FechaRegistro, SYSDATETIME()) / 60.0
+        WHEN t.FechaFirmaCierre IS NULL THEN DATEDIFF(MINUTE, t.FechaRegistro, DATEADD(HOUR, -6, SYSUTCDATETIME())) / 60.0
         ELSE DATEDIFF(MINUTE, t.FechaRegistro, t.FechaFirmaCierre) / 60.0
     END,
 
     DiasCiclo = CASE
         WHEN t.FechaRegistro IS NULL THEN NULL
-        WHEN t.FechaFirmaCierre IS NULL THEN DATEDIFF(MINUTE, t.FechaRegistro, SYSDATETIME()) / 1440.0
+        WHEN t.FechaFirmaCierre IS NULL THEN DATEDIFF(MINUTE, t.FechaRegistro, DATEADD(HOUR, -6, SYSUTCDATETIME())) / 1440.0
         ELSE DATEDIFF(MINUTE, t.FechaRegistro, t.FechaFirmaCierre) / 1440.0
     END,
 
     AgingBucket = CASE
         WHEN t.FechaRegistro IS NULL THEN N'Sin fecha'
-        WHEN DATEDIFF(DAY, t.FechaRegistro, ISNULL(t.FechaFirmaCierre, SYSDATETIME())) BETWEEN 0 AND 1 THEN N'0-1 dias'
-        WHEN DATEDIFF(DAY, t.FechaRegistro, ISNULL(t.FechaFirmaCierre, SYSDATETIME())) BETWEEN 2 AND 3 THEN N'2-3 dias'
-        WHEN DATEDIFF(DAY, t.FechaRegistro, ISNULL(t.FechaFirmaCierre, SYSDATETIME())) BETWEEN 4 AND 7 THEN N'4-7 dias'
-        WHEN DATEDIFF(DAY, t.FechaRegistro, ISNULL(t.FechaFirmaCierre, SYSDATETIME())) BETWEEN 8 AND 15 THEN N'8-15 dias'
-        WHEN DATEDIFF(DAY, t.FechaRegistro, ISNULL(t.FechaFirmaCierre, SYSDATETIME())) BETWEEN 16 AND 30 THEN N'16-30 dias'
+        WHEN DATEDIFF(DAY, t.FechaRegistro, ISNULL(t.FechaFirmaCierre, DATEADD(HOUR, -6, SYSUTCDATETIME()))) BETWEEN 0 AND 1 THEN N'0-1 dias'
+        WHEN DATEDIFF(DAY, t.FechaRegistro, ISNULL(t.FechaFirmaCierre, DATEADD(HOUR, -6, SYSUTCDATETIME()))) BETWEEN 2 AND 3 THEN N'2-3 dias'
+        WHEN DATEDIFF(DAY, t.FechaRegistro, ISNULL(t.FechaFirmaCierre, DATEADD(HOUR, -6, SYSUTCDATETIME()))) BETWEEN 4 AND 7 THEN N'4-7 dias'
+        WHEN DATEDIFF(DAY, t.FechaRegistro, ISNULL(t.FechaFirmaCierre, DATEADD(HOUR, -6, SYSUTCDATETIME()))) BETWEEN 8 AND 15 THEN N'8-15 dias'
+        WHEN DATEDIFF(DAY, t.FechaRegistro, ISNULL(t.FechaFirmaCierre, DATEADD(HOUR, -6, SYSUTCDATETIME()))) BETWEEN 16 AND 30 THEN N'16-30 dias'
         ELSE N'31+ dias'
     END,
 

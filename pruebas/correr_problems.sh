@@ -357,7 +357,7 @@ afirmar "las 10 del correo salen vencidas" \
        AND CASE dbo.fn_ClaveNombre(p.Estado)
                 WHEN N'ENANALISIS'  THEN p.FechaAnalisis
                 WHEN N'ENSOLUCION'  THEN p.FechaSolucion
-                WHEN N'ENMONITOREO' THEN p.FechaCierre END < CONVERT(DATE, SYSDATETIME());" \
+                WHEN N'ENMONITOREO' THEN p.FechaCierre END < CONVERT(DATE, DATEADD(HOUR, -6, SYSUTCDATETIME()));" \
     "10"
 
 # 1b. Y las diez ya estaban vencidas AL 19 DE AGOSTO, que es lo que de verdad

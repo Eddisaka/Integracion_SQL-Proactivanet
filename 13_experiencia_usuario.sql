@@ -642,11 +642,11 @@ SELECT
 
     -- Dias desde que se creo hasta que cerro, o hasta hoy si sigue viva
     DiasVida = DATEDIFF(DAY, p.FechaCreacion,
-                        ISNULL(p.FechaCierre, CONVERT(DATE, SYSDATETIME()))),
+                        ISNULL(p.FechaCierre, CONVERT(DATE, DATEADD(HOUR, -6, SYSUTCDATETIME())))),
     -- Vencida: hay compromiso de cierre, ya paso, y no ha cerrado
     Vencida = CASE WHEN p.FechaCierre IS NULL
                     AND p.FechaOriginalCierre IS NOT NULL
-                    AND p.FechaOriginalCierre < SYSDATETIME() THEN 1 ELSE 0 END,
+                    AND p.FechaOriginalCierre < DATEADD(HOUR, -6, SYSUTCDATETIME()) THEN 1 ELSE 0 END,
     Activa  = CASE WHEN p.FechaCierre IS NULL THEN 1 ELSE 0 END,
 
     pc.PctDisminucion,
@@ -663,7 +663,7 @@ SELECT
                         WHERE t.Categoria = pc.Categoria),
     VolumenUltimos30 = (SELECT COUNT_BIG(*) FROM dbo.Tickets AS t
                         WHERE t.Categoria = pc.Categoria
-                          AND t.FechaRegistro >= DATEADD(DAY, -30, SYSDATETIME())),
+                          AND t.FechaRegistro >= DATEADD(DAY, -30, DATEADD(HOUR, -6, SYSUTCDATETIME()))),
 
     CategoriaInactiva = COALESCE(pc.CategoriaInactiva, CONVERT(BIT, c.Inactiva)),
     pc.VigenteEnOrigen,
@@ -689,9 +689,9 @@ SELECT
     Activa  = CASE WHEN p.FechaCierre IS NULL THEN 1 ELSE 0 END,
     Vencida = CASE WHEN p.FechaCierre IS NULL
                     AND p.FechaOriginalCierre IS NOT NULL
-                    AND p.FechaOriginalCierre < SYSDATETIME() THEN 1 ELSE 0 END,
+                    AND p.FechaOriginalCierre < DATEADD(HOUR, -6, SYSUTCDATETIME()) THEN 1 ELSE 0 END,
     DiasVida = DATEDIFF(DAY, p.FechaCreacion,
-                        ISNULL(p.FechaCierre, CONVERT(DATE, SYSDATETIME()))),
+                        ISNULL(p.FechaCierre, CONVERT(DATE, DATEADD(HOUR, -6, SYSUTCDATETIME())))),
     Categorias = (SELECT COUNT(*) FROM dbo.ProblemCategoria AS pc
                   WHERE pc.Codigo = p.Codigo AND pc.VigenteEnOrigen = 1),
     VolumenTotal = (SELECT ISNULL(SUM(v.VolumenCategoria), 0)

@@ -673,7 +673,7 @@ SELECT
                       COALESCE(t.FechaFirmaSolucion, t.FechaFirmaCierre)) / 60.0
     END,
 
-    DiasBacklog = DATEDIFF(DAY, t.FechaRegistro, CONVERT(DATE, SYSDATETIME())),
+    DiasBacklog = DATEDIFF(DAY, t.FechaRegistro, CONVERT(DATE, DATEADD(HOUR, -6, SYSUTCDATETIME()))),
     EnBacklog = CASE WHEN t.Estado NOT IN (N'Cerrada', N'Rechazada', N'Resuelta')
                      THEN 1 ELSE 0 END
 FROM dbo.Tickets AS t
