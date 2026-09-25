@@ -81,6 +81,10 @@ hacen referencia a columnas u objetos que ya no existen. Conviene correrlo
 antes y despues de aplicar scripts: asi se vio que volver a correr 04 le habia
 quitado `Lider` a `vw_Dash_ProductividadBase`.
 
+`35_diagnostico_qa_tablero.sql` es para cuando la pestaña QA del tablero tarda
+o cuenta de mas: dice cuando se cambio `vw_CorreoQA_Base`, que categorias
+llenan la ventana de 15 dias y cuanto tarda leerla. Solo lee.
+
 ## Lo que no se versiona
 
 El repositorio es publico. No se suben credenciales (`config*.json`,
