@@ -7,15 +7,14 @@
 // ensamblado vive en App_Code/ExperienciaQueries.cs; aqui solo se leen los
 // parametros, se serializa y se traducen los errores.
 //
-// Parametros (todos opcionales):
+// Parametros (opcional):
 //
 //     anio=2026     año que acota las vistas por mes. Por omision, el actual.
 //                   Las vistas por slot son ventanas relativas de 30 dias y
 //                   no dependen de este valor.
-//     detalle=5000  cuantos tickets del periodo vigente se incluyen en
-//                   tickets_detalle, para el boton de exportar. Por omision 0
-//                   (lista vacia, igual que el mock): son decenas de miles de
-//                   filas y el tablero ya sabe funcionar sin ellas.
+//
+// El detalle de tickets del boton "Descargar Tickets" no sale de aqui: lo
+// sirve handlers/experiencia_exportar.ashx, ya filtrado por periodo y dueños.
 //
 // POR QUE NO USA DashboardHandler.Responder
 // -----------------------------------------
@@ -36,10 +35,6 @@ using System.Web.Script.Serialization;
 
 public class Experiencia : IHttpHandler
 {
-    // Tope de tickets del export, para que un ?detalle= grande no se lleve la
-    // memoria del proceso de IIS por delante.
-    private const int TOPE_DETALLE = 50000;
-
     public void ProcessRequest(HttpContext context)
     {
         context.Response.ContentType = "application/json; charset=utf-8";
@@ -52,12 +47,8 @@ public class Experiencia : IHttpHandler
         try
         {
             var anio = DashboardParams.Entero(context.Request, "anio", DateTime.Today.Year);
-            var detalle = DashboardParams.Entero(context.Request, "detalle", 0);
 
-            if (detalle < 0) detalle = 0;
-            if (detalle > TOPE_DETALLE) detalle = TOPE_DETALLE;
-
-            var salida = ExperienciaQueries.Construir(anio, detalle);
+            var salida = ExperienciaQueries.Construir(anio);
             context.Response.Write(serializador.Serialize(salida));
         }
         catch (Exception ex)
@@ -65,11 +56,20 @@ public class Experiencia : IHttpHandler
             context.Response.StatusCode = 500;
             context.Response.TrySkipIisCustomErrors = true;
 
-            // Solo el mensaje y el tipo: ni la traza ni la cadena de conexion
-            // salen del servidor. experiencia.js lee "error" y cae al mock.
+            /* Ni la traza, ni la cadena de conexion, ni el mensaje crudo de
+               SQL Server -que lleva servidor, base y procedimiento- salen del
+               servidor: el navegador recibe el texto saneado que arma
+               DashboardHandler.MensajeSeguro, el mismo criterio que usan la
+               envoltura comun y qa.ashx.
+
+               El detalle completo va a la traza de ASP.NET. El contrato JSON
+               no cambia: siguen siendo las mismas dos llaves, y
+               experiencia.js sigue leyendo "error" para caer al mock. */
+            DashboardHandler.Registrar("experiencia.ashx", ex);
+
             var error = new Dictionary<string, object>
             {
-                { "error", ex.Message },
+                { "error", DashboardHandler.MensajeSeguro(ex) },
                 { "tipo", ex.GetType().Name },
             };
             context.Response.Write(serializador.Serialize(error));

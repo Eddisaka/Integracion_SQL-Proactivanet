@@ -81,8 +81,19 @@ try {
 
 const P = DATOS;
 
+/* Escape de HTML. La implementacion es la compartida de assets/js/escape.js:
+   todo lo que sale del handler -categorias, titulos, descripciones, folios,
+   estados, nombres de Director/PO/Service Owner- se pega con innerHTML y
+   tiene que entrar como TEXTO. Los numeros pasan por FMT/PCT y no hace falta
+   escaparlos. */
+const esc = v => Escape.html(v);
+
 const FMT = n => Math.round(n||0).toLocaleString('es-MX');
 const PCT = n => Math.round((n||0)*100)+'%';
+/* Cifra del primer y del ultimo punto de una linea: el plugin compartido
+   de assets/js/lineas.js atado al FMT de esta pagina. Se enchufa por
+   grafica en su arreglo `plugins`, igual que la cifra dentro de la barra. */
+const CIFRAS_EXTREMOS = Lineas.cifrasExtremos(FMT);
 /* =========================================================================
    PALETA DE GRAFICAS — escala verde de la cabecera.
 
@@ -175,7 +186,7 @@ const miniBar = v => {const s=SEM(v);return `<span class="mini"><i style="width:
 const fdate = s => s? s.split('-').reverse().join('/') : '—';
 // Pinta una fecha en rojo+negritas si corresponde al estado y esta retrasada.
 function fdateSem(i, campo){
-  const val = fdate(i[campo]);
+  const val = esc(fdate(i[campo]));
   const mapa = {'En Análisis':'f_analisis','En Solución':'f_solucion','En Monitoreo':'f_cierre'};
   if(i.fecha_retrasada && mapa[i.estado]===campo){
     return `<b style="color:#982a18">${val}</b>`;
@@ -222,17 +233,48 @@ function pronosticoMes(volReal){
   return Math.round(volReal / P.dias_transcurridos_mes * 30);
 }
 
-// Enlace "Consulta el Detalle" (header y modal) desde LIGADETALLE
+/* Enlace "Consulta el Detalle" (header y modal) desde LIGADETALLE.
+
+   La URL viene de fuera -AppSettings["ExperienciaLigaDetalle"], via el
+   handler-, asi que se valida el ESQUEMA antes de ponerla en un href. Un
+   `javascript:...` no tiene ni un caracter que el escape de HTML cambie, y
+   en un <a href> se ejecuta al hacer clic.
+
+   LIGA_DETALLE es '' cuando el valor no sirve, que es exactamente lo mismo
+   que cuando no hay valor: los dos enlaces nacen con display:none en el
+   marcado y se quedan asi. No se avisa de nada al usuario -no es un error
+   suyo- y el resto del tablero no cambia. */
+const LIGA_DETALLE = Escape.url(P.liga_detalle);
+
 (function(){
-  const url=P.liga_detalle;
+  const url=LIGA_DETALLE;
   if(url){
     const h=document.getElementById('ligaHeader');
     if(h){h.href=url; h.style.display='inline-flex';}
     const m=document.getElementById('ligaModal');
     if(m){m.href=url;}
   }
+  /* Sello de frescura y periodo, con el componente compartido
+     (assets/js/datos-info.js). El metadato lo arma el backend en
+     App_Code/ExperienciaQueries.cs -sello = MAX(FechaUltimaCargaDW) de
+     dbo.Tickets, periodo = el SLOT 0, o sea los ultimos 30 dias contados
+     desde el MISMO 'hoy' con el que se rotula el eje- y aqui no se calcula
+     ninguna fecha ni se da formato a mano.
+
+     P.meta falta en el mock guardado (data/experiencia.mock.json, anterior a
+     este contrato): en ese caso se cae a fecha_actualizacion, que ya venia
+     formateada como dd/MM/yyyy y es lo unico que ese archivo sabe del corte.
+     Con el handler respondiendo, manda siempre P.meta. */
   const cf=document.getElementById('corteFecha');
-  if(cf && P.fecha_actualizacion) cf.textContent='Corte Actualización de Tickets: '+P.fecha_actualizacion;
+  if(cf && P.meta){
+    DatosInfo.pintar(cf, P.meta);
+  } else if(cf && P.fecha_actualizacion){
+    DatosInfo.pintar(cf, DatosInfo.armar({
+      fuente: 'Experiencia al Usuario',
+      sello: P.fecha_actualizacion,
+      origen: 'Corte guardado en data/experiencia.mock.json',
+    }));
+  }
 })();
 
 // ---- filtrar categorias segun Director / PO ----
@@ -253,33 +295,9 @@ function currentCats(){
 // tickets. Sumando por C2 (mas los C1 sin hijos, para no perder los que
 // no tienen ninguna subcategoria) el total sigue sin duplicar y ademas
 // no depende de que el dueño del C1 y de sus hijos coincida.
-// Primer segmento de una ruta "/A/B/C", RECORTADO.
-//
-// El recorte no es cosmetico: es lo que hace que un C1&C2 encuentre a su
-// padre. La llave de un C1 viene de fn_CategoriaC1 (replicada en
-// ExperienciaQueries.C1DeTsql), que recorta; la de un C1&C2 viene de
-// fn_CategoriaC1C2 (C1C2De), que NO recorta y conserva la ruta tal cual esta
-// en Proactivanet. Con una categoria sucia como "/Monitoreo Activación
-// Continua /Job Control M" eso da
-//
-//     C1    = "Monitoreo Activación Continua"     (recortado)
-//     C1&C2 = "/Monitoreo Activación Continua /Job Control M"
-//
-// y un split('/')[1] a secas devuelve "Monitoreo Activación Continua " -con
-// el espacio-, que no es igual al C1. El padre parecia no tener hijos, se
-// sumaba TAMBIEN de los suyos, y sus tickets se contaban dos veces: eran los
-// 63 que le sobraban al "Volumen actual" contra la base. Se recorta aqui, en
-// el tablero, y no en C1C2De, porque esa llave tiene que seguir cruzando
-// caracter por caracter con la que emite T-SQL (el catalogo de dueños, entre
-// otras).
-function c1DeRuta(ruta){
-  const s = (ruta||'').split('/')[1];
-  return s===undefined ? s : s.trim();
-}
-
 function aggCats(){
   const cats = currentCats();
-  const c1conHijos = new Set(cats.filter(c=>c.nivel==='C2').map(c=>c1DeRuta(c.categoria)));
+  const c1conHijos = new Set(cats.filter(c=>c.nivel==='C2').map(c=>c.categoria.split('/')[1]));
   return cats.filter(c=>c.nivel==='C2' || !c1conHijos.has(c.categoria));
 }
 
@@ -288,7 +306,7 @@ function renderKPIs(cats, det){
   det = det || cats;
   const vol=cats.reduce((s,c)=>s+volActualDe(c),0);       // volumen: solo C1 (sin duplicar)
   // --- fuente de detalle real: subcategorias C2 + C1 que no tienen hijos C2 ---
-  const c1conHijos=new Set(det.filter(c=>c.nivel==='C2').map(c=>c1DeRuta(c.categoria)));
+  const c1conHijos=new Set(det.filter(c=>c.nivel==='C2').map(c=>c.categoria.split('/')[1]));
   const detReal=det.filter(c=>c.nivel==='C2' || !c1conHijos.has(c.categoria));
   // Cobertura y retraso: sumar los agregados ini_total/ret de las categorias del
   // detalle real (C2 + C1 sin hijos). Se usa el ini_total del motor (que ya suma
@@ -360,7 +378,8 @@ function renderEvol(cats){
   // El punto de pronostico conserva el ambar: es una advertencia, no una serie.
   const pointColors=vals.map((_,i)=>i===idxPron?AMBAR_SEM:VERDE.profundo);
   const pointRadii=vals.map((_,i)=>i===idxPron?6:3);
-  chartEvol=new Chart(ctx,{type:'line',data:{labels,datasets:[{label:'Volumen',data:vals,
+  // De cuanto volumen arranca la ventana y en cuanto acaba, sobre la linea.
+  chartEvol=new Chart(ctx,{type:'line',plugins:[CIFRAS_EXTREMOS],data:{labels,datasets:[{label:'Volumen',data:vals,
     borderColor:VERDE.pino,backgroundColor:'rgba(47,143,107,.14)',fill:true,tension:.3,
     pointRadius:pointRadii,pointHoverRadius:pointRadii.map(r=>r+3),
     pointBackgroundColor:pointColors,borderWidth:2}]},
@@ -397,7 +416,7 @@ function renderDona(cats){
     options:{responsive:true,cutout:'58%',plugins:{legend:{display:false},
       tooltip:{callbacks:{label:c=>c.label+': '+FMT(c.raw)}}}}});
   document.getElementById('legendDona').innerHTML=labels.map((l,i)=>
-    `<span><i style="background:${colors[i]}"></i>${l}: ${FMT(data[i])}</span>`).join('');
+    `<span><i style="background:${colors[i]}"></i>${esc(l)}: ${FMT(data[i])}</span>`).join('');
 }
 
 function tend(delta){
@@ -445,23 +464,23 @@ function renderDet(cats){
     const aConIni=conIniVolDe({nivel:'C1', categoria:c1});
     const aPctInic = aVol>0 ? Math.min(aConIni/aVol,1) : 0;
     h+=`<tr class="c1row" data-g="g${idx}">
-      <td><span class="catclick" data-cat="${encodeURIComponent(agg.categoria)}">${c1}</span></td>
+      <td><span class="catclick" data-cat="${encodeURIComponent(agg.categoria)}">${esc(c1)}</span></td>
       <td class="num">${FMT(aPrev)}</td><td class="num">${FMT(aVol)}</td>
       <td class="num">${tend(aDelta)}</td><td class="num">${FMT(aConIni)}</td>
       <td class="num">${miniBar(aPctInic)} ${badge(aPctInic)}</td>
       <td class="num">${FMT(agg.ret)}</td><td class="num">${badge(agg.pct_en_tiempo)}</td>
-      <td>${agg.po||'—'}</td><td>${agg.so||'—'}</td></tr>`;
+      <td>${esc(agg.po||'—')}</td><td>${esc(agg.so||'—')}</td></tr>`;
     hijos.forEach(c=>{
       const cVol=volActualDe(c), cPrev=volAnteriorDe(c), cDelta=deltaDe(c);
       const cConIni=conIniVolDe(c);
       const cPctInic = cVol>0 ? Math.min(cConIni/cVol,1) : 0;
       h+=`<tr class="c2row g${idx}">
-        <td><span class="catclick" data-cat="${encodeURIComponent(c.categoria)}">${c.categoria}</span></td>
+        <td><span class="catclick" data-cat="${encodeURIComponent(c.categoria)}">${esc(c.categoria)}</span></td>
         <td class="num">${FMT(cPrev)}</td><td class="num">${FMT(cVol)}</td>
         <td class="num">${tend(cDelta)}</td><td class="num">${FMT(cConIni)}</td>
         <td class="num">${miniBar(cPctInic)} ${badge(cPctInic)}</td>
         <td class="num">${FMT(c.ret)}</td><td class="num">${badge(c.pct_en_tiempo)}</td>
-        <td>${c.po||'—'}</td><td>${c.so||'—'}</td></tr>`;
+        <td>${esc(c.po||'—')}</td><td>${esc(c.so||'—')}</td></tr>`;
     });
   });
   document.getElementById('bodyDet').innerHTML=h||'<tr><td colspan="10" class="empty">Sin datos</td></tr>';
@@ -573,10 +592,7 @@ function renderSin(cats){
   const grupos={};   // c1 -> { c1c2 -> [hojas] }
   hojas.forEach(hj=>{
     const partes=hj.categoria.split('/');
-    // El C1 se recorta (ver c1DeRuta) para que byCat[c1] encuentre la fila
-    // del padre y salgan su PO y su Service Owner. El C1&C2 se deja tal
-    // cual: esa llave si tiene que cruzar literal con byCat[c1c2].
-    const c1=c1DeRuta(hj.categoria);
+    const c1=partes[1];
     const c1c2=partes.length>=3 ? ('/'+partes[1]+'/'+partes[2]) : hj.categoria;
     grupos[c1]=grupos[c1]||{};
     (grupos[c1][c1c2]=grupos[c1][c1c2]||[]).push(hj);
@@ -611,17 +627,17 @@ function renderSin(cats){
       if(esHojaC2){
         h+=`<tr class="c2row s${idx}"><td>${c1c2}</td>
           <td class="num">${FMT(sC2)}</td><td class="num">${badgeBin(pC2)}</td>
-          <td>${c2Info.po||nodos[0].po||'—'}</td><td>${c2Info.so||nodos[0].so||'—'}</td></tr>`;
+          <td>${esc(c2Info.po||nodos[0].po||'—')}</td><td>${esc(c2Info.so||nodos[0].so||'—')}</td></tr>`;
       }else{
         h+=`<tr class="c2row s${idx} c2exp" data-g2="${gid}"><td>${c1c2}</td>
           <td class="num">${FMT(sC2)}</td><td class="num">${badgeBin(pC2)}</td>
-          <td>${c2Info.po||'—'}</td><td>${c2Info.so||'—'}</td></tr>`;
+          <td>${esc(c2Info.po||'—')}</td><td>${esc(c2Info.so||'—')}</td></tr>`;
         nodos.sort((a,b)=>sinDeCatV2(b)-sinDeCatV2(a)).forEach(n=>{
           const nombreCorto=n.categoria.split('/').pop();
           const volN=volCatV2(n); const pctN=volN>0?conDeCatV2(n)/volN:0;
-          h+=`<tr class="c3row s${idx} ${gid}"><td style="padding-left:34px;color:#5e5e5f">${nombreCorto}</td>
+          h+=`<tr class="c3row s${idx} ${gid}"><td style="padding-left:34px;color:#5e5e5f">${esc(nombreCorto)}</td>
             <td class="num">${FMT(sinDeCatV2(n))}</td><td class="num">${badgeBin(pctN)}</td>
-            <td>${n.po||'—'}</td><td>${n.so||'—'}</td></tr>`;
+            <td>${esc(n.po||'—')}</td><td>${esc(n.so||'—')}</td></tr>`;
         });
       }
     });
@@ -662,14 +678,14 @@ function openCatPopup(folio){
   if(sub){
     const titulo=(entradas[0]&&entradas[0].titulo_problem)||'—';
     const desc=(entradas[0]&&entradas[0].descripcion)||'—';
-    sub.innerHTML=`<b>Título:</b> ${titulo}<br><b>Descripción:</b> ${desc}`;
+    sub.innerHTML=`<b>Título:</b> ${esc(titulo)}<br><b>Descripción:</b> ${esc(desc)}`;
   }
   let totalVol=0, totalReduce=0;
   const filas=entradas.map(e=>{
     const cv=map.get(e.categoria);
     const vol=cv?volCatV2(cv):0;
     totalVol+=vol; totalReduce+=(e.tickets_reduce||0);
-    return `<tr><td>${e.categoria}</td><td class="num">${FMT(vol)}</td>
+    return `<tr><td>${esc(e.categoria)}</td><td class="num">${FMT(vol)}</td>
       <td class="num">${PCT(e.pct_dism)}</td><td class="num">${FMT(e.tickets_reduce)}</td></tr>`;
   });
   const totalRow = entradas.length
@@ -690,7 +706,7 @@ function bindVerCategoriasClicks(bodyId){
 // graficas de TAREA 3) de Vencidas/Activas -- se factoriza para
 // reutilizarse tanto en la tabla como en las 3 graficas del panel.
 function filasBaseVen(cats){
-  const c1conHijos=new Set(cats.filter(c=>c.nivel==='C2').map(c=>c1DeRuta(c.categoria)));
+  const c1conHijos=new Set(cats.filter(c=>c.nivel==='C2').map(c=>c.categoria.split('/')[1]));
   const fuente=cats.filter(c=>c.nivel==='C2' || !c1conHijos.has(c.categoria));
   const vistos=new Set(); const rows=[];
   fuente.forEach(c=>c.iniciativas.forEach(i=>{
@@ -702,7 +718,7 @@ function filasBaseVen(cats){
   return rows;
 }
 function filasBaseAct(cats){
-  const c1conHijos=new Set(cats.filter(c=>c.nivel==='C2').map(c=>c1DeRuta(c.categoria)));
+  const c1conHijos=new Set(cats.filter(c=>c.nivel==='C2').map(c=>c.categoria.split('/')[1]));
   const fuente=cats.filter(c=>c.nivel==='C2' || !c1conHijos.has(c.categoria));
   const vistos=new Set(); const rows=[];
   fuente.forEach(c=>c.iniciativas.forEach(i=>{
@@ -744,13 +760,13 @@ function renderVen(cats){
   rows.sort((a,b)=>b.retrazado-a.retrazado);
   document.getElementById('bodyVen').innerHTML = rows.length? rows.map(x=>{
     const camb=[x.n_analisis,x.n_solucion,x.n_cierre].reduce((a,b)=>a+(b||0),0);
-    return `<tr><td><button class="btn-ver-cat" data-fol="${x.folio}">Ver categorías</button></td><td>${x.folio}</td><td>${x.titulo||'—'}</td>
-      <td><span class="chip" style="background:${ACOLOR[x.agrup]}33;color:${TINTA_CHIP}">${x.agrup}</span></td>
+    return `<tr><td><button class="btn-ver-cat" data-fol="${Escape.attr(x.folio)}">Ver categorías</button></td><td>${esc(x.folio)}</td><td>${esc(x.titulo||'—')}</td>
+      <td><span class="chip" style="background:${ACOLOR[x.agrup]}33;color:${TINTA_CHIP}">${esc(x.agrup)}</span></td>
       <td class="num"><b>${FMT(x.riesgo_folio)}</b></td><td class="num">${FMT(volumenCategoriasFolio(x.folio))}</td>
-      <td><span class="tag-est">${x.estado||'—'}</span></td>
+      <td><span class="tag-est">${esc(x.estado||'—')}</span></td>
       <td class="fecha-cell"><span class="dot" style="background:${SEMC[x.sem_fecha]}"></span>${fdateSem(x,'f_analisis')}</td>
       <td class="fecha-cell">${fdateSem(x,'f_solucion')}</td><td class="fecha-cell">${fdateSem(x,'f_cierre')}</td>
-      <td class="num">${FMT(camb)}</td><td>${x.po||'—'}</td></tr>`;
+      <td class="num">${FMT(camb)}</td><td>${esc(x.po||'—')}</td></tr>`;
   }).join('') : '<tr><td colspan="12" class="empty">Sin iniciativas retrasadas ✅</td></tr>';
   const cap=document.getElementById('capVen');
   if(cap) cap.textContent=`${rows.length} iniciativas activas retrasadas`;
@@ -764,13 +780,13 @@ function renderAct(cats){
   rows.sort((a,b)=>(b.riesgo_folio||0)-(a.riesgo_folio||0));
   document.getElementById('bodyAct').innerHTML = rows.length? rows.map(x=>{
     const camb=[x.n_analisis,x.n_solucion,x.n_cierre].reduce((a,b)=>a+(b||0),0);
-    return `<tr><td><button class="btn-ver-cat" data-fol="${x.folio}">Ver categorías</button></td><td>${x.folio}</td><td>${x.titulo||'—'}</td>
-      <td><span class="chip" style="background:${ACOLOR[x.agrup]}33;color:${TINTA_CHIP}">${x.agrup}</span></td>
+    return `<tr><td><button class="btn-ver-cat" data-fol="${Escape.attr(x.folio)}">Ver categorías</button></td><td>${esc(x.folio)}</td><td>${esc(x.titulo||'—')}</td>
+      <td><span class="chip" style="background:${ACOLOR[x.agrup]}33;color:${TINTA_CHIP}">${esc(x.agrup)}</span></td>
       <td class="num"><b>${FMT(x.riesgo_folio)}</b></td><td class="num">${FMT(x.vol_reduce_folio)}</td>
-      <td><span class="tag-est">${x.estado||'—'}</span></td>
+      <td><span class="tag-est">${esc(x.estado||'—')}</span></td>
       <td class="fecha-cell"><span class="dot" style="background:${SEMC[x.sem_fecha]}"></span>${fdateSem(x,'f_analisis')}</td>
       <td class="fecha-cell">${fdateSem(x,'f_solucion')}</td><td class="fecha-cell">${fdateSem(x,'f_cierre')}</td>
-      <td class="num">${FMT(camb)}</td><td>${x.po||'—'}</td></tr>`;
+      <td class="num">${FMT(camb)}</td><td>${esc(x.po||'—')}</td></tr>`;
   }).join('') : '<tr><td colspan="12" class="empty">Sin iniciativas activas</td></tr>';
   const cap=document.getElementById('capAct');
   if(cap) cap.textContent=`${rows.length} iniciativas activas`;
@@ -828,9 +844,7 @@ function construirGruposHist(){
   const grupos={};
   hojas.forEach(hj=>{
     const partes=hj.categoria.split('/');
-    // C1 recortado: si no, una categoria con espacios abre DOS renglones de
-    // primer nivel con el mismo nombre. El C1&C2 se deja literal.
-    const c1=c1DeRuta(hj.categoria);
+    const c1=partes[1];
     const c1c2=partes.length>=3 ? ('/'+partes[1]+'/'+partes[2]) : hj.categoria;
     grupos[c1]=grupos[c1]||{};
     (grupos[c1][c1c2]=grupos[c1][c1c2]||[]).push(hj);
@@ -853,7 +867,7 @@ function histChk(nivel,categoria){
 function renderHeadHist(){
   const labels=etiquetasPeriodos();
   let h='<th></th><th>Categoría</th>';
-  labels.forEach(l=>{h+=`<th class="num">${l}</th>`;});
+  labels.forEach(l=>{h+=`<th class="num">${esc(l)}</th>`;});
   h+='<th class="num">Tend.</th>';
   const thead=document.getElementById('theadHist');
   if(thead) thead.innerHTML=h;
@@ -877,7 +891,7 @@ function renderHist(){
     const deltaC1=deltaDeValores(valC1);
     hcuerpo+=`<tr class="c1row" data-g="h${idx}">
       <td>${histChk(1,c1)}</td>
-      <td>${c1}</td>
+      <td>${esc(c1)}</td>
       ${valC1.map(v=>`<td class="num">${FMT(v)}</td>`).join('')}
       <td class="num">${tend(deltaC1)}</td></tr>`;
     Object.keys(grupos[c1]).sort((a,b)=>{
@@ -890,18 +904,18 @@ function renderHist(){
       const gid='h'+idx+'_'+jdx;
       const esHojaC2=nodos.length===1 && nodos[0].categoria===c1c2;
       if(esHojaC2){
-        hcuerpo+=`<tr class="c2row h${idx}"><td>${histChk(2,c1c2)}</td><td>${c1c2}</td>
+        hcuerpo+=`<tr class="c2row h${idx}"><td>${histChk(2,c1c2)}</td><td>${esc(c1c2)}</td>
           ${valC2.map(v=>`<td class="num">${FMT(v)}</td>`).join('')}
           <td class="num">${tend(deltaC2)}</td></tr>`;
       }else{
-        hcuerpo+=`<tr class="c2row h${idx} c2exp" data-g2="${gid}"><td>${histChk(2,c1c2)}</td><td>${c1c2}</td>
+        hcuerpo+=`<tr class="c2row h${idx} c2exp" data-g2="${gid}"><td>${histChk(2,c1c2)}</td><td>${esc(c1c2)}</td>
           ${valC2.map(v=>`<td class="num">${FMT(v)}</td>`).join('')}
           <td class="num">${tend(deltaC2)}</td></tr>`;
         nodos.slice().sort((a,b)=>volSlotOMes(b,nums[iAct])-volSlotOMes(a,nums[iAct])).forEach(n=>{
           const valC3=valoresPeriodos(n);
           const deltaC3=deltaDeValores(valC3);
           const nombreCorto=n.categoria.split('/').pop();
-          hcuerpo+=`<tr class="c3row h${idx} ${gid}"><td>${histChk(3,n.categoria)}</td><td style="padding-left:34px;color:#5e5e5f">${nombreCorto}</td>
+          hcuerpo+=`<tr class="c3row h${idx} ${gid}"><td>${histChk(3,n.categoria)}</td><td style="padding-left:34px;color:#5e5e5f">${esc(nombreCorto)}</td>
             ${valC3.map(v=>`<td class="num">${FMT(v)}</td>`).join('')}
             <td class="num">${tend(deltaC3)}</td></tr>`;
         });
@@ -948,7 +962,7 @@ function propagarHistDescendientes(nivel,categoria,marcar){
       hijos[c1c2].forEach(n=>claves.push([3,n.categoria]));
     });
   } else if(nivel===2){
-    const c1=c1DeRuta(categoria);
+    const c1=categoria.split('/')[1];
     const nodos=(grupos[c1] && grupos[c1][categoria])||[];
     nodos.forEach(n=>claves.push([3,n.categoria]));
   }
@@ -984,7 +998,7 @@ function graficarHist(){
       const val=sumaValores(...Object.values(grupos[categoria]).map(nodos=>sumaValores(...nodos.map(valoresPeriodos))));
       series.push({label:categoria, data:val});
     } else if(nivel===2){
-      const c1=c1DeRuta(categoria);
+      const c1=categoria.split('/')[1];
       const nodos=grupos[c1] && grupos[c1][categoria];
       if(!nodos) return;
       series.push({label:categoria, data:sumaValores(...nodos.map(valoresPeriodos))});
@@ -1021,7 +1035,7 @@ function graficarHist(){
         }}}}}};
     leyenda.innerHTML=pieSeries.map((s,i)=>{
       const pct=totalPie>0?s.valor/totalPie:0;
-      return `<span><i style="background:${colores[i%colores.length]}"></i>${s.label}: ${FMT(s.valor)} (${PCT(pct)})</span>`;
+      return `<span><i style="background:${colores[i%colores.length]}"></i>${esc(s.label)}: ${FMT(s.valor)} (${PCT(pct)})</span>`;
     }).join('');
     leyenda.style.display='flex';
   } else {
@@ -1032,7 +1046,11 @@ function graficarHist(){
     const seriesOrdenadas = tipo==='bar'
       ? series.slice().sort((a,b)=>b.data.reduce((s,v)=>s+v,0)-a.data.reduce((s,v)=>s+v,0))
       : series;
-    cfg={type:tipo,data:{labels,
+    // Las cifras de los extremos son de la vista de LINEAS: son el primer y
+    // el ultimo punto de una serie en el tiempo. En la vista de barras cada
+    // barra es un periodo suelto y no hay "extremos" que leer, asi que esa se
+    // queda como estaba.
+    cfg={type:tipo,plugins:tipo==='line'?[CIFRAS_EXTREMOS]:[],data:{labels,
       datasets:seriesOrdenadas.map((s,i)=>({label:s.label,data:s.data,
         borderColor:colores[i%colores.length],
         backgroundColor: tipo==='line' ? colores[i%colores.length]+'33' : colores[i%colores.length],
@@ -1125,7 +1143,7 @@ function renderModalBody(){
   const nCer=new Set(c.iniciativas.filter(i=>i.agrup!=='ReqOpr' && i.estado==='Cerrado').map(i=>i.folio)).size;
   document.getElementById('modalTitle').textContent=c.categoria;
   const lm=document.getElementById('ligaModal');
-  if(lm && P.liga_detalle) lm.style.display='inline-block';
+  if(lm && LIGA_DETALLE) lm.style.display='inline-block';
   document.getElementById('modalSub').textContent=
     `Volumen actual: ${FMT(volActualDe(c))} · Con iniciativa activa: ${FMT(c.ini_total)} (${PCT(c.pct_inic)}) · `
     +`${nAct} activas · ${nCer} cerradas`;
@@ -1134,17 +1152,17 @@ function renderModalBody(){
     // POP-1: el folio siempre se muestra como liga -- el disparador de
     // POP-2 (detalle del Problem) ya no depende de que existan observaciones.
     const folioCell = `<span class="folioclick" style="color:var(--accent);cursor:pointer;text-decoration:underline dotted"
-           data-obs="${obs.replace(/"/g,'&quot;')}" data-fol="${i.folio}"
-           data-titulo="${(i.titulo_problem||'').replace(/"/g,'&quot;')}"
-           data-desc="${(i.descripcion||'').replace(/"/g,'&quot;')}"
-           title="Ver detalle del Problem">${i.folio}</span>`;
-    return `<tr><td>${folioCell}</td><td>${i.titulo||'—'}</td>
-     <td><span class="chip" style="background:${(ACOLOR[i.agrup]||'#eeeeee')}33;color:${TINTA_CHIP}">${i.agrup||'—'}</span></td>
+           data-obs="${Escape.attr(obs)}" data-fol="${Escape.attr(i.folio)}"
+           data-titulo="${Escape.attr(i.titulo_problem||'')}"
+           data-desc="${Escape.attr(i.descripcion||'')}"
+           title="Ver detalle del Problem">${esc(i.folio)}</span>`;
+    return `<tr><td>${folioCell}</td><td>${esc(i.titulo||'—')}</td>
+     <td><span class="chip" style="background:${(ACOLOR[i.agrup]||'#eeeeee')}33;color:${TINTA_CHIP}">${esc(i.agrup||'—')}</span></td>
      <td class="num">${FMT(i.riesgo_folio)}</td>
      <td class="fecha-cell"><span class="dot" style="background:${SEMC[i.sem_fecha]}"></span>${fdateSem(i,'f_analisis')}</td>
      <td class="fecha-cell">${fdateSem(i,'f_solucion')}</td><td class="fecha-cell">${fdateSem(i,'f_cierre')}</td>
      <td class="num">${i.antiguedad!=null?i.antiguedad+' d':'—'}</td>
-     <td><span class="tag-est">${i.estado||'—'}</span></td><td>${i.po||'—'}</td><td>${i.so||'—'}</td></tr>`;
+     <td><span class="tag-est">${esc(i.estado||'—')}</span></td><td>${esc(i.po||'—')}</td><td>${esc(i.so||'—')}</td></tr>`;
    }).join('') : `<tr><td colspan="11" class="empty">${verCerradas?'Esta categoría no tiene iniciativas registradas.':'Sin iniciativas activas. Marca la casilla para ver las cerradas.'}</td></tr>`;
   // click en folio -> POP-2 (Folio, Titulo, Descripcion y Observaciones del Problem)
   document.querySelectorAll('#modalBody .folioclick').forEach(el=>{
@@ -1202,47 +1220,474 @@ function renderAll(){
   if(modoResumen==='director') renderResumen();
   else if(modoResumen==='po') renderResumenPorPO(fDir);
   if(modoResumen!=='oculto') renderChartEstados(cats);
-  // [Pendientes Claude #7]: se muestra con cualquier filtro de Director/PO
-  // activo, sin importar si esta corrida trajo detalle de tickets -- si no
-  // lo trajo, se asume que ya existe un Detalle_Tickets.xlsx de una corrida
-  // anterior en la misma carpeta que este tablero (ver descargarTickets()).
+  // [Pendientes Claude #7]: se muestra con cualquier filtro de Director / PO /
+  // Manager / SO activo; descargarTickets() exporta con esos mismos cuatro.
   const btnDesc=document.getElementById('btnDescargaTickets');
   if(btnDesc) btnDesc.style.display=(fDir||fPO||fMgr||fSO)?'inline-block':'none';
 }
 
-// [Pendientes Claude #7]: descarga CSV de los tickets del periodo vigente
-// (SLOT 0 o mes actual, segun modoTiempo -- lo mismo que muestra KPI-1)
-// filtrados por Director/PO, sin backend (Blob + <a download>). Si esta
-// corrida no trajo detalle de tickets (payload.tickets_detalle vacio --
-// no se activo "Actualizar Base de Tickets"), cae a descargar el archivo
-// fisico Detalle_Tickets.xlsx que deberia existir en la misma carpeta de
-// una corrida anterior.
-function descargarTickets(){
-  if(!(P.tickets_detalle && P.tickets_detalle.length)){
-    const a=document.createElement('a');
-    a.href='Detalle_Tickets.xlsx'; a.download='Detalle_Tickets.xlsx';
-    document.body.appendChild(a); a.click(); a.remove();
-    return;
+// EL DETALLE SE PIDE APARTE, YA FILTRADO
+// --------------------------------------
+// El payload del tablero no trae tickets individuales (son decenas de miles
+// de filas que solo sirven al exportar). Al pulsar el boton se pide a
+// handlers/experiencia_exportar.ashx el periodo que se esta viendo -SLOT 0, o
+// el mes P.mes_actual del año P.anio- y los cuatro filtros de dueños. El
+// servidor resuelve periodo y dueños con la misma logica que las filas de
+// categoria y devuelve solo los tickets que van al libro, sin tope.
+const EXPORT_URL = new URL('../handlers/experiencia_exportar.ashx', BASE).href;
+async function pedirTicketsExport(){
+  const url=new URL(EXPORT_URL);
+  const esMes=modoTiempo==='mes';
+  url.searchParams.set('modo', esMes ? 'mes' : 'slot');
+  if(esMes){
+    // El mock no trae anio: en ese caso el tablero se armo con el año en curso.
+    url.searchParams.set('anio', String(P.anio || new Date().getFullYear()));
+    url.searchParams.set('mes', String(P.mes_actual));
   }
-  const periodoOk = t => modoTiempo==='mes' ? t.mes===P.mes_actual : t.slot===0;
-  const filtrados=(P.tickets_detalle||[]).filter(t=>
-    periodoOk(t) && (!fDir || t.director===fDir) && (!fPO || t.po===fPO));
-  if(!filtrados.length){ alert('No hay tickets para el filtro y periodo actuales.'); return; }
-  const cols=[
-    ['fecha','Fecha de registro'], ['codigo','C\u00F3digo'], ['grupo','Grupo'],
-    ['estado','Estado'], ['titulo','T\u00EDtulo'], ['descripcion','Descripci\u00F3n'],
-    ['categoria_raw','Categor\u00EDa'], ['solucion','Soluci\u00F3n para el usuario'],
-    ['tipo','Tipo'], ['tipo_rel','Tipo relaci\u00F3n'],
-  ];
-  const esc=v=>{const s=(v==null?'':String(v)).replace(/"/g,'""'); return /[",\n]/.test(s)?`"${s}"`:s;};
-  const csv=[cols.map(c=>c[1]).join(',')]
-    .concat(filtrados.map(t=>cols.map(c=>esc(t[c[0]])).join(','))).join('\n');
-  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');
-  a.href=url; a.download='Tickets_'+(fDir||fPO||'filtro').replace(/[^a-z0-9]+/gi,'_')+'.csv';
-  document.body.appendChild(a); a.click(); a.remove();
-  URL.revokeObjectURL(url);
+  [['director',fDir],['po',fPO],['manager',fMgr],['so',fSO]].forEach(([k,v])=>{
+    if(v) url.searchParams.set(k, v);
+  });
+  const resp=await fetch(url.href, {headers: {'Accept': 'application/json'}});
+  let datos=null;
+  try{ datos=await resp.json(); }catch(e){ /* cuerpo no JSON: se reporta abajo */ }
+  // El handler responde {error} con 400/500: se prefiere su mensaje al HTTP.
+  if(!resp.ok || !datos || datos.error)
+    throw new Error((datos && datos.error) || ('HTTP '+resp.status+' '+resp.statusText));
+  return datos;
+}
+
+// SheetJS se trae la primera vez que se pulsa el boton, no al cargar el
+// tablero: son 250 KB que la mayoria de las visitas no necesita. La ruta se
+// resuelve contra BASE (la carpeta de ESTE archivo) porque embebido en
+// dashboard.html el documento vive un nivel mas arriba; ademas, ahi el
+// montador borra los <script> de experiencia.html, asi que una etiqueta en el
+// marcado no serviria para la pestaña.
+let xlsxCargando=null;
+function cargarXLSX(){
+  if(window.XLSX) return Promise.resolve(window.XLSX);
+  if(!xlsxCargando){
+    xlsxCargando=new Promise((listo,fallo)=>{
+      const s=document.createElement('script');
+      s.src=new URL('vendor/xlsx.mini.min.js', BASE).href;
+      s.onload=()=>listo(window.XLSX);
+      s.onerror=()=>{ xlsxCargando=null; fallo(new Error('no se pudo cargar '+s.src)); };
+      document.head.appendChild(s);
+    });
+  }
+  return xlsxCargando;
+}
+
+/* === LIBRO XLSX (inicio) ===
+   No lo carga nadie mas que descargarTickets(); vive aparte para que la
+   prueba tools/tests/LibroTicketsSmoke.js pueda ejecutarlo tal cual, sin
+   navegador. Entre los dos marcadores no hay nada del tablero: ni P, ni
+   document, ni filtros. Todo entra por parametro.
+
+   QUE HACE Y POR QUE ASI
+   ----------------------
+   La hoja que sale de SheetJS es correcta pero pelada: el vendor que trae el
+   proyecto (vendor/xlsx.mini.min.js, la build comunitaria 0.18.5) escribe
+   anchos de columna, altos de fila, combinaciones y autofiltro, pero NO
+   escribe estilos de celda -el `s` de una celda se ignora al guardar- ni
+   paneles congelados. Se comprobo: un libro con `fill` y `!freeze` sale sin
+   `fills` en styles.xml y sin `<pane>` en la hoja.
+
+   Asi que el libro se arma con SheetJS como siempre -mismas filas, mismas
+   columnas, mismos valores- y despues se le retocan DOS piezas del .xlsx ya
+   generado, con el mismo vendor (XLSX.CFB, que lee y escribe el zip):
+
+     xl/styles.xml            se sustituye por la hoja de estilos de abajo
+     xl/worksheets/sheet1.xml se le mete el <pane> congelado y un s="i" por
+                              celda, que apunta a esos estilos
+
+   NO se toca ni un valor: el `s` es una referencia de formato y el texto de
+   cada celda es el que puso SheetJS. Nada de esto altera que tickets se
+   exportan ni con que campos: eso lo decide descargarTickets().
+
+   La paleta es la del tablero, en acento y no en masa: el verde va en la
+   fila de encabezados y en el total, el resto es gris muy claro para las
+   filas alternas y texto casi negro. Un libro verde entero seria peor de
+   leer que el volcado que ya habia. */
+const LibroTickets = (function () {
+  'use strict';
+
+  /* Colores en ARGB, como los quiere OOXML (dos digitos de alfa delante).
+     El verde es el del tablero; los tenues son ese mismo tono lavado, para
+     que el semaforo del Estado no grite. */
+  const VERDE = 'FF166534';        // encabezado de la tabla y cifras fuertes
+  const VERDE_TENUE = 'FFE7F3EC';
+  const AMBAR = 'FF92400E', AMBAR_TENUE = 'FFFDF3E3';
+  const ROJO = 'FF991B1B', ROJO_TENUE = 'FFFCE9E9';
+  const TINTA = 'FF111827', TINTA_SUAVE = 'FF6B7280';
+  const ZEBRA = 'FFF3F6F4';        // fila alterna: gris con una gota de verde
+  const LINEA = 'FFE2E6E4';        // borde de la tabla
+
+  /* Los indices de cellXfs que se usan al pintar. El orden importa: es el
+     mismo del arreglo `xfs` de HOJA_ESTILOS. */
+  const E = {
+    BASE: 0, TITULO: 1, SUBTITULO: 2, META_ETIQUETA: 3, META_VALOR: 4,
+    META_FUERTE: 5, ENCABEZADO: 6, CELDA: 7, CELDA_ZEBRA: 8,
+    CELDA_LARGA: 9, CELDA_LARGA_ZEBRA: 10,
+    ESTADO_VERDE: 11, ESTADO_AMBAR: 12, ESTADO_ROJO: 13,
+  };
+
+  function fuente(attrs) { return '<font>' + attrs + '<name val="Calibri"/><family val="2"/><scheme val="minor"/></font>'; }
+  function relleno(color) { return '<fill><patternFill patternType="solid"><fgColor rgb="' + color + '"/><bgColor indexed="64"/></patternFill></fill>'; }
+
+  /* styles.xml completo. Se escribe entero -y no parcheando el que genera
+     SheetJS- porque ese trae una sola fuente, un solo relleno y un solo xf:
+     no hay nada que conservar. */
+  function hojaEstilos() {
+    const fuentes = [
+      fuente('<sz val="11"/><color rgb="' + TINTA + '"/>'),                          // 0 base
+      fuente('<b/><sz val="16"/><color rgb="' + TINTA + '"/>'),                      // 1 titulo
+      fuente('<sz val="10"/><color rgb="' + TINTA_SUAVE + '"/>'),                    // 2 subtitulo
+      fuente('<b/><sz val="10"/><color rgb="' + TINTA_SUAVE + '"/>'),                // 3 etiqueta
+      fuente('<sz val="10"/><color rgb="' + TINTA + '"/>'),                          // 4 valor
+      fuente('<b/><sz val="11"/><color rgb="FFFFFFFF"/>'),                           // 5 encabezado
+      fuente('<b/><sz val="10"/><color rgb="' + VERDE + '"/>'),                      // 6 cifra fuerte
+      fuente('<b/><sz val="11"/><color rgb="' + VERDE + '"/>'),                      // 7 estado verde
+      fuente('<b/><sz val="11"/><color rgb="' + AMBAR + '"/>'),                      // 8 estado ambar
+      fuente('<b/><sz val="11"/><color rgb="' + ROJO + '"/>'),                       // 9 estado rojo
+    ];
+    const rellenos = [
+      '<fill><patternFill patternType="none"/></fill>',
+      '<fill><patternFill patternType="gray125"/></fill>',
+      relleno(VERDE), relleno(ZEBRA), relleno(VERDE_TENUE),
+      relleno(AMBAR_TENUE), relleno(ROJO_TENUE),
+    ];
+    const lado = '<left style="thin"><color rgb="' + LINEA + '"/></left>'
+      + '<right style="thin"><color rgb="' + LINEA + '"/></right>'
+      + '<top style="thin"><color rgb="' + LINEA + '"/></top>'
+      + '<bottom style="thin"><color rgb="' + LINEA + '"/></bottom><diagonal/>';
+    const bordes = [
+      '<border><left/><right/><top/><bottom/><diagonal/></border>',
+      '<border>' + lado + '</border>',
+    ];
+    // [numFmt, fuente, relleno, borde, alineacion]
+    const xfs = [
+      [0, 0, 0, 0, ''],
+      [0, 1, 0, 0, '<alignment vertical="center"/>'],
+      [0, 2, 0, 0, '<alignment vertical="center"/>'],
+      [0, 3, 0, 0, '<alignment vertical="center"/>'],
+      [0, 4, 0, 0, '<alignment vertical="center"/>'],
+      [0, 6, 0, 0, '<alignment vertical="center"/>'],
+      [0, 5, 2, 1, '<alignment vertical="center" wrapText="1"/>'],
+      [0, 0, 0, 1, '<alignment vertical="top"/>'],
+      [0, 0, 3, 1, '<alignment vertical="top"/>'],
+      [0, 0, 0, 1, '<alignment vertical="top" wrapText="1"/>'],
+      [0, 0, 3, 1, '<alignment vertical="top" wrapText="1"/>'],
+      [0, 7, 4, 1, '<alignment vertical="top"/>'],
+      [0, 8, 5, 1, '<alignment vertical="top"/>'],
+      [0, 9, 6, 1, '<alignment vertical="top"/>'],
+    ];
+    const xf = xfs.map(function (x) {
+      return '<xf numFmtId="' + x[0] + '" fontId="' + x[1] + '" fillId="' + x[2] + '"'
+        + ' borderId="' + x[3] + '" xfId="0" applyFont="1" applyFill="1" applyBorder="1"'
+        + (x[4] ? ' applyAlignment="1">' + x[4] + '</xf>' : '/>');
+    }).join('');
+
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+      + '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+      + '<fonts count="' + fuentes.length + '">' + fuentes.join('') + '</fonts>'
+      + '<fills count="' + rellenos.length + '">' + rellenos.join('') + '</fills>'
+      + '<borders count="' + bordes.length + '">' + bordes.join('') + '</borders>'
+      + '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
+      + '<cellXfs count="' + xfs.length + '">' + xf + '</cellXfs>'
+      + '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'
+      + '<dxfs count="0"/>'
+      + '<tableStyles count="0" defaultTableStyle="TableStyleMedium9" defaultPivotStyle="PivotStyleMedium4"/>'
+      + '</styleSheet>';
+  }
+
+  /* Semaforo del Estado, y SOLO del Estado: es la unica columna exportada
+     cuyo valor es una situacion y no un texto libre. Subestado y Prioridad
+     tambien se exportan, pero sin color: sus valores no tienen una escala
+     acordada y no se inventa ninguna. Lo que no
+     reconozca sale con el formato normal, sin color. */
+  function estiloEstado(valor) {
+    const v = String(valor || '').toLowerCase();
+    if (!v) return null;
+    if (/(cerrad|resuelt|solucionad|finalizad|complet)/.test(v)) return E.ESTADO_VERDE;
+    if (/(cancelad|rechazad|reabiert|escalad)/.test(v)) return E.ESTADO_ROJO;
+    if (/(pendiente|espera|proceso|curso|asignad|abiert|nuev)/.test(v)) return E.ESTADO_AMBAR;
+    return null;
+  }
+
+  // "A", "B", ... "Z", "AA". Lo mismo que XLSX.utils.encode_col, escrito
+  // aqui para que el bloque no dependa de nada al probarlo suelto.
+  function letraCol(i) {
+    let n = i, s = '';
+    do { s = String.fromCharCode(65 + (n % 26)) + s; n = Math.floor(n / 26) - 1; } while (n >= 0);
+    return s;
+  }
+
+  /* Arma la matriz de la hoja: cabecera del reporte, metadatos, un renglon
+     en blanco y la tabla. Devuelve tambien donde empieza la tabla, que es lo
+     que necesitan el autofiltro, el panel congelado y el pintado.
+
+     `meta` son pares [etiqueta, valor] que decide quien llama: aqui no se
+     consulta ningun filtro ni se inventa ningun dato. */
+  function componer(titulo, subtitulo, meta, encabezados, filas) {
+    const aoa = [[titulo], [subtitulo], []];
+    meta.forEach(function (par) { aoa.push([par[0], par[1]]); });
+    aoa.push([]);
+    const filaEncabezado = aoa.length;      // 0-based: la fila que sigue
+    aoa.push(encabezados.slice());
+    filas.forEach(function (f) { aoa.push(f.slice()); });
+    return { aoa: aoa, filaEncabezado: filaEncabezado };
+  }
+
+  /* El s="i" de cada celda, por posicion. `largas` son las columnas que
+     llevan wrapText -titulo, descripcion, solucion-: las que pueden traer un
+     parrafo y sin ajuste harian la hoja absurdamente ancha. */
+  function estiloDe(fila, col, disposicion) {
+    const d = disposicion;
+    if (fila === 0) return col === 0 ? E.TITULO : E.BASE;
+    if (fila === 1) return col === 0 ? E.SUBTITULO : E.BASE;
+    if (fila < d.filaEncabezado - 1) {
+      if (col === 0) return E.META_ETIQUETA;
+      return d.filaFuerte === fila ? E.META_FUERTE : E.META_VALOR;
+    }
+    if (fila === d.filaEncabezado) return E.ENCABEZADO;
+    if (fila > d.filaEncabezado) {
+      const zebra = (fila - d.filaEncabezado) % 2 === 0;
+      if (col === d.colEstado) {
+        const propio = estiloEstado(d.valorEstado(fila));
+        if (propio !== null) return propio;
+      }
+      if (d.largas.indexOf(col) >= 0) return zebra ? E.CELDA_LARGA_ZEBRA : E.CELDA_LARGA;
+      return zebra ? E.CELDA_ZEBRA : E.CELDA;
+    }
+    return E.BASE;
+  }
+
+  // Cadena binaria -> bytes, para devolverle a CFB el XML retocado.
+  function aBytes(texto) {
+    const b = new Uint8Array(texto.length);
+    for (let i = 0; i < texto.length; i++) b[i] = texto.charCodeAt(i) & 255;
+    return b;
+  }
+  function aTexto(contenido) {
+    let s = '';
+    for (let i = 0; i < contenido.length; i++) s += String.fromCharCode(contenido[i]);
+    return s;
+  }
+
+  /* Congela por debajo del encabezado de la tabla -cabecera y metadatos se
+     quedan a la vista- y mete el s="i" celda por celda. Las dos cosas se
+     hacen sobre el XML ya escrito porque la build comunitaria no las emite:
+     ver la nota de arriba. */
+  function retocarHoja(xml, disposicion) {
+    const primeraDatos = disposicion.filaEncabezado + 2;   // 1-based, tras el encabezado
+    const pane = '<sheetView workbookViewId="0">'
+      + '<pane ySplit="' + (primeraDatos - 1) + '" topLeftCell="A' + primeraDatos + '"'
+      + ' activePane="bottomLeft" state="frozen"/>'
+      + '<selection pane="bottomLeft" activeCell="A' + primeraDatos + '" sqref="A' + primeraDatos + '"/>'
+      + '</sheetView>';
+    let salida = xml.replace('<sheetView workbookViewId="0"/>', pane);
+
+    return salida.replace(/<c r="([A-Z]+)(\d+)"/g, function (todo, letras, numero) {
+      let col = 0;
+      for (let i = 0; i < letras.length; i++) col = col * 26 + (letras.charCodeAt(i) - 64);
+      const estilo = estiloDe(parseInt(numero, 10) - 1, col - 1, disposicion);
+      return estilo ? todo + ' s="' + estilo + '"' : todo;
+    });
+  }
+
+  /* Tope de Excel por celda: 32.767 caracteres. SheetJS lo hace cumplir al
+     escribir -"Text length must not exceed 32767 characters"- y un solo valor
+     de mas tumbaba el libro entero (REQ 2026-396620: Descripcion de 38.036).
+     Se aplica SOLO a lo que va al libro; los datos del ticket no se tocan.
+     Lo que cabe sale igual. Lo que no, se corta siempre en el mismo punto y
+     termina con un aviso, para que nadie lo lea como el texto completo; aviso
+     incluido, la celda mide exactamente el tope. El corte no parte un par
+     sustituto UTF-16 (un emoji, por ejemplo). */
+  const LIMITE_CELDA = 32767;
+  function ajustarCelda(valor) {
+    if (typeof valor !== 'string' || valor.length <= LIMITE_CELDA) return valor;
+    const aviso = ' … [recortado: ' + valor.length + ' caracteres en origen]';
+    let corte = LIMITE_CELDA - aviso.length;
+    const c = valor.charCodeAt(corte - 1);
+    if (c >= 0xD800 && c <= 0xDBFF) corte--;
+    return valor.slice(0, corte) + aviso;
+  }
+
+  /* Construye el .xlsx y devuelve sus bytes. `XLSX` entra por parametro -no
+     se toca window- para que la prueba pueda pasarle el mismo vendor.
+
+     opciones: { titulo, subtitulo, meta, etiquetaTotal, encabezados, filas,
+                 anchos, largas, colEstado, hoja } */
+  function construir(XLSX, opciones) {
+    const datos = opciones.filas.map(function (f) { return f.map(ajustarCelda); });
+    const compuesto = componer(opciones.titulo, opciones.subtitulo,
+      opciones.meta, opciones.encabezados, datos);
+    const aoa = compuesto.aoa;
+
+    const hoja = XLSX.utils.aoa_to_sheet(aoa);
+    hoja['!cols'] = opciones.anchos.map(function (w) { return { wch: w }; });
+    // Alto propio solo donde hace falta: titulo, subtitulo y encabezado. Las
+    // filas de datos se quedan sin alto fijo a proposito, para que Excel las
+    // crezca solo cuando el texto ajustado ocupe dos o tres renglones.
+    const filas = [];
+    filas[0] = { hpt: 26 };
+    filas[1] = { hpt: 15 };
+    filas[compuesto.filaEncabezado] = { hpt: 22 };
+    hoja['!rows'] = filas;
+    // La cabecera se combina ARRIBA de la tabla; dentro de la tabla no hay
+    // ninguna combinacion, que romperia ordenar y filtrar.
+    const ultimaCol = opciones.encabezados.length - 1;
+    hoja['!merges'] = [
+      { s: { r: 0, c: 0 }, e: { r: 0, c: ultimaCol } },
+      { s: { r: 1, c: 0 }, e: { r: 1, c: ultimaCol } },
+    ];
+    const refEncabezado = 'A' + (compuesto.filaEncabezado + 1);
+    hoja['!autofilter'] = { ref: refEncabezado + ':' + letraCol(ultimaCol) + aoa.length };
+
+    const libro = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(libro, hoja, opciones.hoja);
+
+    const disposicion = {
+      filaEncabezado: compuesto.filaEncabezado,
+      filaFuerte: opciones.etiquetaTotal
+        ? 3 + opciones.meta.map(function (m) { return m[0]; }).indexOf(opciones.etiquetaTotal)
+        : -1,
+      largas: opciones.largas || [],
+      colEstado: opciones.colEstado === undefined ? -1 : opciones.colEstado,
+      valorEstado: function (fila) {
+        const f = datos[fila - compuesto.filaEncabezado - 1];
+        return f ? f[opciones.colEstado] : '';
+      },
+    };
+
+    const zip = XLSX.CFB.read(XLSX.write(libro, { type: 'binary', bookType: 'xlsx' }), { type: 'binary' });
+    XLSX.CFB.utils.cfb_add(zip, '/xl/styles.xml', aBytes(hojaEstilos()));
+    const hojaXml = XLSX.CFB.find(zip, '/xl/worksheets/sheet1.xml');
+    XLSX.CFB.utils.cfb_add(zip, '/xl/worksheets/sheet1.xml',
+      aBytes(retocarHoja(aTexto(hojaXml.content), disposicion)));
+    return XLSX.CFB.write(zip, { fileType: 'zip', type: 'array', compression: true });
+  }
+
+  return { construir: construir, estiloEstado: estiloEstado, ajustarCelda: ajustarCelda,
+           LIMITE_CELDA: LIMITE_CELDA, ESTILOS: E };
+})();
+/* === LIBRO XLSX (fin) === */
+
+/* === COLUMNAS XLSX (inicio) ===
+   Las 24 columnas del export, en el orden pedido: [llave del ticket que manda
+   experiencia_exportar.ashx,
+   encabezado, ancho]. El encabezado es el nombre del campo en dbo.vw_Tickets.
+   Categoria y Tipo leen las llaves *_origen (los campos crudos), no
+   categoria_raw/tipo, que son CategoriaV2 y TipoTicket de la vista de slots.
+   tools/tests/LibroTicketsSmoke.js recorta y ejecuta este bloque tal cual. */
+const COLUMNAS_TICKETS = [
+  ['fecha_registro', 'FechaRegistro', 19],
+  ['fecha_estimada_resolucion', 'FechaEstimadaResolucion', 19],
+  ['codigo', 'CodigoTicket', 15],
+  ['grupo', 'Grupo', 24],
+  ['tecnico_segunda_linea', 'TecnicoSegundaLinea', 26],
+  ['estado', 'Estado', 16],
+  ['subestado', 'Subestado', 18],
+  ['prioridad', 'Prioridad', 12],
+  ['titulo', 'Titulo', 42],
+  ['descripcion', 'Descripcion', 60],
+  ['cliente', 'Cliente', 24],
+  ['sucursal', 'Sucursal', 24],
+  ['categoria_origen', 'Categoria', 30],
+  ['solucion', 'SolucionUsuario', 45],
+  ['fecha_firma_solucion', 'FechaFirmaSolucion', 19],
+  ['fecha_ultima_modificacion', 'FechaUltimaModificacion', 19],
+  ['fecha_firma_cierre', 'FechaFirmaCierre', 19],
+  ['firma_cierre_revocacion', 'FirmaCierreRevocacion', 24],
+  ['firma_solucion', 'FirmaSolucion', 24],
+  ['responsable_ultima_modificacion', 'ResponsableUltimaModificacion', 26],
+  ['notificado_por', 'NotificadoPor', 26],
+  ['tipo_origen', 'Tipo', 14],
+  ['registrado_por', 'RegistradoPor', 26],
+  ['tipo_rel', 'TipoRelacion', 16],
+];
+// Un ticket -> su renglon, todo como texto; lo que no venga sale vacio.
+function filaTicket(t, cols) {
+  return cols.map(function (c) { const v = t[c[0]]; return v == null ? '' : String(v); });
+}
+/* === COLUMNAS XLSX (fin) === */
+
+// [Pendientes Claude #7]: descarga XLSX de los tickets del periodo vigente
+// (SLOT 0 o mes actual, segun modoTiempo -- lo mismo que muestra KPI-1)
+// filtrados por Director/PO/Manager/Service Owner -- los mismos cuatro que
+// habilitan el boton. Los tickets llegan ya filtrados del servidor (ver
+// pedirTicketsExport); el libro se arma en memoria con SheetJS
+// (vendor/xlsx.mini.min.js).
+async function descargarTickets(){
+  const btn=document.getElementById('btnDescargaTickets');
+  const rotulo=btn?btn.textContent:'';
+  if(btn){ btn.disabled=true; btn.textContent='Preparando...'; }
+  try{
+    let datos;
+    try{ datos=await pedirTicketsExport(); }
+    catch(e){ console.error(e); alert('No se pudo traer el detalle de tickets: '+e.message); return; }
+    const filtrados=datos.tickets||[];
+    if(!filtrados.length){ alert('No hay tickets para el filtro y periodo actuales.'); return; }
+    const cols=COLUMNAS_TICKETS;
+    // Matriz (no json_to_sheet) para fijar el orden de columnas y forzar texto:
+    // los codigos y fechas no deben reinterpretarse como numero o fecha Excel.
+    const encabezados=cols.map(c=>c[1]);
+    const filas=filtrados.map(t=>filaTicket(t, cols));
+    let XLSX;
+    try{ XLSX=await cargarXLSX(); }
+    catch(e){ console.error(e); alert('No se pudo cargar el generador de Excel.'); return; }
+    /* El contenido es el de siempre -las mismas filas y las mismas columnas de
+       `cols`-; lo que cambia es la presentacion, que la arma LibroTickets: una
+       cabecera de reporte, los filtros con los que se genero y la tabla con
+       encabezado fijo, autofiltro y filas alternas. Los metadatos salen SOLO
+       de lo que ya tiene el tablero y de lo que confirmo el servidor: el
+       periodo exportado (en Mes, con el año que devolvio el handler), los
+       cuatro filtros -"Todos" cuando no hay uno puesto-, el total de filas
+       exportadas y la fecha del equipo. */
+    const periodo = modoTiempo==='mes'
+      ? ((P.meses[P.mes_nums.indexOf(P.mes_actual)] || 'Mes actual') + (datos.anio ? ' '+datos.anio : ''))
+      : (P.slots[0] || '0-30 dias');
+    const bytes = LibroTickets.construir(XLSX, {
+      hoja: 'Tickets',
+      titulo: 'Tickets — Dashboard Export',
+      subtitulo: 'Tablero de Experiencia',
+      meta: [
+        ['Periodo', periodo],
+        ['Director', fDir || 'Todos'],
+        ['Product Owner', fPO || 'Todos'],
+        ['Manager', fMgr || 'Todos'],
+        ['Service Owner', fSO || 'Todos'],
+        ['Total de tickets', FMT(filas.length)],
+        ['Exportado', new Date().toLocaleString('es-MX')],
+      ],
+      etiquetaTotal: 'Total de tickets',
+      encabezados,
+      filas,
+      // Anchos por columna, en caracteres. Los tres campos de parrafo
+      // -Titulo, Descripcion, SolucionUsuario- van anchos Y con ajuste de
+      // texto; sus posiciones se buscan por llave para no desfasarse si el
+      // orden de COLUMNAS_TICKETS cambia.
+      anchos: cols.map(c=>c[2]),
+      largas: ['titulo','descripcion','solucion'].map(k=>cols.findIndex(c=>c[0]===k)),
+      colEstado: cols.findIndex(c=>c[0]==='estado'),
+    });
+    // Un solo filtro activo -> su nombre en el archivo; varios -> nombre corto.
+    const activos=[fDir,fPO,fMgr,fSO].filter(Boolean);
+    const sufijo=activos.length===1?activos[0]:(activos.length?'filtrado':'filtro');
+    const nombre='Tickets_'+sufijo.replace(/[^a-z0-9]+/gi,'_')+'.xlsx';
+    /* Se descarga desde un Blob y no con XLSX.writeFile porque el libro ya
+       viene retocado: writeFile volveria a generarlo desde el libro en
+       memoria y se perderian los estilos y el panel congelado. El nombre y su
+       sufijo por filtro son exactamente los de antes. */
+    const url=URL.createObjectURL(new Blob([bytes],
+      {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
+    const a=document.createElement('a');
+    a.href=url; a.download=nombre;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url), 60000);
+  } finally {
+    if(btn){ btn.disabled=false; btn.textContent=rotulo; }
+  }
 }
 
 // ---- Treemap propio (algoritmo "squarified", sin dependencias externas --
@@ -1324,6 +1769,16 @@ function renderTreemap(containerId,items,opts){
   const total=data.reduce((s,it)=>s+it.value,0);
   const w=el.clientWidth||300, h=el.clientHeight||300;
   const rects=squarify(data,0,0,w,h);
+  /* Color de identidad, resuelto para TODOS los recuadros de golpe: es lo
+     que deja esquivar que dos personas distintas caigan en el mismo tono
+     mientras queden colores libres. Se indexa por etiqueta -no por posicion-
+     porque el treemap ordena por area y ese orden no debe decidir color. */
+  const tonoDe={};
+  if(opts.lider){
+    const nombres=data.map(it=>it.label);
+    const escala=opts.director ? Paleta.escalaDirectores(nombres) : Paleta.escalaPersonas(nombres);
+    nombres.forEach((n,i)=>{ tonoDe[n]=escala[i]; });
+  }
   rects.forEach((r,i)=>{
     const div=document.createElement('div');
     div.className='treemap-item';
@@ -1332,7 +1787,13 @@ function renderTreemap(containerId,items,opts){
     }
     div.style.left=r.x+'px'; div.style.top=r.y+'px';
     div.style.width=Math.max(0,r.w)+'px'; div.style.height=Math.max(0,r.h)+'px';
-    const tono=TM_COLORES[i%TM_COLORES.length];
+    /* `lider: true` -el treemap de la dimension Director / Product Owner-
+       pide el color por NOMBRE a la tabla compartida, igual que las barras:
+       ese recuadro es una persona, y la persona lleva su color aunque el
+       treemap la ordene por area. Sin esa marca -el treemap de agrupacion,
+       cuyos recuadros son Problem / SorIA / Mejora...- sigue el reparto por
+       posicion de la paleta categorica, que ahi no representa a nadie. */
+    const tono=opts.lider ? tonoDe[r.label] : TM_COLORES[i%TM_COLORES.length];
     div.style.background=tono;
     // .treemap-item pinta el texto en blanco; sobre los verdes claros de la
     // escala hay que devolverlo a carbon o la etiqueta desaparece.
@@ -1342,7 +1803,7 @@ function renderTreemap(containerId,items,opts){
       ? `${r.label}\n${FMT(r.value)} iniciativas\n${PCT(pct)} del total`
       : `${r.label}: ${FMT(r.value)}`;
     if(r.w>=34 && r.h>=24){
-      div.innerHTML=`<div class="tm-label">${r.label}</div><div class="tm-value">${FMT(r.value)}${opts.onClick?' · '+PCT(pct):''}</div>`;
+      div.innerHTML=`<div class="tm-label">${esc(r.label)}</div><div class="tm-value">${FMT(r.value)}${opts.onClick?' · '+PCT(pct):''}</div>`;
     }
     if(opts.onClick){
       div.style.cursor='pointer';
@@ -1352,35 +1813,17 @@ function renderTreemap(containerId,items,opts){
   });
 }
 
-// Plugin de Chart.js inline (sin dependencias externas, como el treemap) que
-// dibuja el valor de cada barra encima de ella -- Chart.js core no trae un
-// plugin de datalabels.
-/* La cifra dentro de la barra la pinta el plugin COMPARTIDO
-   (assets/js/barras.js), atado al FMT de este tablero. Una sola
-   implementacion: dashboard.js usa ese mismo plugin para las barras de
-   Backlog. Aqui solo se le pone nombre local para no tocar los usos. */
-const valueLabelsDentroPlugin = Barras.etiquetasDentro(FMT);
-const valueLabelsPlugin={
-  id:'valueLabels',
-  afterDatasetsDraw(chart){
-    const ctx=chart.ctx;
-    chart.data.datasets.forEach((ds,dsIdx)=>{
-      const meta=chart.getDatasetMeta(dsIdx);
-      if(meta.hidden) return;
-      meta.data.forEach((bar,i)=>{
-        const val=ds.data[i];
-        if(val==null) return;
-        ctx.save();
-        ctx.fillStyle='#191919';
-        ctx.font='bold 12px system-ui, -apple-system, sans-serif';
-        ctx.textAlign='center';
-        ctx.textBaseline='bottom';
-        ctx.fillText(FMT(val), bar.x, bar.y-4);
-        ctx.restore();
-      });
-    });
-  }
-};
+/* Aqui vivian los dos plugins de cifra de este tablero y ya no vive ninguno:
+   las cuatro graficas de barras pasan por DashboardBarChart
+   (assets/js/grafica.js), que enchufa solo el plugin COMPARTIDO de
+   assets/js/barras.js atado al FMT de esta pagina.
+
+   - `valueLabelsDentroPlugin` era un alias de Barras.etiquetasDentro(FMT);
+     ahora lo crea DashboardBarChart.
+   - `valueLabelsPlugin` pintaba la cifra SIEMPRE por ENCIMA de la barra, en
+     carbon y sin mirar si cabia dentro. Lo usaba una sola grafica -las barras
+     de estado del panel cross-filter-, que quedaba distinta de su gemela
+     "Iniciativas por Estado" teniendo los mismos datos y los mismos colores. */
 
 // ---- Iniciativas por Estado (TAREA 2): barras verticales, orden fijo
 // En Análisis -> En Solución -> En Monitoreo (mismo orden que ESTADOS_ACTIVOS),
@@ -1393,7 +1836,7 @@ let chartEstados=null;
    suficientes para distinguirse (ΔL >= 0.06 entre vecinos). */
 const COLOR_ESTADO={'En Análisis':'#8cbf1e','En Solución':'#4f9528','En Monitoreo':'#256425'};
 function conteoIniciativasPorEstado(cats){
-  const c1conHijos=new Set(cats.filter(c=>c.nivel==='C2').map(c=>c1DeRuta(c.categoria)));
+  const c1conHijos=new Set(cats.filter(c=>c.nivel==='C2').map(c=>c.categoria.split('/')[1]));
   const fuente=cats.filter(c=>c.nivel==='C2' || !c1conHijos.has(c.categoria));
   const vistos=new Set(); const conteo={};
   ESTADOS_ACTIVOS.forEach(e=>conteo[e]=0);
@@ -1465,8 +1908,18 @@ function renderBarrasFiltroEstado(tab, conteo, seleccionado){
     return (!seleccionado || seleccionado===e) ? base : base+'40';
   });
   if(chartsFiltroEstado[tab]) chartsFiltroEstado[tab].destroy();
-  chartsFiltroEstado[tab]=new Chart(el,{type:'bar',data:{labels,datasets:[{data,backgroundColor:colors}]},
-    options:{responsive:true,plugins:{legend:{display:false},
+  /* Misma grafica que "Iniciativas por Estado" pero dentro del panel
+     cross-filter, asi que va por el MISMO camino: DashboardBarChart pone
+     medidas, radio y cifra dentro. El color se pasa hecho en `colores`
+     porque es progresion semantica (COLOR_ESTADO), con el `+'40'` que
+     apaga los estados no seleccionados: eso es del filtro, no del estilo. */
+  chartsFiltroEstado[tab]=new DashboardBarChart({
+    canvas: el,
+    etiquetas: labels,
+    datos: data,
+    colores: colors,
+    formato: FMT,
+    opciones:{plugins:{legend:{display:false},
       tooltip:{callbacks:{label:c=>c.label+': '+FMT(c.raw)+' iniciativas'}}},
       onClick:(evt,elements)=>{
         if(!elements.length) return;
@@ -1474,7 +1927,7 @@ function renderBarrasFiltroEstado(tab, conteo, seleccionado){
       },
       onHover:(evt,elements)=>{evt.native.target.style.cursor=elements.length?'pointer':'default';},
       scales:{y:{beginAtZero:true,ticks:{precision:0}}}},
-    plugins:[valueLabelsPlugin]});
+  }).render();
 }
 // Renderiza las 3 graficas del panel cross-filter de una pestaña (ven/act).
 // Cada grafica se calcula sobre las filas ya filtradas por las OTRAS 2
@@ -1489,9 +1942,13 @@ function renderPanelGraf(tab, cats){
   const rowsDim=aplicarFiltroGraf(baseRows, est, 'dim');
   const conteoDim={};
   rowsDim.forEach(r=>{ const v=r[est.dim]||'(Sin dato)'; conteoDim[v]=(conteoDim[v]||0)+1; });
+  // La dimension de este treemap es SIEMPRE una persona -Director o Product
+  // Owner-, asi que el color es identidad y sale de la tabla compartida.
+  registrarDimension(Object.keys(conteoDim));
   renderTreemap('chart'+cap1(tab)+'Dim',
     Object.entries(conteoDim).map(([label,value])=>({label,value})),
-    {selected:est.dimVal, onClick:val=>toggleFiltroGraf(tab,'dimVal',val)});
+    {selected:est.dimVal, lider:true, director:est.dim==='director',
+     onClick:val=>toggleFiltroGraf(tab,'dimVal',val)});
 
   const rowsAgrup=aplicarFiltroGraf(baseRows, est, 'agrup');
   const conteoAgrup={};
@@ -1509,23 +1966,41 @@ function renderPanelGraf(tab, cats){
 
 let chartBarDir=null;
 
-/* Identidad de DIRECTOR y de PRODUCT OWNER. Las dos dimensiones se ordenan
-   por volumen, asi que su posicion cambia con cada filtro: por eso van por
-   registro con nombre de la paleta COMPARTIDA (assets/js/paleta.js) y no por
-   indice. El registro reparte por orden de ALTA, asi que un director -o un
-   PO- conserva su color aunque baje de puesto, salga del top 15 o se entre a
-   un director en el detalle. Las dos graficas de PO comparten registro, asi
-   que el mismo PO sale del mismo color en "Volumen" y en "Con Iniciativa". */
-const REG_DIRECTOR = Paleta.registro('exp-director');
-const REG_PO = Paleta.registro('exp-po');
+/* IDENTIDAD DE LIDER en "Volumen por Director", "Volumen por Product Owner"
+   y su version "con Iniciativa".
 
-/* Grosor de barra: el juego COMPARTIDO de assets/js/barras.js, el mismo que
-   usan las barras de Backlog. Desde que Barras.aplicarDefaults() lo deja como
-   default del tipo `bar`, este alias ya no hace falta para que la barra salga
-   gruesa; se conserva porque lo nombran las dos graficas de abajo y porque
-   deja escrito, ahi mismo, que su grosor no es una decision local. El radio
-   lo pone tambien el default (Barras.RADIO). */
-const BARRA_GRUESA = Barras.GRUESA;
+   Aqui vivieron primero REG_DIRECTOR y REG_PO -dos registros que repartian
+   color por orden de ALTA- y despues nada: las tres graficas pasaron al azul
+   de barra ordinaria (Paleta.AZUL_SERIE). Las dos cosas estaban mal por el
+   mismo motivo: un director o un PO NO es una barra anonima, es la misma
+   persona que el Backlog pinta como lider en su tendencia, en su apilada de
+   antiguedad y en sus swatches. Si ahi es azul, aqui tiene que ser azul.
+
+   Asi que las tres piden el color por NOMBRE -el color de siempre de esa
+   persona, congelado en paleta.js- a la tabla compartida: la de Director por
+   `paleta: { directores: true }` y las dos de PO por Paleta.escalaPersonas().
+   El registro local desaparece a proposito: un solo mapa nombre -> color para
+   todo el tablero, sin copias que se contradigan.
+
+   Se piden por LISTA y no nombre a nombre para que dentro de una misma
+   grafica no se repita color mientras queden libres; las dos dimensiones van
+   por caminos distintos porque Director y Product Owner son dimensiones
+   distintas y no comparten cupo de colores.
+
+   El ORDEN de las barras no se toca: los tres rankings siguen de mayor a
+   menor volumen. El color va con la persona, el puesto con la cifra: una
+   persona que baja del primero al quinto lugar conserva su color.
+
+   `registrarDimension()` da de alta el roster de la vista antes de pintar,
+   para que el reparto sea el mismo conjunto en las tres graficas. Los cubos
+   "(Sin director)" y "(Sin PO)" NO son personas: la tabla compartida los
+   deja fuera del orden y los pinta de NEUTRO. */
+function registrarDimension(nombres){ Paleta.registrarLideres(nombres); }
+
+/* Aqui vivia `BARRA_GRUESA`, un alias de Barras.GRUESA que las dos graficas
+   de abajo copiaban en su dataset. Ya no hace falta: las dos pasan por
+   DashboardBarChart, que aplica el juego compartido solo, y el grosor y el
+   radio son ademas el default del tipo `bar` desde Barras.aplicarDefaults(). */
 
 /* Volumen por Product Owner: barras verticales, no treemap.
 
@@ -1545,15 +2020,31 @@ function renderBarrasPO(canvasId, filas, valorDe){
   if(!el) return;
   if(chartsPO[canvasId]) chartsPO[canvasId].destroy();
   const datos = filas.filter(r => valorDe(r) > 0);
-  chartsPO[canvasId] = new Chart(el, {
-    type: 'bar',
-    data: { labels: datos.map(r => cortaPO(r.po)),
-      // El color se pide con el nombre COMPLETO, no con el recortado del eje:
-      // dos POs distintos pueden compartir los primeros 15 caracteres.
-      datasets: [Object.assign({ data: datos.map(valorDe),
-        backgroundColor: REG_PO.escala(datos.map(r => r.po)) }, BARRA_GRUESA)] },
-    options: {
-      responsive: true, maintainAspectRatio: false,
+  /* Medidas, radio y cifra dentro las pone DashboardBarChart; aqui solo queda
+     lo propio: el eje con los nombres recortados y el tooltip con el completo.
+     El color es IDENTIDAD y se pide con el nombre COMPLETO -no con el
+     recortado del eje: dos POs distintos pueden compartir los primeros 15
+     caracteres-, asi que va por `colores`, ya resuelto contra la tabla
+     compartida. Las dos graficas de PO -"Volumen" y "Con Iniciativa"- salen
+     por aqui con las MISMAS filas, de modo que el mismo PO sale del mismo
+     color en las dos.
+
+     Se piden los quince de golpe (Paleta.escalaPersonas) y no uno por uno:
+     con quince personas y una paleta pequena dos POs distintos acababan del
+     mismo color. Pidiendo la lista completa, quien tiene color historico lo
+     conserva y al resto se le esquiva la colision mientras queden colores.
+     El reparto no depende del orden de las barras, asi que el ranking por
+     volumen puede reordenarse sin recolorear a nadie. */
+  registrarDimension(datos.map(r => r.po));
+  const coloresPO = Paleta.escalaPersonas(datos.map(r => r.po));
+  chartsPO[canvasId] = new DashboardBarChart({
+    canvas: el,
+    etiquetas: datos.map(r => cortaPO(r.po)),
+    datos: datos.map(valorDe),
+    colores: coloresPO,
+    formato: FMT,
+    opciones: {
+      maintainAspectRatio: false,
       plugins: { legend: { display: false },
         tooltip: { callbacks: {
           title: it => datos[it[0].dataIndex] ? datos[it[0].dataIndex].po : '',
@@ -1564,8 +2055,7 @@ function renderBarrasPO(canvasId, filas, valorDe){
              ticks: { autoSkip: false, maxRotation: 55, minRotation: 55, font: { size: 10 } } },
       },
     },
-    plugins: [valueLabelsDentroPlugin],
-  });
+  }).render();
 }
 function renderResumen(){
   document.getElementById('tituloResumen').textContent='Indicadores por Director';
@@ -1592,19 +2082,32 @@ function renderResumen(){
     ret:v.ret, pctTiempo:v.ini>0?Math.max(0,Math.min(1,1-v.ret/v.ini)):1,
   })).sort((a,b)=>b.vol-a.vol);
   document.getElementById('bodyDirectores').innerHTML=dirRows.map(r=>
-    `<tr><td><b>${r.dir}</b></td><td class="num">${FMT(r.vol)}</td><td class="num">${PCT(r.pct)}</td>
+    `<tr><td><b>${esc(r.dir)}</b></td><td class="num">${FMT(r.vol)}</td><td class="num">${PCT(r.pct)}</td>
      <td class="num">${FMT(r.ini)}</td><td class="num">${miniBar(r.pctIni)} ${badge(r.pctIni)}</td>
      <td class="num">${FMT(r.ret)}</td><td class="num">${badge(r.pctTiempo)}</td></tr>`).join('');
   // barras por director (nombre completo en el eje Y, sin truncar)
   const bdCtx=document.getElementById('chartBarDir');
   if(chartBarDir)chartBarDir.destroy();
-  chartBarDir=new Chart(bdCtx,{type:'bar',data:{labels:dirRows.map(r=>r.dir),
-    datasets:[Object.assign({data:dirRows.map(r=>r.vol),
-      backgroundColor:REG_DIRECTOR.escala(dirRows.map(r=>r.dir))},BARRA_GRUESA)]},
-    options:{indexAxis:'y',responsive:true,plugins:{legend:{display:false}},
+  /* Ranking HORIZONTAL, pero con el mismo lenguaje que las verticales: el
+     grosor, el radio y la cifra dentro salen de DashboardBarChart, que ademas
+     mide a lo ancho cuando indexAxis es 'y'. Lo propio es la orientacion, que
+     el nombre del director va entero en el eje y que el color es IDENTIDAD:
+     `paleta: { directores: true }` lo resuelve por NOMBRE contra el mapa de
+     Directores de la tabla compartida. Director es una dimension propia: sus
+     colores no salen del cupo de Product Owners ni se los quitan. Las barras
+     siguen ordenadas por volumen (mayor -> menor) y el color no se mueve con
+     el puesto. */
+  registrarDimension(dirRows.map(r=>r.dir));
+  chartBarDir=new DashboardBarChart({
+    canvas: bdCtx,
+    etiquetas: dirRows.map(r=>r.dir),
+    datos: dirRows.map(r=>r.vol),
+    paleta: { directores: true },
+    formato: FMT,
+    opciones:{indexAxis:'y',plugins:{legend:{display:false}},
       scales:{x:{beginAtZero:true,ticks:{callback:v=>FMT(v)}},
         y:{ticks:{autoSkip:false,font:{size:11}}}}},
-    plugins:[valueLabelsDentroPlugin]});
+  }).render();
   // barras por PO (top 15) y su version "con iniciativa" (mismas filas/orden)
   const porPO={};
   c1.forEach(c=>{const p=c.po||'(Sin PO)';
@@ -1639,7 +2142,7 @@ function renderResumenPorPO(dir){
     ret:v.ret, pctTiempo:v.ini>0?Math.max(0,Math.min(1,1-v.ret/v.ini)):1,
   })).sort((a,b)=>b.vol-a.vol);
   document.getElementById('bodyDirectores').innerHTML=poRows.map(r=>
-    `<tr><td><b>${r.po}</b></td><td class="num">${FMT(r.vol)}</td><td class="num">${PCT(r.pct)}</td>
+    `<tr><td><b>${esc(r.po)}</b></td><td class="num">${FMT(r.vol)}</td><td class="num">${PCT(r.pct)}</td>
      <td class="num">${FMT(r.ini)}</td><td class="num">${miniBar(r.pctIni)} ${badge(r.pctIni)}</td>
      <td class="num">${FMT(r.ret)}</td><td class="num">${badge(r.pctTiempo)}</td></tr>`).join('');
   renderBarrasPO('chartBarPO', poRows, r=>r.vol);
@@ -1648,11 +2151,11 @@ function renderResumenPorPO(dir){
 
 // ---- selectores encadenados ----
 const selDir=document.getElementById('selDir'), selPO=document.getElementById('selPO');
-P.directores.forEach(d=>selDir.insertAdjacentHTML('beforeend',`<option value="${d}">${d}</option>`));
+P.directores.forEach(d=>selDir.insertAdjacentHTML('beforeend',`<option value="${Escape.attr(d)}">${esc(d)}</option>`));
 function fillPO(){
   selPO.innerHTML='<option value="">— Todos —</option>';
   const pos = fDir? (P.jerarquia[fDir]||[]) : [...new Set(P.categorias.map(c=>c.po).filter(Boolean))].sort();
-  pos.forEach(p=>selPO.insertAdjacentHTML('beforeend',`<option value="${p}">${p}</option>`));
+  pos.forEach(p=>selPO.insertAdjacentHTML('beforeend',`<option value="${Escape.attr(p)}">${esc(p)}</option>`));
 }
 selDir.onchange=()=>{fDir=selDir.value;fPO='';fillPO();renderAll();};
 selPO.onchange=()=>{fPO=selPO.value;renderAll();};
@@ -1661,12 +2164,12 @@ selPO.onchange=()=>{fPO=selPO.value;renderAll();};
 // Service Owner reporta a un Manager, ver TAREA 1 / generar.py so_manager).
 // Se combinan con Director/PO via AND (pasaFiltroGlobal), no se excluyen.
 const selMgr=document.getElementById('selMgr'), selSO=document.getElementById('selSO');
-(P.managers||[]).forEach(m=>selMgr.insertAdjacentHTML('beforeend',`<option value="${m}">${m}</option>`));
+(P.managers||[]).forEach(m=>selMgr.insertAdjacentHTML('beforeend',`<option value="${Escape.attr(m)}">${esc(m)}</option>`));
 function fillSO(){
   selSO.innerHTML='<option value="">— Todos —</option>';
   const sos = fMgr ? ((P.jerarquia_mgr||{})[fMgr]||[])
     : [...new Set(P.categorias.map(c=>c.so).filter(Boolean))].sort();
-  sos.forEach(s=>selSO.insertAdjacentHTML('beforeend',`<option value="${s}">${s}</option>`));
+  sos.forEach(s=>selSO.insertAdjacentHTML('beforeend',`<option value="${Escape.attr(s)}">${esc(s)}</option>`));
 }
 selMgr.onchange=()=>{fMgr=selMgr.value;fSO='';fillSO();renderAll();};
 selSO.onchange=()=>{fSO=selSO.value;renderAll();};

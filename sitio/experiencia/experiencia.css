@@ -82,10 +82,10 @@ justify-content:flex-end;flex-wrap:wrap;gap:8px}
    trato que el sello del ETL de SLA y que el chip de fecha de QA. Es
    informacion, no un boton: sin sombra dura, sin degradado y sin cursor.
    Vacia no se pinta. */
-#corteFecha{display:inline-block;padding:5px 12px;border-radius:999px;
-background:rgba(255,255,255,.92);border:1px solid rgba(255,255,255,.6);
-color:var(--g-900);font-size:11.5px;font-weight:600;white-space:nowrap;
-box-shadow:0 1px 2px rgba(25,25,25,.10)}
+/* La pastilla del corte ya NO se describe aqui: es .datos-info, en
+   assets/css/datos-info.css, la misma que usan SLA, Backlog y QA. Este
+   selector solo esconde el nodo mientras esta vacio; el aspecto lo pone el
+   componente compartido. */
 #corteFecha:empty{display:none}
 
 /* Barra de filtros: fuera de la cabecera y con la misma tarjeta que la
@@ -135,15 +135,10 @@ cursor:pointer;font-size:12px;font-weight:700}
 #btnResetGrafVen:hover,#btnResetGrafAct:hover,#btnMarcarTodasHist:hover,
 #btnDesmarcarTodasHist:hover,#btnGraficarHist:hover{
 background:var(--grad-btn-hover);border-color:var(--g-800)}
-.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:14px;margin-bottom:16px}
-.kpi{background:var(--card);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow);
-border:1px solid var(--line-soft);border-left:5px solid var(--kpi-ok)}
-.kpi.sv{border-left-color:var(--kpi-ok)}
-.kpi.sa{border-left-color:var(--ambr)}
-.kpi.sr{border-left-color:var(--rojo)}
-.kpi .lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;font-weight:600}
-.kpi .val{font-size:25px;font-weight:800;margin-top:4px}
-.kpi .foot{font-size:11px;color:var(--muted);margin-top:3px}
+/* `.kpis` y `.kpi` viven en ../assets/css/kpi.css, junto con la copia que
+   tenian dashboard.css y qa.css. Esta se habia quedado con la pista en
+   175px y el valor en 25px, y por el @scope de la pestaña le ganaba a la
+   del tablero: las tarjetas de Experiencia no median como las demas. */
 .badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;color:#fff}
 .bv{background:var(--verde-strong)}.ba{background:var(--ambr)}.br{background:var(--rojo)}
 .grid2{display:grid;grid-template-columns:1.6fr 1fr;gap:16px;margin-bottom:16px}

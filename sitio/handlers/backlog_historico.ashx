@@ -28,8 +28,10 @@
 //
 // Asi que el rango se calcula aqui: @FechaFin es el corte que el tablero
 // tiene seleccionado (fecha_corte) y @FechaInicio son "dias" cortes hacia
-// atras contando ese mismo dia, igual que QaParams.Rango
-// (fin.AddDays(-(dias - 1))): con dias=30 la ventana son 30 dias, no 31.
+// atras contando ese mismo dia (fin.AddDays(-(dias - 1))): con dias=30 la
+// ventana son 30 dias, no 31. Es la misma cuenta del ancho que hace
+// QaParams.Rango, pero no el mismo corte: alli el fin por defecto es ayer,
+// aqui es el fecha_corte que el tablero tenga seleccionado.
 //
 // Los filtros se leen con BacklogUtil, igual que en los demas handlers de
 // backlog. Los defaults de dias y granularidad son los mismos que trae el

@@ -1,0 +1,89 @@
+/* =========================================================================
+   backlog/backlog.css - Lo PRIVADO del tablero de Backlog
+   -------------------------------------------------------------------------
+   Esta hoja NO es una hoja de pagina completa, a diferencia de
+   experiencia/experiencia.css y qa/qa.css. No resetea `*`, no estiliza `body`
+   ni `table`, y no redeclara .card / .kpi / .grid2 / .grid3 / .filtros /
+   .panel / .lienzo / .cap / .nota / .num / .mini / .ord.
+
+   El motivo sale de la auditoria de la extraccion: las 24 clases que usa el
+   marcado del Backlog salen TODAS de dashboard.css, la hoja del cascaron, y
+   con los mismos valores. Copiarlas aqui habria creado un segundo juego que
+   se puede separar del primero con el tiempo -es justo la deriva visual que
+   esta extraccion tenia que evitar-, asi que el vocabulario compartido se
+   queda donde estaba y se consume:
+
+   - embebido: dashboard.html ya tiene dashboard.css cargada;
+   - suelto:   backlog.html enlaza ../dashboard.css.
+
+   Aqui abajo va solo lo que NINGUN otro tablero usa. Se comprobo uso a uso:
+   ninguna de estas clases aparece en la vista de SLA, en Call Center, en
+   experiencia/ ni en qa/. Las declaraciones bajan de dashboard.css TAL CUAL,
+   sin cambiar un valor.
+
+   Las variables (--card, --line-soft, --accent, --radius, --shadow, --ink-2,
+   --muted, --muted-2, --ambr) siguen viniendo de :root en dashboard.css. Al
+   montarse, moduloEmbebido envuelve esta hoja en @scope (#tab-backlog), y el
+   @scope no corta la herencia: las variables de :root siguen llegando.
+   ========================================================================= */
+
+/* Reserva el alto del sello para que la cabecera no salte mientras el nodo
+   esta vacio. El aspecto lo pone .datos-info (assets/css/datos-info.css). El
+   selector hermano de SLA, #estado-carga:empty, se queda en dashboard.css. */
+header.top #estado-carga-bl:empty { display: none; }
+
+/* ---- Avisos ---- */
+/* Solo los pinta el Backlog: los dos cortes de dbo.CorreoBacklogSnapshot. */
+.aviso {
+  background: #fffbeb; border: 1px solid #fde68a; color: #92400e;
+  border-left: 4px solid var(--ambr);
+  border-radius: var(--radius); padding: 11px 15px;
+  font-size: 12.5px; margin-bottom: 14px;
+  box-shadow: var(--shadow);
+}
+
+/* Cuadrito de color del lider, en leyendas y tablas. El color lo pone
+   Paleta.colorLider por nombre; aqui solo va la geometria. */
+.swatch {
+  display: inline-block; width: 10px; height: 10px; border-radius: 3px;
+  margin-right: 6px; vertical-align: middle;
+}
+
+/* La franja va de color plano, como la de .aviso de aqui arriba. Antes era
+   border-image con el degradado de la cabecera, que ademas de pintar los
+   cuatro lados ANULA el render de border-radius: esta caja era la unica de
+   esquinas cuadradas del tablero. Mismo motivo -y mismo arreglo- por el que
+   las tarjetas KPI dejaron de usarlo.
+
+   El color es --accent, neutro a proposito: esto no es un semaforo. El
+   sentido de la variacion lo dice .delta con su flecha, y la caja sale
+   igual suba o baje, asi que teñir la franja de verde o rojo afirmaria algo
+   que el dato no siempre respalda. */
+.tendencia-linea {
+  font-size: 13.5px; margin: 0 0 16px;
+  background: var(--card); border: 1px solid var(--line-soft);
+  border-left: 4px solid var(--accent);
+  border-radius: var(--radius); box-shadow: var(--shadow);
+  padding: 12px 16px; color: var(--ink-2);
+}
+.tendencia-linea:empty { display: none; }
+.tendencia-linea .delta { font-weight: 700; }
+
+.grupo-lider {
+  margin: 20px 0 8px; font-size: 14px; font-weight: 700;
+  display: flex; align-items: center; gap: 2px; flex-wrap: wrap;
+}
+.grupo-lider .conteo {
+  font-weight: 600; font-size: 10.5px; color: var(--muted); margin-left: 8px;
+  text-transform: uppercase; letter-spacing: .4px;
+}
+
+/* Señal visual de que la celda tiene tooltip; si no, nadie descubre que
+   pasando el raton aparece la descripcion. */
+.con-hint { cursor: help; border-bottom: 1px dotted var(--muted-2); }
+
+/* Codigo de ticket que si tiene GUID en el mapeo: abre el formulario de
+   edicion en Proactivanet. Los que no lo tienen se quedan como texto. */
+.enlace-ticket { color: var(--accent); text-decoration: none; font-weight: 600; }
+.enlace-ticket:hover { text-decoration: underline; }
+.enlace-ticket::after { content: '\2197'; font-size: 0.72em; margin-left: 3px; opacity: 0.55; }

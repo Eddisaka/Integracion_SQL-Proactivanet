@@ -12,13 +12,26 @@
      falta tambien cuando la pagina cae en el iframe de respaldo, donde no
      llega ninguna hoja de dashboard.html. -->
 <link rel="stylesheet" href="../assets/css/barra-mini.css">
+<!-- Tarjeta KPI compartida. Como el medidor: hace falta tambien en la
+     pagina suelta y en el iframe de respaldo, donde no llega ninguna hoja
+     de dashboard.html. -->
+<link rel="stylesheet" href="../assets/css/kpi.css">
+<!-- Sello de "Última actualización" / "Periodo", compartido con el resto del
+     tablero. Como los demas compartidos: solo para la pagina suelta -embebido
+     en dashboard.html este <link> se quita y manda la copia de alli-. -->
+<link rel="stylesheet" href="../assets/css/datos-info.css">
+<script src="../assets/js/datos-info.js"></script>
 <script src="../assets/js/desplegable.js"></script>
 <script src="vendor/chart.umd.min.js"></script>
 <!-- Paleta categorica compartida (solo para la pagina suelta: embebida en
      dashboard.html este <script> se quita y manda la copia de alli). -->
+<!-- Escape de HTML compartido. Va ANTES de los modulos: todo lo que sale de
+     SQL se pega con innerHTML y tiene que entrar como texto, no como marcado. -->
+<script src="../assets/js/escape.js"></script>
 <script src="../assets/js/paleta.js"></script>
 <script src="../assets/js/barras.js"></script>
 <script src="../assets/js/grafica.js"></script>
+<script src="../assets/js/lineas.js"></script>
 </head>
 <body>
 <div class="wrap">

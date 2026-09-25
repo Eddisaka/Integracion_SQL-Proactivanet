@@ -136,9 +136,10 @@ header.top .sub {
   font-size: 12.5px; color: var(--ink-2); margin-top: 5px;
   font-variant-numeric: tabular-nums;
 }
-/* En fila: el chip de fecha y "Limpiar" uno al lado del otro. Apilados eran
-   los que marcaban el alto de esta cabecera y la dejaban mas alta que la de
-   SLA, Backlog y Call Center. */
+/* En fila y pegadas a la derecha. Hoy solo cuelga de aqui el chip de fecha,
+   pero la cabecera comparte la regla con SLA, Backlog y Call Center: cuando
+   hay mas de un elemento, apilarlos era lo que dejaba esta cabecera mas alta
+   que las demas. */
 header.top .acciones-top {
   display: flex; flex-direction: row; align-items: center;
   justify-content: flex-end; flex-wrap: wrap; gap: 8px;
@@ -193,6 +194,10 @@ header.top .btn:hover { border-color: rgba(25, 25, 25, .38); }
   grid-template-columns: 1fr 1fr;
   align-items: start;
 }
+/* Sin align-items: las dos tarjetas de la fila se estiran al alto de la mas
+   alta -Recategorizacion, con su tabla de 292px- y quedan alineadas arriba y
+   abajo. El sobrante de la tarjeta de la dona no es hueco muerto: .dona-grupo
+   lo reparte arriba y abajo del conjunto dona + leyenda. */
 .grid-sec {
   display: grid; gap: 16px; margin-bottom: 16px;
   grid-template-columns: minmax(300px, 1fr) minmax(430px, 1.65fr);
@@ -254,24 +259,10 @@ code {
 }
 
 /* ---------- KPIs ---------- */
-.kpis {
-  display: grid; gap: 14px; margin-bottom: 16px;
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-}
-.kpi {
-  position: relative; overflow: hidden;
-  background: var(--card); border-radius: var(--radius); padding: 16px 18px;
-  box-shadow: var(--shadow); border: 1px solid var(--line-soft);
-  border-left: 5px solid var(--kpi-ok);
-  transition: transform .18s ease, box-shadow .18s ease;
-}
-.kpi:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
-.kpi .kpi-tit {
-  font-size: 11px; font-weight: 600; text-transform: uppercase;
-  letter-spacing: .4px; color: var(--muted);
-}
-.kpi .kpi-val { font-size: 26px; font-weight: 800; line-height: 1.15; margin-top: 4px; }
-.kpi .kpi-nota { font-size: 11px; color: var(--muted); margin-top: 4px; }
+/* La geometria (`.kpis`, `.kpi` y los tres hijos) vive en
+   ../assets/css/kpi.css, que declara kpi-tit / kpi-val / kpi-nota junto a
+   los nombres lbl / val / foot del resto del tablero. Aqui solo queda el
+   color, que es lo unico propio de QA. */
 
 /* Nombres heredados que escribe el JS y que ya NO describen su color.
    Los tres son el mismo semaforo de franja izquierda que .sv/.sa/.sr:
@@ -290,7 +281,29 @@ code {
    height: 260px y, dentro de la pestaña, esa regla tambien alcanza a estos
    lienzos; el alto de QA lo deciden .lienzo-dona y el que calcula qa.js. */
 .lienzo { position: relative; width: 100%; height: auto; }
-.lienzo-dona { height: 232px; }
+/* La dona es su propio marco cuadrado y centrado: caja de lado 232 (menos si
+   la tarjeta es mas estrecha) con aspect-ratio 1. Asi Chart.js -responsive,
+   aspectRatio 1- siempre mide igual de ancho que de alto y no hay que pelear
+   con el width/height que escribe en el style del canvas. */
+.lienzo-dona {
+  width: min(232px, 100%);
+  height: auto;
+  aspect-ratio: 1;
+  margin-inline: auto;
+  flex: none;
+}
+
+/* La tarjeta de la dona es una columna: el h3 arriba y .dona-grupo ocupando
+   TODO lo que sobre hasta igualar el alto de Recategorizacion. Dentro del
+   grupo, justify-content: center deja el mismo aire encima de la dona que
+   debajo de la leyenda, con las dos filas de leyenda pegadas a la dona. */
+.card-dona { display: flex; flex-direction: column; }
+.dona-grupo {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
 
 /* Alto de partida de las graficas de barras. La pagina se pinta antes de
    tener datos, y sin esto la tarjeta nace plana y da un salto cuando llegan.

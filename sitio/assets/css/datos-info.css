@@ -1,0 +1,55 @@
+/* Sello de frescura y periodo: UNA sola pastilla para las cuatro pestañas.
+
+   Antes cada modulo tenia la suya y las tres se parecian sin ser iguales:
+   #estado-carga / #estado-carga-bl en dashboard.css, #corteFecha en
+   experiencia.css y .chip en qa.css. Los tres valores eran ya practicamente
+   los mismos -pastilla blanca, 5px 12px, radio completo, sombra de 1px-, asi
+   que aqui se escriben una vez y los tres selectores heredan de este bloque.
+
+   No es un componente nuevo: es EXACTAMENTE el que ya existia, con el mismo
+   lenguaje visual del tablero (superficie blanca sobre el verde de cabecera,
+   carbon para el texto, tipografia del sistema, sombra minima). Lo unico que
+   cambia es que ahora admite dos renglones -sello y periodo- sin empujar el
+   alto de la barra.
+
+   Lo carga dashboard.html (vale tambien para los modulos embebidos, que
+   pierden sus propios <link> al montarse) y cada pagina suelta. */
+
+.datos-info {
+  display: inline-block;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .92);
+  border: 1px solid rgba(255, 255, 255, .6);
+  box-shadow: 0 1px 2px rgba(25, 25, 25, .10);
+  /* La cabecera es verde y el texto va sobre blanco: carbon, no blanco. */
+  color: #393939;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.45;
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Con dos renglones la pastilla deja de ser una pildora de una linea y pasa a
+   ser una tarjetita: el radio completo se vería deformado. */
+.datos-info:has(.datos-info-linea + .datos-info-linea) {
+  border-radius: 12px;
+}
+
+.datos-info-linea + .datos-info-linea {
+  /* El periodo es dato secundario del sello: mismo tamaño, menos peso. */
+  font-weight: 500;
+  color: #5e5e5f;
+  margin-top: 1px;
+}
+
+.datos-info:empty { display: none; }
+
+/* En pantalla chica la cabecera envuelve y la pastilla queda debajo del
+   titulo, no colgada a la derecha: mismo criterio que dashboard.css aplica a
+   su .estado. Se repite aqui para que valga tambien en Experiencia y QA. */
+@media (max-width: 700px) {
+  .datos-info { text-align: left; white-space: normal; }
+}

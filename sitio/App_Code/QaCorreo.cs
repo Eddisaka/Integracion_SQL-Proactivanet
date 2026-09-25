@@ -279,8 +279,8 @@ public static class QaCorreo
         }
         catch (SqlException ex)
         {
-            // La cuenta del App Pool tiene EXECUTE sobre los procedimientos QA
-            // (lo comprueba handlers/qa_diag.ashx); que ademas tenga SELECT
+            // La cuenta del App Pool tiene EXECUTE sobre los procedimientos QA;
+            // que ademas tenga SELECT
             // sobre dbo.vw_CorreoQA_Base es otra cosa. Si no lo tiene, el
             // tablero sigue funcionando por donde funcionaba antes -- lento,
             // pero con los mismos numeros -- y el motivo queda anotado en

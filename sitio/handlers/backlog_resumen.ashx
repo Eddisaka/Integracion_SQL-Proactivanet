@@ -10,7 +10,14 @@
 //     { "kpis": { "BacklogTotal": 0, "Criticos": 0, "Altos": 0,
 //                 "Mayor30Dias": 0, "Reasignados": 0, "Reabiertos": 0 },
 //       "prioridad": [...], "aging": [...],
-//       "reasignaciones": [...], "reabiertos": [...], "sla": [...] }
+//       "reasignaciones": [...], "reabiertos": [...], "sla": [...],
+//       "meta": { ultimaActualizacion, periodoInicio, periodoFin, tipoPeriodo } }
+//
+// "meta" es el contrato compartido de frescura del tablero
+// (App_Code/DashboardDataInfo.cs), el mismo que publican kpis.ashx,
+// experiencia.ashx y qa.ashx para que las cuatro pestañas se pinten con un
+// unico componente. El tablero lo lee para el sello de la cabecera y no
+// depende de el para ningun numero.
 //
 // dbo.usp_CorreoBacklog_Principal devuelve seis result sets y aqui se mapean
 // POR POSICION, en el orden en que el procedimiento los emite (ver los
@@ -36,9 +43,23 @@ public class BacklogResumen : IHttpHandler
         DashboardHandler.Responder(context, delegate
         {
             var parametros = BacklogUtil.Filtros(context.Request);
-            parametros["FechaCorte"] = BacklogUtil.FechaCorte(context.Request);
+            var corte = BacklogUtil.FechaCorte(context.Request);
+            parametros["FechaCorte"] = corte;
 
             var sets = DashboardDb.EjecutarMultiple("dbo.usp_CorreoBacklog_Principal", parametros);
+
+            /* Metadato de frescura de ESTA pestana, en el contrato compartido
+               (App_Code/DashboardDataInfo.cs). El Backlog no es una ventana
+               sino una FOTO, asi que viaja sin periodo: el tablero pinta el
+               sello y nada mas.
+
+               El sello es dbo.CorreoBacklogSnapshot.FechaHoraSnapshot -cuando
+               se tomo la foto-, acotado al MISMO corte que acaba de responder
+               el procedimiento. FechaCorte sigue siendo lo que siempre fue: la
+               dimension de negocio con la que se filtra y se agrupa, y que se
+               pasa intacta al procedimiento unas lineas mas arriba. Ver
+               BacklogUtil.DatosInfo en App_Code/DashboardDb.cs. */
+            var info = BacklogUtil.DatosInfo(corte);
 
             return new Dictionary<string, object>
             {
@@ -48,6 +69,7 @@ public class BacklogResumen : IHttpHandler
                 { "reasignaciones", Filas(sets, 3) },
                 { "reabiertos",    Filas(sets, 4) },
                 { "sla",           Filas(sets, 5) },
+                { "meta",          info.AJson() },
             };
         });
     }

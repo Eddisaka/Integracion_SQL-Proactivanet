@@ -63,16 +63,18 @@ El tablero muestra, entre otros:
 - técnicos activos;
 - grupos activos.
 
+El interruptor **Todos / Sin proveedores** (encima de «Limpiar») saca de toda la pestaña de SLA —KPIs, tendencia, productividad, distribución, detalle y la tabla por líder y grupo— los grupos de proveedor: los que, sin espacios a la izquierda, empiezan por `Proveedor` (sin distinguir mayúsculas). «Vendor Managment» no entra en la regla y se queda. El grupo excluido sale del numerador y del denominador del SLA. La regla vive solo en `DashboardQueries.GrupoProveedor` (`App_Code/DashboardQueries.cs`); viaja como `?proveedores=excluir` y «Todos» no manda nada, así que da exactamente los números de siempre. No toca la base de datos: la tabla por líder y grupo filtra en `sla_lider_grupo.ashx` las filas que devuelve `dbo.usp_Dash_SlaLiderGrupo`. En el Call Center el interruptor se retira, igual que Grupos.
+
 Los gráficos utilizan Chart.js mediante CDN. Si el servidor no tiene salida a internet, puede descargarse `chart.umd.min.js` y servirse localmente.
 
 ### Call Center y carga combinada
 
 En la misma pestaña, y con los mismos filtros de fecha, se muestran dos bloques adicionales:
 
-- **Call Center** — tarjetas y gráficos de llamadas, servidos por `llamadas.ashx`. Los filtros de grupo y técnico no se aplican: una llamada no tiene grupo resolutor.
-- **Carga combinada** — tickets y llamadas por técnico en la misma fila, servido por `carga_combinada.ashx`. Solo incluye a los técnicos con extensión telefónica registrada en `dbo.CatAgenteTecnico`. Los tickets se cuentan por fecha de firma de solución y las llamadas únicamente si fueron contestadas.
+- **Call Center** — tarjetas y gráficos de llamadas, servidos por `llamadas.ashx`. El filtro de grupo no se aplica: una llamada no tiene grupo resolutor. El de técnico solo acota «Atención por agente»: el handler traduce el nombre a extensiones con `dbo.CatAgenteTecnico` (y `dbo.CatAgenteTecnicoAlias` para nombres viejos) y descarta las filas del resto. Los procedimientos no cambian.
+- **Carga combinada** — tickets y llamadas por técnico en la misma fila, servido por `carga_combinada.ashx`. Solo incluye a los técnicos con extensión telefónica registrada en `dbo.CatAgenteTecnico`; los filtros de grupo y técnico lo acotan. Los tickets se cuentan por fecha de firma de solución y las llamadas únicamente si fueron contestadas.
 
-Ambos bloques requieren que se hayan ejecutado `14_llamadas_callcenter.sql`, `15_dashboard_llamadas.sql` y `16_cruce_llamadas_tickets.sql`. Si faltan, el resto del tablero sigue funcionando y el bloque de carga combinada se desactiva indicando el motivo.
+Ambos bloques requieren que se hayan ejecutado `14_llamadas_callcenter.sql`, `15_dashboard_llamadas.sql` y `16_cruce_llamadas_tickets.sql` (repo Integracion_SQL, rama `feature/tablero-sla-productividad`). El filtro de técnico no necesita ningún script nuevo: usa los catálogos que ya crea el 16. Si faltan, el resto del tablero sigue funcionando y el bloque de carga combinada se desactiva indicando el motivo.
 
 ## 3. Dashboard de Backlog
 
@@ -87,9 +89,9 @@ Incluye:
 - backlog por prioridad;
 - antigüedad apilada por líder;
 - tabla resumen;
-- listado de tickets con más de 4 meses.
+- listado de los 10 tickets más antiguos **de cada líder**.
 
-El listado de tickets antiguos permite mostrar la descripción al pasar el ratón sobre el código. El código también puede funcionar como enlace directo al ticket en Proactivanet cuando existe su GUID correspondiente.
+El listado de tickets antiguos no exige una antigüedad mínima y la selección es **por líder**: de cada líder se toman sus diez tickets más viejos por fecha de registro (todos, si tiene menos de diez), así que un líder con mucho backlog viejo no tapa a los demás y un ticket de ayer entra si es de los diez más viejos de esa persona. El recorte lo hace `backlog_antiguos.ashx`, que manda sólo esas filas más `total` (cuántos tenía el corte entero) en vez del backlog completo. Los líderes se listan alfabéticamente, con `Sin Torre` al final. Permite mostrar la descripción al pasar el ratón sobre el código. El código también puede funcionar como enlace directo al ticket en Proactivanet cuando existe su GUID correspondiente.
 
 Las descripciones pueden contener HTML procedente de Outlook y ser muy grandes. Para el tablero se limita el contenido recibido y posteriormente se limpia y recorta en el navegador.
 

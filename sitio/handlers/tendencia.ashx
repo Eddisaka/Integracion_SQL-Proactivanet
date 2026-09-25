@@ -1,8 +1,5 @@
 <%@ WebHandler Language="C#" Class="Tendencia" %>
 
-// Entra vs sale por dia: creados por fecha de registro, resueltos por fecha
-// de solucion. Ver dbo.usp_Dash_TendenciaMulti.
-
 using System.Web;
 
 public class Tendencia : IHttpHandler
@@ -11,7 +8,9 @@ public class Tendencia : IHttpHandler
     {
         DashboardHandler.Responder(context, delegate
         {
-            return DashboardDb.Ejecutar("dbo.usp_Dash_TendenciaMulti", DashboardParams.Sla(context.Request));
+            // Ver App_Code/DashboardQueries.cs: reemplaza a
+            // dbo.usp_Dash_TendenciaMulti por el filtro de tecnicos.
+            return DashboardQueries.Tendencia(DashboardQueries.Filtros.Desde(context.Request));
         });
     }
 

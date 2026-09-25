@@ -1,0 +1,35 @@
+# Local configuration / secrets
+config*.json
+!config.ejemplo.json
+!config_correo_qa.ejemplo.json
+!config_correo_backlog.ejemplo.json
+!config_correo_backlog_direccion.ejemplo.json
+
+# ASP.NET local configuration
+Web.config
+
+# Python
+__pycache__/
+*.pyc
+
+# Logs / diagnostics
+*.log
+logs/
+errores.txt
+extraccion_*.json
+respuesta.json
+
+# Dashboard backups
+dashboard.html.bak*
+
+# Local Claude configuration
+.claude/
+
+# Temporary email files
+correo_qa_temp/
+correo_backlog_temp/
+correo_backlog_direccion_temp/
+Envio_correos/
+# Copia local de los scripts de correo (se ejecutan desde su carpeta, no
+# se versionan ni se sirven por HTTP).
+reenviacorreo/

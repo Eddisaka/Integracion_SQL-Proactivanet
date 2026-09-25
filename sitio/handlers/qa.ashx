@@ -53,7 +53,14 @@
 //       catalogos.categorias y catalogos.gruposValidos. Solo bajo peticion.
 //
 //   GET qa.ashx?action=meta
-//       Solo trazabilidad: generatedAt y source.
+//       Solo trazabilidad: generatedAt, source y dataInfo.
+//
+//   dataInfo va en TODAS las acciones y es el contrato compartido del tablero
+//   (App_Code/DashboardDataInfo.cs): ultimaActualizacion, periodoInicio,
+//   periodoFin y tipoPeriodo, con las mismas llaves que publican SLA y
+//   Experiencia para que el navegador las pinte con un unico componente.
+//   generatedAt y source.consultadoEn siguen siendo la hora del servidor al
+//   responder y NO son la frescura del dato; ver DatosInfo() mas abajo.
 //
 //   Cualquier accion acepta &debug=timings, que agrega source.timings con los
 //   milisegundos de cada paso y el numero de filas recorridas. Son duraciones
@@ -287,6 +294,7 @@ public class Qa : IHttpHandler
         var salida = new Dictionary<string, object>();
         salida["generatedAt"] = Ahora();
         salida["source"] = Origen(peticion, total);
+        salida["dataInfo"] = DatosInfo(peticion);
 
         var resumen = new Dictionary<string, object>();
         resumen["totalTickets"] = total;
@@ -391,6 +399,7 @@ public class Qa : IHttpHandler
         var salida = new Dictionary<string, object>();
         salida["generatedAt"] = Ahora();
         salida["source"] = Origen(peticion, agregados.Total);
+        salida["dataInfo"] = DatosInfo(peticion);
         salida["qare"] = qare;
         // Los otros dos bloques que salen de esta misma pasada. Van aqui para
         // que el tablero complete la carga con UNA sola peticion y no con
@@ -463,6 +472,7 @@ public class Qa : IHttpHandler
         var salida = new Dictionary<string, object>();
         salida["generatedAt"] = Ahora();
         salida["source"] = Origen(peticion, null);
+        salida["dataInfo"] = DatosInfo(peticion);
         salida["catalogos"] = catalogos;
 
         Escribir(context, salida);
@@ -479,7 +489,65 @@ public class Qa : IHttpHandler
         var meta = new Dictionary<string, object>();
         meta["generatedAt"] = Ahora();
         meta["source"] = Origen(peticion, tickets);
+        meta["dataInfo"] = DatosInfo(peticion);
         return meta;
+    }
+
+    /* Metadato de frescura y periodo de ESTA pestana, en el contrato
+       compartido (App_Code/DashboardDataInfo.cs).
+
+       OJO CON EL SELLO. generatedAt y source.consultadoEn son la hora del
+       SERVIDOR al responder: dicen cuando se pregunto, no de cuando son los
+       datos, asi que no sirven como "ultima actualizacion". QA lee
+       dbo.vw_CorreoQA_Base, que vive sobre las MISMAS tablas de tickets que
+       carga el ETL de Proactivanet en esta misma base, asi que su frescura
+       real es la de ese ETL: el fin registrado en dbo.EtlLog, exactamente el
+       mismo valor -y el mismo texto de consulta- que publica la pestana de
+       SLA. No es el sello de otra base: es el de la suya.
+
+       En modo snapshot los datos estan congelados y su fecha autoritativa es
+       la del export, no la del ETL.
+
+       La zona se declara abajo, por origen: el ETL esta en UTC y el export no
+       se sabe. */
+    private static Dictionary<string, object> DatosInfo(Peticion peticion)
+    {
+        var snapshot = QaDb.ModoSnapshot;
+
+        object sello = snapshot
+            ? QaSnapshot.ExportadoEn
+            : (object)DashboardDataInfo.LeerUltimoEtlTickets();
+
+        object desde = snapshot ? (QaSnapshot.FechaInicio ?? peticion.Fi) : peticion.Fi;
+        object hasta = snapshot ? (QaSnapshot.FechaFin ?? peticion.Ff) : peticion.Ff;
+
+        /* De que zona viene el sello. Son dos origenes distintos y no se puede
+           tratarlos igual:
+
+             en vivo   dbo.EtlLog.Fin, guardado en UTC por un host que corre en
+                       UTC -> lo convierte el contrato compartido;
+             snapshot  exportadoEn, un texto que escribio el exportador con la
+                       hora que tuviera su maquina. Este servidor no sabe en
+                       que zona esta, y adivinarlo seria correr seis horas un
+                       dato ajeno -> se muestra tal cual. */
+        var zona = snapshot ? ZonaSello.YaLocal : ZonaSello.Utc;
+
+        var info = DashboardDataInfo.Periodo(
+            "QA de categorizacion",
+            sello,
+            zona,
+            desde,
+            hasta,
+            snapshot
+                ? "Snapshot sin conexion (datos congelados)"
+                : "dbo.EtlLog (Proactivanet tickets) sobre dbo.vw_CorreoQA_Base");
+
+        if (!snapshot && info.UltimaActualizacion == null)
+        {
+            info.Nota = "dbo.EtlLog no reporto ningun ETL de tickets.";
+        }
+
+        return info.AJson();
     }
 
     // Trazabilidad de la respuesta: de donde salen los datos y que ventana
