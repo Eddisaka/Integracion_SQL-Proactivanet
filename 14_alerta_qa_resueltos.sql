@@ -90,6 +90,7 @@ GO
    manera, se copia igual- para que las dos cosas no puedan discrepar:
 
      Categoria -> dbo.Categorias.RutaCompleta -> GrupoIncidenciasPeticiones
+     categoria fuera del catalogo, o sin grupo -> Sin catalogo
      Grupo del ticket = ese grupo            -> OK
      no coinciden pero la pareja esta en vw_GruposValidos -> Valido
      cualquier otro caso                     -> Incorrecto
@@ -157,6 +158,9 @@ SELECT
 
     Validacion = CASE
         WHEN cat.RutaCompleta IS NULL THEN N'Sin catalogo'
+        -- Sin grupo en el catalogo no hay contra que validar; ver la misma
+        -- linea en 05_correo_qa_categorias.sql.
+        WHEN NULLIF(LTRIM(RTRIM(cat.GrupoIncidenciasPeticiones)), N'') IS NULL THEN N'Sin catalogo'
         WHEN LTRIM(RTRIM(t.Grupo)) = LTRIM(RTRIM(cat.GrupoIncidenciasPeticiones)) THEN N'OK'
         WHEN EXISTS (
             SELECT 1 FROM dbo.vw_GruposValidos gv

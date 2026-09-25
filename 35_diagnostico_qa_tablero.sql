@@ -46,6 +46,10 @@
    9) Desde cuando conoce el catalogo dbo.Categorias cada arbol de Punto de
       Venta, y con que grupo. Va en su propio lote: si la tabla no tuviera
       alguna columna, falla solo ese bloque.
+  10) Que pasaria si cada categoria sin grupo heredara el del nivel de arriba
+      mas cercano que si lo tiene, como dice Proactivanet que hace: cuantos
+      tickets de la ventana cambian y a que, que categorias, y en que arboles
+      del catalogo falta el grupo. Solo lo calcula; no cambia nada.
 
    Todas las horas salen en hora de Mexico.
 
@@ -85,25 +89,30 @@ JOIN sys.schemas AS s ON s.schema_id = o.schema_id
 WHERE o.name LIKE N'vw[_]CorreoQA[_]%'
    OR o.name LIKE N'usp[_]CorreoQA[_]%'
    OR o.name LIKE N'usp[_]QaWeb[_]%'
+   OR o.name LIKE N'vw[_]AlertaQA[_]%'
+   OR o.name LIKE N'usp[_]AlertaQA[_]%'
    OR o.name = N'vw_GruposValidos'
 ORDER BY o.modify_date DESC;
 
 
 /* ---------------------------------------------------------------------------
-   1b) La vista tal como esta hoy, comparada con la de 05 del repositorio.
-       La huella es un SHA-256 del texto sin espacios, tabuladores ni saltos
-       de linea, asi que no la cambia abrir el archivo en Windows o en Linux.
-       6A33EAFFED94 es la de la vista de 05 al 2026-09-25 (commit e0335c1);
-       si 05 cambia, hay que actualizarla aqui. La del repositorio tiene 6
-       filtros NOT LIKE: 2 por grupo y 4 por categoria (el de SorIA es <>).
+   1b) La vista tal como esta hoy, comparada con las versiones conocidas. La
+       huella es un SHA-256 del texto sin espacios, tabuladores ni saltos de
+       linea, asi que no la cambia abrir el archivo en Windows o en Linux.
+       Si 05 cambia la vista, hay que agregar aqui su huella nueva. Todas
+       tienen 6 filtros NOT LIKE: 2 por grupo y 4 por categoria (el de SorIA
+       es <>).
    --------------------------------------------------------------------------- */
 SELECT
     Bloque = N'1b) La vista de hoy',
-    EsLaDelRepositorio = CASE WHEN h.Huella = '6A33EAFFED94' THEN N'si' ELSE N'NO' END,
+    Version = ISNULL(k.Version, N'DESCONOCIDA: alguien la cambio fuera del repositorio'),
     h.Huella,
     FiltrosNotLike = (LEN(m.definition) - LEN(REPLACE(m.definition, N'NOT LIKE', N''))) / 8,
-    NombraAplicativosPV = CASE WHEN m.definition LIKE N'%Aplicativos Punto de Venta%' THEN N'si' ELSE N'no' END,
-    NombraAmpliacionPV = CASE WHEN m.definition LIKE N'%Ampliacion Punto de Venta%' THEN N'si' ELSE N'no' END,
+    LeeDe = CASE WHEN m.definition LIKE N'%FROM dbo.vw[_]Tickets AS t%' THEN N'vw_Tickets'
+                 WHEN m.definition LIKE N'%FROM dbo.Tickets AS t%'     THEN N'dbo.Tickets'
+                 ELSE N'?' END,
+    SinGrupoEsSinCatalogo = CASE WHEN m.definition LIKE N'%NULLIF(LTRIM(RTRIM(cat.GrupoIncidenciasPeticiones)), N%'
+                                 THEN N'si' ELSE N'no' END,
     Largo = LEN(m.definition)
 FROM sys.sql_modules AS m
 CROSS APPLY (
@@ -111,6 +120,11 @@ CROSS APPLY (
         REPLACE(REPLACE(REPLACE(REPLACE(m.definition, NCHAR(13), N''), NCHAR(10), N''),
                 NCHAR(9), N''), N' ', N'')), 2), 12)
 ) AS h
+LEFT JOIN (VALUES
+    ('6A33EAFFED94', N'05 hasta el 2026-09-25 (lee dbo.Tickets)'),
+    ('675629BCB2BA', N'la de produccion del 2026-09-25 13:16 (lee vw_Tickets)'),
+    ('B1B0343DF284', N'05 actual (vw_Tickets; sin grupo en el catalogo = Sin catalogo)')
+) AS k (Huella, Version) ON k.Huella = h.Huella
 WHERE m.object_id = OBJECT_ID(N'dbo.vw_CorreoQA_Base');
 
 
@@ -387,5 +401,138 @@ CROSS APPLY (
 WHERE a.Arbol IS NOT NULL
 GROUP BY a.Arbol, c.GrupoIncidenciasPeticiones
 ORDER BY a.Arbol, COUNT_BIG(*) DESC;
+GO
+
+
+/* ---------------------------------------------------------------------------
+   10) La herencia, simulada. Para cada categoria sin grupo se sube un nivel
+       por vuelta ('/A/B/C' -> '/A/B' -> '/A') hasta dar con uno que tenga
+       grupo. Si un nivel intermedio no esta en el catalogo, se salta y se
+       sigue subiendo. La regla de validacion es la misma de la vista; solo
+       cambia de donde sale el grupo.
+   --------------------------------------------------------------------------- */
+SET NOCOUNT ON;
+
+DECLARE @Hoy DATE = CONVERT(date, DATEADD(HOUR, -6, SYSUTCDATETIME()));
+DECLARE @Ff DATE = DATEADD(DAY, -1, @Hoy);
+DECLARE @Fi DATE = DATEADD(DAY, -14, @Ff);
+
+SELECT
+    Ruta = c.RutaCompleta,
+    GrupoPropio = NULLIF(LTRIM(RTRIM(c.GrupoIncidenciasPeticiones)), N'')
+INTO #Cat
+FROM dbo.vw_CorreoQA_CategoriaUnica AS c;
+
+SELECT
+    Ruta,
+    GrupoPropio,
+    Busca = Ruta,
+    GrupoEfectivo = GrupoPropio,
+    HeredaDe = CAST(NULL AS NVARCHAR(1000))
+INTO #Herencia
+FROM #Cat;
+
+DECLARE @Vuelta INT = 0;
+WHILE @Vuelta < 15
+  AND EXISTS (SELECT 1 FROM #Herencia WHERE GrupoEfectivo IS NULL AND CHARINDEX(N'/', Busca, 2) > 0)
+BEGIN
+    UPDATE h
+    SET Busca = x.Padre,
+        GrupoEfectivo = p.GrupoPropio,
+        HeredaDe = CASE WHEN p.GrupoPropio IS NOT NULL THEN x.Padre END
+    FROM #Herencia AS h
+    CROSS APPLY (SELECT Padre = LEFT(h.Busca, LEN(h.Busca) - CHARINDEX(N'/', REVERSE(h.Busca)))) AS x
+    LEFT JOIN #Cat AS p ON p.Ruta = x.Padre
+    WHERE h.GrupoEfectivo IS NULL
+      AND CHARINDEX(N'/', h.Busca, 2) > 0;
+
+    SET @Vuelta += 1;
+END;
+
+SELECT
+    q.Validacion,
+    Grupo = LTRIM(RTRIM(q.Grupo)),
+    Ruta = LTRIM(RTRIM(REPLACE(ISNULL(q.Categoria, N''), NCHAR(160), N' ')))
+INTO #Tickets
+FROM dbo.vw_CorreoQA_Base AS q
+WHERE q.FechaRegistroDia >= @Fi
+  AND q.FechaRegistroDia <= @Ff;
+
+SELECT
+    t.Validacion,
+    t.Ruta,
+    h.HeredaDe,
+    h.GrupoEfectivo,
+    ConHerencia = CASE
+        WHEN h.Ruta IS NULL OR h.GrupoEfectivo IS NULL THEN N'Sin catalogo'
+        WHEN t.Grupo = h.GrupoEfectivo THEN N'OK'
+        WHEN EXISTS (
+            SELECT 1 FROM dbo.vw_GruposValidos AS gv
+            WHERE gv.GrupoCorrecto = h.GrupoEfectivo
+              AND gv.GrupoValido = t.Grupo
+        ) THEN N'Valido'
+        ELSE N'Incorrecto'
+    END
+INTO #Simulado
+FROM #Tickets AS t
+LEFT JOIN #Herencia AS h ON h.Ruta = t.Ruta;
+
+SELECT
+    Bloque = N'10) Ventana: hoy contra con herencia',
+    Hoy = s.Validacion,
+    s.ConHerencia,
+    Tickets = COUNT_BIG(*)
+FROM #Simulado AS s
+GROUP BY s.Validacion, s.ConHerencia
+ORDER BY s.Validacion, s.ConHerencia;
+
+SELECT
+    Bloque = N'10b) Totales de la ventana',
+    Tickets = COUNT_BIG(*),
+    IncorrectosHoy = SUM(CASE WHEN Validacion = N'Incorrecto' THEN 1 ELSE 0 END),
+    PctHoy = CAST(100.0 * SUM(CASE WHEN Validacion = N'Incorrecto' THEN 1 ELSE 0 END)
+                  / NULLIF(COUNT_BIG(*), 0) AS DECIMAL(6,2)),
+    IncorrectosConHerencia = SUM(CASE WHEN ConHerencia = N'Incorrecto' THEN 1 ELSE 0 END),
+    PctConHerencia = CAST(100.0 * SUM(CASE WHEN ConHerencia = N'Incorrecto' THEN 1 ELSE 0 END)
+                          / NULLIF(COUNT_BIG(*), 0) AS DECIMAL(6,2))
+FROM #Simulado;
+
+SELECT TOP (15)
+    Bloque = N'10c) Categorias que cambian',
+    Categoria = s.Ruta,
+    s.HeredaDe,
+    GrupoHeredado = s.GrupoEfectivo,
+    Tickets = COUNT_BIG(*),
+    OK = SUM(CASE WHEN s.ConHerencia = N'OK' THEN 1 ELSE 0 END),
+    Valido = SUM(CASE WHEN s.ConHerencia = N'Valido' THEN 1 ELSE 0 END),
+    Incorrecto = SUM(CASE WHEN s.ConHerencia = N'Incorrecto' THEN 1 ELSE 0 END)
+FROM #Simulado AS s
+WHERE s.Validacion <> s.ConHerencia
+GROUP BY s.Ruta, s.HeredaDe, s.GrupoEfectivo
+ORDER BY COUNT_BIG(*) DESC;
+
+-- Todo el catalogo, por primer nivel: donde falta el grupo y si la herencia
+-- lo resuelve.
+SELECT TOP (20)
+    Bloque = N'10d) Catalogo sin grupo, por primer nivel',
+    PrimerNivel = n.PrimerNivel,
+    Rutas = COUNT_BIG(*),
+    SinGrupoPropio = SUM(CASE WHEN h.GrupoPropio IS NULL THEN 1 ELSE 0 END),
+    LoHeredan = SUM(CASE WHEN h.GrupoPropio IS NULL AND h.GrupoEfectivo IS NOT NULL THEN 1 ELSE 0 END),
+    NiPropioNiHeredado = SUM(CASE WHEN h.GrupoEfectivo IS NULL THEN 1 ELSE 0 END)
+FROM #Herencia AS h
+CROSS APPLY (
+    SELECT PrimerNivel = CASE WHEN CHARINDEX(N'/', h.Ruta, 2) > 0
+                              THEN LEFT(h.Ruta, CHARINDEX(N'/', h.Ruta, 2) - 1)
+                              ELSE h.Ruta END
+) AS n
+GROUP BY n.PrimerNivel
+HAVING SUM(CASE WHEN h.GrupoPropio IS NULL THEN 1 ELSE 0 END) > 0
+ORDER BY SUM(CASE WHEN h.GrupoPropio IS NULL THEN 1 ELSE 0 END) DESC;
+
+DROP TABLE #Simulado;
+DROP TABLE #Tickets;
+DROP TABLE #Herencia;
+DROP TABLE #Cat;
 
 PRINT N'Fin: ' + CONVERT(NVARCHAR(40), SYSDATETIMEOFFSET(), 127);

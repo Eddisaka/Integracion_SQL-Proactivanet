@@ -17,6 +17,8 @@
      '/S-Fenicia/Dispositivo PC & movil/Desbloqueo').
    - Esa Categoria define un "Grupo Correcto" (columna "Grupo incidencias /
      peticiones" del catalogo de categorias de Proactivanet).
+   - Si la Categoria no esta en el catalogo, o esta pero sin grupo
+                                                    -> Validacion = 'Sin catalogo'
    - Si Tickets.Grupo = GrupoCorrecto              -> Validacion = 'OK'
    - Si no coincide pero (GrupoCorrecto, Tickets.Grupo)
      existe en la tabla de excepciones "grupos validos"
@@ -56,9 +58,9 @@
      GrupoIncidenciasPeticiones / VigenteEnOrigen -ver 04_esquema_categorias.sql-)
    - dbo.CatGruposValidos + dbo.vw_GruposValidos (excepciones grupo
      correcto/valido, ya filtrada a VigenteEnOrigen = 1 -ver 06_catalogos_excel.sql-)
-   Requiere que 04_esquema_categorias.sql y 06_catalogos_excel.sql ya se
-   hayan ejecutado (y que el ETL las tenga cargadas) antes de correr este
-   archivo.
+   Requiere que 04_esquema_categorias.sql, 06_catalogos_excel.sql y
+   15_vw_tickets.sql ya se hayan ejecutado (y que el ETL las tenga
+   cargadas) antes de correr este archivo.
 
    Notas:
    - Script idempotente. Compatible con SQL Server 2016+.
@@ -163,6 +165,11 @@ SELECT
 
     Validacion = CASE
         WHEN cat.RutaCompleta IS NULL THEN N'Sin catalogo'
+        -- La categoria esta en el catalogo pero sin grupo: no hay contra que
+        -- validar. Desde septiembre de 2026 Proactivanet solo pone el grupo en
+        -- el primer nivel y los demas lo heredan; antes de esta linea, cada
+        -- ticket de esas categorias salia Incorrecto.
+        WHEN NULLIF(LTRIM(RTRIM(cat.GrupoIncidenciasPeticiones)), N'') IS NULL THEN N'Sin catalogo'
         WHEN LTRIM(RTRIM(t.Grupo)) = LTRIM(RTRIM(cat.GrupoIncidenciasPeticiones)) THEN N'OK'
         WHEN EXISTS (
             SELECT 1
@@ -172,7 +179,11 @@ SELECT
         ) THEN N'Valido'
         ELSE N'Incorrecto'
     END
-FROM dbo.Tickets AS t
+-- vw_Tickets y no dbo.Tickets: asi quedo en produccion el 2026-09-25 a las
+-- 13:16, y es la misma base que usa la alerta de QA (14). vw_Tickets ya
+-- quita su lista de categorias y los tickets con TipoRelacion 'Dependiente'.
+-- Por eso este script necesita 15_vw_tickets.sql en una base nueva.
+FROM dbo.vw_Tickets AS t
 CROSS APPLY (
     SELECT CategoriaNorm = LTRIM(RTRIM(REPLACE(ISNULL(t.Categoria, N''), NCHAR(160), N' ')))
 ) AS catn
