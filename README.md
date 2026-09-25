@@ -33,6 +33,32 @@ estan ahi.
 - **Backlog Soriana Total** — carga inicial, se corre una vez con `--completa`.
 - **Backlog Soriana Ultimos 3 dias** — el incremental diario, por UPSERT.
 
+## La hora: el servidor va en UTC, Proactivanet en hora de Mexico
+
+Comprobado el 2026-09-24 en el servidor: `SYSDATETIMEOFFSET()` da `+00:00`, y
+el ticket mas reciente de `dbo.Tickets` era de las 17:56 cuando la carga que lo
+trajo quedo apuntada a las 00:00 del dia siguiente. Las fechas de Proactivanet
+(`FechaRegistro`, `FechaEstimadaResolucion`, las de Problems...) son de Mexico.
+
+Por eso **ningun script compara esas fechas con `SYSDATETIME()` ni `GETDATE()`**.
+"Ahora" se escribe siempre asi, para que se pueda buscar:
+
+```sql
+DATEADD(HOUR, -6, SYSUTCDATETIME())
+```
+
+Antes, cada ticket abierto se daba por vencido seis horas antes de tiempo, su
+antiguedad salia seis horas de mas, y "hoy" cambiaba a las 18:00. Mexico no
+tiene horario de verano desde 2022; si volviera, este es el unico patron que
+habria que cambiar.
+
+El reloj del servidor **si** se queda en la auditoria de la base: los `DEFAULT`
+de las tablas, `FechaUltimaCargaDW` y `dbo.EtlLog.Fin`. La guarda de frescura
+del agente mide la edad de la carga contra `SYSDATETIME()` del mismo servidor.
+
+`pruebas/prueba_reloj_sql.py` revisa todos los `.sql` y falla si alguno vuelve
+a comparar contra el reloj del servidor.
+
 ## Lo que no se versiona
 
 El repositorio es publico. No se suben credenciales (`config*.json`,
