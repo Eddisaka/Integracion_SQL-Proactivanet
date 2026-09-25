@@ -1,0 +1,54 @@
+﻿Bloque     Objeto                             Estado
+---------- ---------------------------------- ------
+1. Objetos dbo.AlertaQAAvisado                ok
+1. Objetos dbo.vw_AlertaQA_Base               ok
+1. Objetos dbo.usp_AlertaQA_Pendientes        ok
+1. Objetos dbo.usp_AlertaQA_MarcarAvisado     ok
+1. Objetos dbo.CatCuentaNoPersona (requerida) ok
+
+Bloque                     Validacion   Tickets
+-------------------------- ------------ -----------
+2. Resueltos, ultimas 48 h OK           651
+2. Resueltos, ultimas 48 h Valido       65
+2. Resueltos, ultimas 48 h Sin catalogo 32
+2. Resueltos, ultimas 48 h Incorrecto   23
+
+Bloque            Lider                                                                                                                                                  Tickets     Tecnicos    CuentasSistema
+----------------- ------------------------------------------------------------------------------------------------------------------------------------------------------ ----------- ----------- --------------
+3. Se avisaria de Laura Cardenas                                                                                                                                         2           1           1
+3. Se avisaria de Sergio Gonzalez                                                                                                                                        1           1           0
+3. Se avisaria de Adriana Lozano                                                                                                                                         1           1           0
+3. Se avisaria de Jesus Campa                                                                                                                                            1           1           0
+Warning: Null value is eliminated by an aggregate or other SET operation.
+
+Bloque                                          Tecnico                                                                                                                                                                                                                                                          Tickets     Grupos      EnCatalogo  SiempreProveedor Cobertura
+----------------------------------------------- ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- ----------- ----------- ----------- ---------------- --------------------------
+3b. Cuentas que firman, y como quedan cubiertas Bizerba, Proveedor                                                                                                                                                                                                                                               8           1           0           1                grupo proveedor
+3b. Cuentas que firman, y como quedan cubiertas Lexmark, Proveedor                                                                                                                                                                                                                                               8           1           0           1                grupo proveedor
+3b. Cuentas que firman, y como quedan cubiertas Mexba, Proveedor                                                                                                                                                                                                                                                 8           1           0           1                grupo proveedor
+3b. Cuentas que firman, y como quedan cubiertas Berkel, Proveedor                                                                                                                                                                                                                                                7           1           0           1                grupo proveedor
+3b. Cuentas que firman, y como quedan cubiertas Transnetwork, Proveedor                                                                                                                                                                                                                                          5           1           0           1                grupo proveedor
+3b. Cuentas que firman, y como quedan cubiertas Lexmark2, Proveedor                                                                                                                                                                                                                                              5           1           0           1                grupo proveedor
+3b. Cuentas que firman, y como quedan cubiertas Realfix, Proveedor                                                                                                                                                                                                                                               1           1           0           1                grupo proveedor
+3b. Cuentas que firman, y como quedan cubiertas Sonda, Proveedor                                                                                                                                                                                                                                                 1           1           0           1                grupo proveedor
+3b. Cuentas que firman, y como quedan cubiertas User, Setup                                                                                                                                                                                                                                                      109         14          1           0                catalogo
+3b. Cuentas que firman, y como quedan cubiertas Proactivanet, Customer Service                                                                                                                                                                                                                                   100         3           1           0                catalogo
+3b. Cuentas que firman, y como quedan cubiertas Desk, Smart                                                                                                                                                                                                                                                      1           1           1           0                catalogo
+
+Bloque                        Cuenta                                                                                                                                                                                                                                                          Habilitado Tickets30d  ParecidosSinEspacioDuro Diagnostico
+----------------------------- --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- ---------- ----------- ----------------------- --------------------------------------------------------------------------
+5. El catalogo visto al reves User, Setup                                                                                                                                                                                                                                                     1          109         109                     ok
+5. El catalogo visto al reves Proactivanet, Customer Service                                                                                                                                                                                                                                  1          100         100                     ok
+5. El catalogo visto al reves Desk, Smart                                                                                                                                                                                                                                                     1          1           1                       ok
+5. El catalogo visto al reves Energeticos, Control                                                                                                                                                                                                                                            1          0           0                       sin tickets en 30 dias (normal si la cuenta ya no se usa)
+5. El catalogo visto al reves MAC, Mesa                                                                                                                                                                                                                                                       1          0           0                       sin tickets en 30 dias (normal si la cuenta ya no se usa)
+5. El catalogo visto al reves NetLogistik, NetLogistik Soporte                                                                                                                                                                                                                                1          0           0                       sin tickets en 30 dias (normal si la cuenta ya no se usa)
+5. El catalogo visto al reves Operaciones, Operaciones                                                                                                                                                                                                                                        1          0           0                       sin tickets en 30 dias (normal si la cuenta ya no se usa)
+5. El catalogo visto al reves Soriana, Consulta                                                                                                                                                                                                                                               1          0           0                       sin tickets en 30 dias (normal si la cuenta ya no se usa)
+
+Bloque         Filas
+-------------- -----------
+6. Ya avisados 227
+
+
+Hora de finalización: 2026-09-25T17:23:19.9670710-06:00
