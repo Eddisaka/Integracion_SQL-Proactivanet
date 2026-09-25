@@ -42,13 +42,23 @@
   <script src="../assets/vendor/chart.umd.min.js"></script>
   <!-- Paleta categorica compartida (solo para la pagina suelta: embebida en
        dashboard.html este <script> se quita y manda la copia de alli). -->
-  <script src="../assets/js/paleta.js"></script>
+  <!-- Escape de HTML compartido. Va ANTES de los modulos: todo lo que sale de
+     SQL se pega con innerHTML y tiene que entrar como texto, no como marcado. -->
+<script src="../assets/js/escape.js"></script>
+<script src="../assets/js/paleta.js"></script>
   <!-- Geometria y cifra de las barras, con la misma nota: solo para la
        pagina suelta. -->
   <script src="../assets/js/barras.js"></script>
   <!-- Desplegable compartido, con la misma nota: solo para la pagina suelta. -->
   <script src="../assets/js/desplegable.js"></script>
   <link rel="stylesheet" href="../assets/css/desplegable.css">
+  <!-- Tarjeta KPI compartida; hace falta en la pagina suelta y en el
+       iframe de respaldo. -->
+  <link rel="stylesheet" href="../assets/css/kpi.css">
+  <!-- Sello de "Última actualización" / "Periodo", compartido con el resto
+       del tablero, con la misma nota: solo para la pagina suelta. -->
+  <link rel="stylesheet" href="../assets/css/datos-info.css">
+  <script src="../assets/js/datos-info.js"></script>
   <link rel="stylesheet" href="qa.css">
 </head>
 <body>
@@ -65,8 +75,10 @@
         <div class="sub" id="qa-sub-fuente">Cargando origen de datos&hellip;</div>
       </div>
       <div class="acciones-top">
-        <span class="chip" id="qa-chip-fecha">Datos QA: &mdash;</span>
-        <button type="button" class="btn chico" id="qa-btn-recargar">Limpiar</button>
+        <!-- El sello lo pinta DatosInfo (assets/js/datos-info.js) con la clase
+             .datos-info, compartida con SLA, Backlog y Experiencia. Ya no lleva
+             .chip: esa era la version propia de QA de la misma pastilla. -->
+        <div id="qa-chip-fecha"></div>
       </div>
     </header>
 
@@ -110,13 +122,17 @@
     </section>
 
     <section class="grid-sec">
-      <div class="card">
+      <div class="card card-dona">
         <h3>Distribucion de validacion<span class="hint" id="qa-hint-validacion"></span></h3>
-        <div class="lienzo lienzo-dona">
-          <canvas id="qa-chart-validacion"></canvas>
-          <p class="lienzo-msg" id="qa-msg-validacion"><span class="spinner" aria-hidden="true"></span>Calculando&hellip;</p>
+        <!-- La dona y su leyenda son UN grupo: el div los centra juntos en el
+             alto que le sobra a la tarjeta al igualarse con Recategorizacion. -->
+        <div class="dona-grupo">
+          <div class="lienzo lienzo-dona">
+            <canvas id="qa-chart-validacion" width="232" height="232"></canvas>
+            <p class="lienzo-msg" id="qa-msg-validacion"><span class="spinner" aria-hidden="true"></span>Calculando&hellip;</p>
+          </div>
+          <div class="leyenda" id="qa-leyenda-validacion"></div>
         </div>
-        <div class="leyenda" id="qa-leyenda-validacion"></div>
       </div>
 
       <div class="card">

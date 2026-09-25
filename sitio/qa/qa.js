@@ -67,12 +67,15 @@
 
   /* Colores de este tablero. Hay DOS sistemas y no se mezclan:
 
-     - IDENTIDAD de serie (barras de Grupo y de Tecnico): sale de la paleta
-       categorica COMPARTIDA, assets/js/paleta.js -> window.Paleta. No se
-       copia el arreglo aqui; una grafica nueva con categorias tambien debe
-       pedirla ahi (Paleta.escala / Paleta.color / Paleta.registro).
-       Embebido en dashboard.html este modulo pierde sus <script> y usa la
-       copia que ya cargo dashboard.html; suelto, la carga qa.html.
+     - MAGNITUD (las dos barras, Grupo y Tecnico): las dos son un TOP 10 de
+       una sola serie, asi que las dos llevan el azul de barra ordinaria
+       compartido, Paleta.AZUL_SERIE. Antes la de Tecnico iba de otro color
+       -la posicion 2 de la paleta- y eso sugeria que Grupo y Tecnico median
+       cosas distintas: miden lo mismo, incidencias, sobre otra dimension.
+       El azul sale de la paleta COMPARTIDA, assets/js/paleta.js ->
+       window.Paleta; no se copia ningun color aqui. Embebido en
+       dashboard.html este modulo pierde sus <script> y usa la copia que ya
+       cargo dashboard.html; suelto, la carga qa.html.
 
      - ESTADO de validacion (OK / Incorrecto / Valido / Sin catalogo): es
        semantico y se queda como esta. El rojo sigue reservado para
@@ -81,12 +84,11 @@
      Los nombres de las claves son heredados y ya NO describen su color: se
      conservan para no tocar la logica que los cita. */
   var COLOR = {
-    azul: Paleta.porIndice(0),   // serie primaria (barras por grupo)
+    azul: Paleta.AZUL_SERIE,     // las dos barras de ranking (grupo y tecnico)
     azulOscuro: '#1d4ed8',       // hover de barra: la primaria, mas profunda
     verde: '#5aa726',            // estado OK
     rojo: '#982a18',             // estado Incorrecto (unico uso del rojo)
     ambar: '#b09512',            // estado Sin catalogo: mostaza, no ambar semantico
-    morado: Paleta.porIndice(2), // serie secundaria (barras por tecnico)
     cyan: '#2f8f6b',             // estado Valido: verde pino
     gris: Paleta.NEUTRO          // fuera de catalogo: neutro
   };
@@ -192,6 +194,13 @@
   function armarShell() {
     kpisEnEspera('—');
 
+    /* Geometria de barra del juego COMPARTIDO (assets/js/barras.js) como
+       DEFAULT del tipo `bar`, igual que hacen dashboard.js y experiencia.js.
+       Antes este modulo no lo llamaba y tenia que copiar Barras.GRUESA y
+       Barras.RADIO dentro de su dataset. Es idempotente: cuando QA va
+       embebido en dashboard.html el tablero ya lo llamo. */
+    Barras.aplicarDefaults();
+
     // Alto de partida: el definitivo lo pone cada bloque cuando sabe cuantas
     // barras tiene. Sin esto la tarjeta nace plana y salta al llegar los datos.
     $('lienzo-grupo').style.height = altoLienzo(TOP_BARRAS);
@@ -201,7 +210,7 @@
       if (etiqueta === '(sin grupo)') return;
       aplicarFiltro('grupo', etiqueta);
     });
-    graficas.tecnico = crearBarras('chart-tecnico', COLOR.morado, function (etiqueta) {
+    graficas.tecnico = crearBarras('chart-tecnico', COLOR.azul, function (etiqueta) {
       aplicarFiltro('tecnico', etiqueta);
     });
     graficas.validacion = crearDona();
@@ -360,9 +369,27 @@
     var desde = fechaCorta(src.fechaInicio);
     var hasta = fechaCorta(src.fechaFin);
 
-    $('chip-fecha').textContent = (desde && hasta)
-      ? 'Datos QA: ' + desde + ' – ' + hasta
-      : 'Datos QA: sin rango informado';
+    /* Sello de frescura y periodo, con el componente compartido
+       (assets/js/datos-info.js). El metadato lo arma qa.ashx -> DatosInfo():
+       el sello es el fin del ultimo ETL de tickets registrado en dbo.EtlLog,
+       la misma base y la misma definicion que publica SLA, y el periodo es la
+       ventana que la consulta USO (por omision los 15 dias del correo de QA).
+
+       Antes esta pastilla solo mostraba el rango; el unico dato de tiempo que
+       llegaba era generatedAt, que es la hora del servidor al responder y no
+       dice de cuando son los datos. Ese valor sigue en el pie de fuente como
+       "Consultado", que es lo que de verdad significa. */
+    if (datos.dataInfo) {
+      DatosInfo.pintar($('chip-fecha'), datos.dataInfo);
+    } else {
+      // Respuesta anterior a dataInfo: queda el rango, que source si trae.
+      DatosInfo.pintar($('chip-fecha'), DatosInfo.armar({
+        fuente: 'QA de categorizacion',
+        inicio: src.fechaInicio,
+        fin: src.fechaFin,
+        origen: src.vista || null,
+      }));
+    }
 
     var partes = [];
     partes.push('Origen: ' + (src.origen || 'no informado'));
@@ -435,16 +462,16 @@
       type: 'bar',
       data: {
         labels: [],
-        // Las medidas y el radio salen del juego COMPARTIDO de
-        // assets/js/barras.js -el mismo de SLA, Backlog y Experiencia- en vez
-        // del arreglo propio que tenia este modulo (tope de 22px y .78/.74 de
-        // ranura), que dejaba estas barras mas delgadas que las de al lado.
-        datasets: [Object.assign({}, Barras.GRUESA, {
+        // Las medidas y el radio ya son el default compartido
+        // (Barras.aplicarDefaults, arriba en armarShell): el mismo de SLA,
+        // Backlog y Experiencia. Antes este modulo tenia un arreglo propio
+        // -tope de 22px y .78/.74 de ranura- que dejaba estas barras mas
+        // delgadas que las de al lado.
+        datasets: [{
           data: [],
           backgroundColor: color,
-          hoverBackgroundColor: COLOR.azulOscuro,
-          borderRadius: Barras.RADIO
-        })]
+          hoverBackgroundColor: COLOR.azulOscuro
+        }]
       },
       options: {
         indexAxis: 'y',
@@ -467,8 +494,8 @@
               label: function (item) { return NUM.format(item.parsed.x) + ' tickets'; }
             }
           },
-          // Valor al final de cada barra, sin plugins externos.
-          etiquetasValor: {}
+          // La cifra la pinta el plugin COMPARTIDO (ver mas abajo), que no
+          // se configura por opciones.
         },
         scales: {
           x: {
@@ -485,7 +512,7 @@
           }
         }
       },
-      plugins: [pluginValores]
+      plugins: [ETIQUETAS_DENTRO]
     });
   }
 
@@ -495,23 +522,16 @@
     grafica.update();
   }
 
-  // Dibuja el valor al final de la barra. Chart.js no lo trae de serie y no
-  // vale la pena sumar otra dependencia por esto.
-  var pluginValores = {
-    id: 'etiquetasValor',
-    afterDatasetsDraw: function (chart) {
-      var ctx = chart.ctx;
-      ctx.save();
-      ctx.font = '600 11px "Segoe UI", Roboto, Arial, sans-serif';
-      ctx.fillStyle = TINTA.etiqueta;
-      ctx.textBaseline = 'middle';
-      chart.getDatasetMeta(0).data.forEach(function (barra, i) {
-        var valor = chart.data.datasets[0].data[i];
-        ctx.fillText(NUM.format(valor), barra.x + 6, barra.y);
-      });
-      ctx.restore();
-    }
-  };
+  /* La cifra de cada barra: el plugin COMPARTIDO de assets/js/barras.js,
+     atado al formateador de este modulo. Aqui vivia `pluginValores`, que la
+     pintaba SIEMPRE por fuera de la punta, en gris y con otra fuente; el
+     compartido la mete DENTRO de la barra cuando cabe -con tinta de contraste
+     contra el relleno- y solo la saca afuera en las barras cortas de la cola.
+     El `layout.padding.right` de arriba es justamente el hueco para esas.
+
+     Se crea una sola vez y lo comparten las dos graficas horizontales de la
+     pagina: el plugin no guarda estado. */
+  var ETIQUETAS_DENTRO = Barras.etiquetasDentro(function (v) { return NUM.format(v); });
 
   // Top de la lista que manda el API, de mayor a menor. Se recalcula en cada
   // pintado, asi que una recarga o un rango distinto rehacen el top solos.
@@ -571,7 +591,9 @@
       type: 'doughnut',
       data: { labels: [], datasets: [{ data: [], backgroundColor: [], borderWidth: 2, borderColor: '#fff' }] },
       options: {
-        responsive: true, maintainAspectRatio: false, cutout: '58%',
+        // Cuadrada de verdad: el lienzo manda el tamano (.lienzo-dona es una
+        // caja con aspect-ratio 1) y Chart.js mide lado = lado.
+        responsive: true, maintainAspectRatio: true, aspectRatio: 1, cutout: '58%',
         // La dona tambien filtra: clic en un estado = detalle de ese estado.
         onClick: function (evento, elementos, grafica) {
           if (elementos.length) {
@@ -776,11 +798,6 @@
 
   // ------------------------------------------------------------- arranque
   function conectarEventos() {
-    $('btn-recargar').addEventListener('click', function () {
-      estado.detalleAbierto = false;
-      $('detalle-panel').hidden = true;
-      cargarResumen();
-    });
     $('btn-reintentar').addEventListener('click', cargarResumen);
 
     $('btn-detalle').addEventListener('click', function () {

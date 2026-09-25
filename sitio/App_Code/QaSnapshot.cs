@@ -180,9 +180,9 @@ public static class QaSnapshot
 
         try
         {
-            var cadena = ConfigurationManager.ConnectionStrings["TicketsProactivanet"];
-            if (cadena == null || !Activo(cadena.ConnectionString)) return;
-            Cachear(Deserializar(Archivo(Carpeta(cadena.ConnectionString), "_Kpis")));
+            string cadena;
+            if (!ConnectionStringProvider.TryObtenerCadena(out cadena) || !Activo(cadena)) return;
+            Cachear(Deserializar(Archivo(Carpeta(cadena), "_Kpis")));
         }
         catch (Exception)
         {

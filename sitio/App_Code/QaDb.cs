@@ -15,7 +15,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Configuration;
 using System.Data;
 using System.Data.SqlClient;
 using System.Globalization;
@@ -220,23 +219,12 @@ public static class QaDb
         return resultados;
     }
 
-    // Una fila del lector como diccionario. Las mismas dos conversiones que
-    // el tablero siempre hizo: DBNull -> null, y las fechas a texto ISO sin
-    // zona horaria, que es como las espera el frontend.
+    // Una fila del lector como diccionario. Mismas dos conversiones que el
+    // tablero siempre hizo (DBNull -> null, fechas a texto ISO sin zona);
+    // compartidas con DashboardDb via SqlRowMapper.
     private static Dictionary<string, object> Fila(IDataRecord reader)
     {
-        var fila = new Dictionary<string, object>();
-        for (int i = 0; i < reader.FieldCount; i++)
-        {
-            object valor = reader.GetValue(i);
-            if (valor is DBNull)
-                valor = null;
-            else if (valor is DateTime)
-                valor = ((DateTime)valor).ToString("yyyy-MM-ddTHH:mm:ss");
-
-            fila[reader.GetName(i)] = valor;
-        }
-        return fila;
+        return SqlRowMapper.Fila(reader);
     }
 
     // Recorre el PRIMER result set de un stored procedure fila por fila, sin
@@ -292,7 +280,7 @@ public static class QaDb
     // ------------------------------------------------- KPIs en una pasada
     // La unica consulta escrita a mano del lado de QA -- todo lo demas aqui
     // son EXEC de procedimientos que la base ya tenia --, con el mismo patron
-    // que ya usan App_Code/ExperienciaQueries.cs: texto
+    // que ya usan App_Code/DashboardQueries.cs y ExperienciaQueries.cs: texto
     // constante y valores como SqlParameter. Existe porque
     // dbo.usp_CorreoQA_Kpis tarda ~28,6 s y no se puede tocar la base:
     //
@@ -469,25 +457,14 @@ WHERE FechaRegistroDia >= @FechaInicio
     {
         get
         {
-            var cs = ConfigurationManager.ConnectionStrings["TicketsProactivanet"];
-            return cs != null && QaSnapshot.Activo(cs.ConnectionString);
+            string cadena;
+            return ConnectionStringProvider.TryObtenerCadena(out cadena) && QaSnapshot.Activo(cadena);
         }
     }
 
     private static string CadenaConexion()
     {
-        var cs = ConfigurationManager.ConnectionStrings["TicketsProactivanet"];
-        if (cs == null || string.IsNullOrWhiteSpace(cs.ConnectionString))
-        {
-            // Sin este mensaje la referencia nula revienta con un
-            // NullReferenceException que no dice nada util, y en pantalla solo
-            // se ve "Error al cargar datos".
-            throw new ConfigurationErrorsException(
-                "Falta la cadena de conexion 'TicketsProactivanet' en Web.config. " +
-                "Copia Web.config.ejemplo como Web.config en la raiz del sitio y " +
-                "ajusta el servidor/credenciales.");
-        }
-        return cs.ConnectionString;
+        return ConnectionStringProvider.ObtenerCadena();
     }
 }
 
@@ -495,17 +472,19 @@ WHERE FechaRegistroDia >= @FechaInicio
 // se concatena a una consulta: todo termina como SqlParameter.
 public static class QaParams
 {
-    // Ventana por defecto del tablero: los ultimos 15 dias, exactamente la
-    // misma que usa usp_CorreoQA_Kpis (@FechaFin = hoy, @FechaInicio = hoy-14).
+    // Ventana por defecto del tablero: los 15 dias completos que terminan
+    // ayer, exactamente la misma que usa el correo de QA (@FechaFin = hoy-1,
+    // @FechaInicio = @FechaFin-14). El dia en curso queda fuera porque todavia
+    // no esta cerrado y movia los KPIs a lo largo de la jornada.
     // Se puede cambiar por query string, sobre todo para reproducir un dia
     // concreto al comparar contra el correo de QA.
     public const int DiasVentana = 15;
 
     public static void Rango(HttpRequest request, out string fechaInicio, out string fechaFin)
     {
-        var hoy = DateTime.Today;
+        var ayer = DateTime.Today.AddDays(-1);
 
-        fechaFin = FechaOpcional(request, "fecha_fin") ?? hoy.ToString("yyyy-MM-dd");
+        fechaFin = FechaOpcional(request, "fecha_fin") ?? ayer.ToString("yyyy-MM-dd");
 
         var inicio = FechaOpcional(request, "fecha_inicio");
         if (inicio == null)

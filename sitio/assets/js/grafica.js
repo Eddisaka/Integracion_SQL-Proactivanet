@@ -31,9 +31,9 @@
        canvas: 'chart-x',
        etiquetas: nombres,
        datos: totales,
-       paleta: { registro: 'backlog-lider' },   // o { orden: ordenLideres }
+       paleta: { lider: true },   // o { personas: true } / { directores: true }
+                                  // / { registro: 'x' } / { orden: [...] }
        formato: FMT,
-       dataset: { borderRadius: 6 },
        opciones: {
          maintainAspectRatio: false,
          plugins: { legend: { display: false } },
@@ -43,8 +43,10 @@
      }).render();
 
    Eso ya trae barra gruesa, esquina redondeada y la cifra dentro. No hay que
-   copiar ni el juego de medidas, ni el plugin, ni la logica de contraste, ni
-   ningun arreglo de colores.
+   copiar ni el juego de medidas, ni el radio, ni el plugin, ni la logica de
+   contraste, ni ningun arreglo de colores. `dataset:` es solo para lo que si
+   es de esa grafica -el contorno de seleccion del cross-filter, por ejemplo-,
+   no para repetir la geometria compartida.
 
    COLOR — las tres formas, en orden de precedencia
    -------------------------------------------------------------------------
@@ -142,6 +144,19 @@
       if (this.o.colores) return this.o.colores;
       var p = this.o.paleta;
       if (!p) return undefined;
+      /* `lider: true` — identidad de persona. El color sale de la tabla
+         compartida por NOMBRE (Paleta.colorLider), asi que no importa como
+         este ordenada esta grafica: un ranking por volumen puede mover a una
+         persona de primera a quinta sin cambiarle el color. */
+      if (p.lider) return (etiquetas || []).map(function (e) { return Paleta.colorLider(e); });
+      /* `personas: true` / `directores: true` — la misma identidad, pero
+         resuelta para la LISTA COMPLETA, que es lo que permite no repetir
+         color dentro de esta grafica mientras queden libres. Los colores
+         fijos -lideres historicos, Directores- salen igual que con
+         `lider: true`; lo que cambia es que a los demas se les esquiva la
+         colision. Sigue sin depender del orden de las barras. */
+      if (p.personas) return Paleta.escalaPersonas(etiquetas);
+      if (p.directores) return Paleta.escalaDirectores(etiquetas);
       if (p.registro) return Paleta.registro(p.registro).escala(etiquetas);
       if (p.orden) return (etiquetas || []).map(function (e) { return Paleta.color(e, p.orden); });
       return Paleta.escala(etiquetas);

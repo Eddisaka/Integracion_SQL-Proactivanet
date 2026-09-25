@@ -8,9 +8,10 @@
 
 using System;
 using System.Collections.Generic;
-using System.Configuration;
 using System.Data;
+using System.Configuration;
 using System.Data.SqlClient;
+using System.Globalization;
 using System.Web;
 using System.Web.Script.Serialization;
 
@@ -41,21 +42,7 @@ public static class DashboardDb
                 do
                 {
                     var filas = new List<Dictionary<string, object>>();
-                    while (reader.Read())
-                    {
-                        var fila = new Dictionary<string, object>();
-                        for (int i = 0; i < reader.FieldCount; i++)
-                        {
-                            object valor = reader.GetValue(i);
-                            if (valor is DBNull)
-                                valor = null;
-                            else if (valor is DateTime)
-                                valor = ((DateTime)valor).ToString("yyyy-MM-ddTHH:mm:ss");
-
-                            fila[reader.GetName(i)] = valor;
-                        }
-                        filas.Add(fila);
-                    }
+                    while (reader.Read()) filas.Add(SqlRowMapper.Fila(reader));
                     resultados.Add(filas);
                 } while (reader.NextResult());
             }
@@ -72,36 +59,7 @@ public static class DashboardDb
         return resultados.Count > 0 ? resultados[0] : new List<Dictionary<string, object>>();
     }
 
-    // Consulta de texto plano, sin parametros. La usa unicamente
-    // diagnostico.ashx: todo lo demas pasa por stored procedures.
-    public static List<Dictionary<string, object>> EjecutarTexto(string sql)
-    {
-        var filas = new List<Dictionary<string, object>>();
-
-        using (var cn = new SqlConnection(ConnectionString()))
-        using (var cmd = new SqlCommand(sql, cn))
-        {
-            cmd.CommandType = CommandType.Text;
-            cn.Open();
-            using (var reader = cmd.ExecuteReader())
-            {
-                while (reader.Read())
-                {
-                    var fila = new Dictionary<string, object>();
-                    for (int i = 0; i < reader.FieldCount; i++)
-                    {
-                        object valor = reader.GetValue(i);
-                        fila[reader.GetName(i)] = (valor is DBNull) ? null : valor;
-                    }
-                    filas.Add(fila);
-                }
-            }
-        }
-
-        return filas;
-    }
-
-    // Expuesta para ExperienciaQueries y QaDb, que abren su propia conexion para las
+    // Expuesta para DashboardQueries, que abre su propia conexion para las
     // consultas de texto parametrizado del tablero de SLA.
     public static string CadenaConexion()
     {
@@ -110,17 +68,7 @@ public static class DashboardDb
 
     private static string ConnectionString()
     {
-        var cs = ConfigurationManager.ConnectionStrings["TicketsProactivanet"];
-        if (cs == null || string.IsNullOrWhiteSpace(cs.ConnectionString))
-        {
-            // Sin este mensaje, la referencia nula reventaba con un
-            // NullReferenceException que no decia nada util: el sintoma en
-            // pantalla era solo "Error al cargar datos".
-            throw new ConfigurationErrorsException(
-                "Falta la cadena de conexion 'TicketsProactivanet' en Web.config. " +
-                "Copia Web.config.ejemplo como Web.config en la raiz del sitio y ajusta el servidor/credenciales.");
-        }
-        return cs.ConnectionString;
+        return ConnectionStringProvider.ObtenerCadena();
     }
 }
 
@@ -164,6 +112,108 @@ public static class BacklogUtil
         var valor = request.QueryString["fecha_corte"];
         return string.IsNullOrWhiteSpace(valor) ? null : (object)valor;
     }
+
+    /* Metadato de frescura del Backlog, en el contrato compartido
+       (App_Code/DashboardDataInfo.cs).
+
+       QUE SELLO ES. dbo.CorreoBacklogSnapshot guarda DOS fechas por fila y no
+       significan lo mismo:
+
+         FechaCorte         (date)      el dia que la foto RETRATA. Es la
+                                        dimension de negocio: la eligen los
+                                        filtros, la devuelven los catalogos y
+                                        contra ella agrupa todo el tablero.
+         FechaHoraSnapshot  (datetime2) cuando se TOMO esa foto. Es la unica
+                                        que dice de cuando son los datos.
+
+       El sello es FechaHoraSnapshot. FechaCorte se queda intacta en su papel
+       de siempre -este metodo no la toca, solo la lee para acotar-; usarla
+       como "ultima actualizacion" era lo que dejaba la hora en 00:00, porque
+       un date no tiene hora que mostrar.
+
+       QUE FOTO. La MISMA que respondio el procedimiento, no un maximo global:
+
+         - con @FechaCorte, se acota a ese corte exacto;
+         - sin el, se toma el corte mas reciente guardado, que es justo lo que
+           dbo.usp_CorreoBacklog_Principal hace cuando recibe NULL.
+
+       Dentro de un corte hay una fila por ticket y todas comparten la carga,
+       asi que MAX() sobre el grupo devuelve el sello de esa carga; si alguna
+       vez un corte se recargara en dos pasadas, el sello seria el de la
+       ultima, que es la que dejo los datos que se estan viendo.
+
+       Sin fila -corte inexistente, o tabla sin llenar- el sello se queda en
+       null y el tablero pinta la cabecera vacia: no se sustituye por
+       FechaCorte ni por la hora del servidor. */
+    public static DashboardDataInfo DatosInfo(object fechaCorte)
+    {
+        const string SQL = @"
+SELECT TOP (1)
+    FechaCorte        = s.FechaCorte,
+    FechaHoraSnapshot = MAX(s.FechaHoraSnapshot)
+FROM dbo.CorreoBacklogSnapshot AS s
+WHERE @FechaCorte IS NULL OR s.FechaCorte = @FechaCorte
+GROUP BY s.FechaCorte
+ORDER BY s.FechaCorte DESC;";
+
+        object corte = null;
+        object sello = null;
+        string error = null;
+
+        try
+        {
+            using (var cn = new SqlConnection(DashboardDb.CadenaConexion()))
+            using (var cmd = new SqlCommand(SQL, cn))
+            {
+                cmd.CommandType = CommandType.Text;
+                cmd.Parameters.AddWithValue("@FechaCorte", fechaCorte ?? (object)DBNull.Value);
+
+                cn.Open();
+                using (var rd = cmd.ExecuteReader())
+                {
+                    if (rd.Read())
+                    {
+                        if (!rd.IsDBNull(0)) corte = rd.GetValue(0);
+                        if (!rd.IsDBNull(1)) sello = rd.GetValue(1);
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            // El sello es informacion de cabecera: que falle no puede tumbar
+            // la respuesta de datos que lo acompana. La nota se PINTA en el
+            // tablero, asi que va saneada; el detalle, a la traza.
+            DashboardHandler.Registrar("DashboardDataInfo", ex);
+            error = DashboardHandler.MensajeSeguro(ex);
+        }
+
+        /* FechaHoraSnapshot es datetime2 con DEFAULT (sysdatetime()) y el host
+           de SQL Server corre en UTC, asi que lo guardado es UTC sin offset.
+           Se declara como tal y el contrato compartido lo pasa a UTC-06 para
+           mostrarlo; el valor de la tabla no se toca. FechaCorte, que es un
+           DATE de negocio, no entra aqui y por tanto no cambia de zona. */
+        var info = DashboardDataInfo.Corte(
+            "Backlog", sello, ZonaSello.Utc,
+            "dbo.CorreoBacklogSnapshot.FechaHoraSnapshot" +
+            (corte == null ? "" : " (corte " + FechaTexto(corte) + ")"));
+
+        if (error != null)
+            info.Nota = "No se pudo leer FechaHoraSnapshot: " + error;
+        else if (sello == null)
+            info.Nota = "El corte consultado no tiene FechaHoraSnapshot guardada.";
+
+        return info;
+    }
+
+    // Solo para el texto de "origen": el corte que de verdad se uso, tal como
+    // lo tiene la tabla. No entra en ningun calculo.
+    private static string FechaTexto(object valor)
+    {
+        return (valor is DateTime)
+            ? ((DateTime)valor).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+            : Convert.ToString(valor, CultureInfo.InvariantCulture);
+    }
 }
 
 // Envoltura comun de los handlers .ashx: serializa el resultado a JSON y,
@@ -173,6 +223,60 @@ public static class BacklogUtil
 // generico sin decir que estaba mal.
 public static class DashboardHandler
 {
+    /* MENSAJE SEGURO — lo unico que puede cruzar al navegador cuando algo
+       truena.
+
+       ex.Message de una SqlException lleva el nombre del servidor, el de la
+       base, el del procedimiento y a veces el del login; el de una excepcion
+       de .NET puede llevar rutas del disco del servidor. Nada de eso le sirve
+       a quien mira el tablero y todo eso le sirve a quien lo esta sondeando,
+       asi que se queda del lado del servidor.
+
+       El diagnostico NO se pierde: el detalle completo va a la traza de
+       ASP.NET (Registrar, abajo) y ahi lo lee quien administra el sitio.
+
+       El criterio es el mismo que qa.ashx ya usaba, y por eso este helper
+       reproduce su reparto en vez de inventar otro:
+         - SqlException            -> texto generico + ex.Number, que es un
+                                      codigo de diagnostico y no identifica
+                                      nada de la instalacion;
+         - ConfigurationErrorsException -> su mensaje tal cual: lo escribe
+                                      ConnectionStringProvider y dice que
+                                      archivo falta copiar, sin servidor,
+                                      usuario ni contraseña;
+         - lo demas                -> texto generico. */
+    public static string MensajeSeguro(Exception ex)
+    {
+        if (ex == null) return "Error desconocido en el servidor.";
+
+        if (ex is ConfigurationErrorsException) return ex.Message;
+
+        var sql = ex as SqlException;
+        if (sql != null)
+        {
+            return "El servidor de SQL rechazo la consulta (error " +
+                   sql.Number.ToString(CultureInfo.InvariantCulture) +
+                   "). Revisa la traza del servidor para el detalle.";
+        }
+
+        return "Ocurrio un error en el servidor al preparar la respuesta. " +
+               "Revisa la traza del servidor para el detalle.";
+    }
+
+    /* El detalle completo, a la traza de ASP.NET (trace.axd).
+
+       Se usa HttpContext.Trace y no System.Diagnostics.Trace porque los
+       metodos de ese ultimo son [Conditional("TRACE")] y ASP.NET no define
+       ese simbolo al compilar App_Code y los .ashx: las llamadas
+       desapareceran sin dejar rastro. Es la misma razon que ya estaba escrita
+       en backlog_antiguos.ashx. */
+    public static void Registrar(string categoria, Exception ex)
+    {
+        var ctx = HttpContext.Current;
+        if (ctx == null || ex == null) return;
+        ctx.Trace.Warn(categoria, ex.GetType().Name + ": " + ex.Message, ex);
+    }
+
     public static void Responder(HttpContext context, Func<object> trabajo)
     {
         context.Response.ContentType = "application/json; charset=utf-8";
@@ -189,9 +293,14 @@ public static class DashboardHandler
             context.Response.StatusCode = 500;
             context.Response.TrySkipIisCustomErrors = true;
 
+            // El detalle se queda en la traza del servidor; al navegador solo
+            // va el mensaje saneado. El contrato JSON no cambia: mismas dos
+            // llaves, "error" y "tipo".
+            Registrar("DashboardHandler", ex);
+
             var error = new Dictionary<string, object>
             {
-                { "error", ex.Message },
+                { "error", MensajeSeguro(ex) },
                 { "tipo", ex.GetType().Name },
             };
             context.Response.Write(new JavaScriptSerializer().Serialize(error));
@@ -230,31 +339,5 @@ public static class DashboardParams
     {
         int valor;
         return int.TryParse(request.QueryString[nombre], out valor) ? valor : porDefecto;
-    }
-
-    /* Los cuatro parametros que reciben los cinco procedimientos de la pestana
-       de SLA. Se arman en un solo lugar para que los cinco handlers no puedan
-       diferir entre si: cuando los parametros estaban repetidos en cada uno,
-       bastaba con olvidar el de tecnicos en uno para que esa grafica ignorara
-       el filtro sin fallar.
-
-       @Tecnicos viaja SEPARADO POR '|', no por coma, y el procedimiento lo
-       parte con dbo.fn_Dash_SplitListPipe. Los nombres de tecnico son
-       "Apellidos, Nombre" y SIEMPRE llevan coma adentro: partiendolos por coma,
-       'Lugo Solis, David' se rompe en dos valores que no existen y el tablero
-       entero se queda en cero en cuanto alguien elige un tecnico.
-       dashboard.js ya los manda asi. */
-    public static Dictionary<string, object> Sla(HttpRequest request)
-    {
-        string fi, ff;
-        RangoFechas(request, out fi, out ff);
-
-        return new Dictionary<string, object>
-        {
-            { "FechaInicio", fi },
-            { "FechaFin",    ff },
-            { "Grupos",      ListaONulo(request, "grupos") },
-            { "Tecnicos",    ListaONulo(request, "tecnicos") },
-        };
     }
 }

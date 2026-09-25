@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<!--
+  backlog/backlog.html - Modulo de Backlog.
+
+  Este archivo es a la vez la pagina suelta y la fuente de la pestaña "Backlog"
+  de dashboard.html: TableroBacklog (dashboard.js) trae este mismo marcado, le
+  quita <script> y <link>, desarma el envoltorio #tab-backlog y lo monta dentro
+  del contenedor de la pestaña. No hay dos versiones del tablero de Backlog, y
+  dashboard.html ya no lleva ninguna copia de este marcado.
+
+  Mismo contrato que experiencia/experiencia.html y qa/qa.html: el contenido
+  vive dentro de un <div id="tab-backlog" class="maintab-content active"> y
+  todo lo que queda fuera de ese div (html, head, body, .wrap) es cascaron de
+  la pagina suelta que el montaje descarta.
+
+  Los ids se conservan EXACTAMENTE como estaban en dashboard.html -todos con
+  sufijo "-bl", que es lo que ya los separaba del #kpis de SLA-, asi que
+  backlog.js sigue encontrandolos con los mismos getElementById de siempre.
+
+  Consume unicamente backlog_catalogos.ashx, backlog_resumen.ashx,
+  backlog_historico.ashx y backlog_antiguos.ashx, servidos por HTTP desde el
+  mismo sitio que los handlers.
+
+  Sobre las hojas: el Backlog no tiene vocabulario visual propio. Sus
+  .card / .kpi / .grid2 / .grid3 / .filtros / .panel / .lienzo son los de
+  dashboard.css, la hoja del cascaron, y por eso la pagina suelta la enlaza
+  directamente en vez de copiarla: asi no hay dos juegos de valores que se
+  puedan separar con el tiempo. Embebido este <link> se descarta y manda la
+  copia que dashboard.html ya tiene cargada. backlog.css lleva solo lo que es
+  privado de este tablero.
+
+  Chart.js 4.4.4 local, en assets/vendor/ (no depende del CDN). En el tablero
+  esta etiqueta se descarta: dashboard.html ya carga su propio Chart.js y una
+  segunda copia reemplazaria el global que usan SLA y Call Center.
+-->
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="color-scheme" content="light">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tickets Proactivanet — Backlog</title>
+  <script src="../assets/vendor/chart.umd.min.js"></script>
+  <!-- Paleta categorica compartida. De aqui sale el color por lider
+       (Paleta.registrarLideres / Paleta.colorLider), el mismo que usa el
+       correo diario: no se copia al modulo. Solo para la pagina suelta,
+       embebida en dashboard.html este <script> se quita y manda la copia
+       de alli. -->
+  <!-- Escape de HTML compartido. Va ANTES de los modulos: todo lo que sale de
+     SQL se pega con innerHTML y tiene que entrar como texto, no como marcado. -->
+<script src="../assets/js/escape.js"></script>
+<script src="../assets/js/paleta.js"></script>
+  <!-- Geometria y cifra de las barras, con la misma nota: solo para la
+       pagina suelta. -->
+  <script src="../assets/js/barras.js"></script>
+  <!-- window.DashboardBarChart, la capa de objetos sobre Chart.js con la que
+       estan hechas las tres barras de este tablero. Va despues de paleta.js y
+       barras.js, que es de donde saca colores y medidas. Misma nota: solo para
+       la pagina suelta. -->
+  <script src="../assets/js/grafica.js"></script>
+  <!-- window.Lineas, la cifra de los extremos de las dos tendencias. Va
+       despues de barras.js, de donde saca la tipografia. Misma nota: solo
+       para la pagina suelta. -->
+  <script src="../assets/js/lineas.js"></script>
+  <!-- Desplegable compartido, con la misma nota: solo para la pagina suelta.
+       Quien lo monta sobre estos <select> es backlog.js. -->
+  <script src="../assets/js/desplegable.js"></script>
+  <link rel="stylesheet" href="../assets/css/desplegable.css">
+  <!-- Tarjeta KPI compartida; hace falta en la pagina suelta y en el
+       iframe de respaldo. -->
+  <link rel="stylesheet" href="../assets/css/kpi.css">
+  <!-- El medidor `.mini` de las tablas (miniBar), compartido. -->
+  <link rel="stylesheet" href="../assets/css/barra-mini.css">
+  <!-- Sello de "Última actualización" / "Periodo", compartido con el resto
+       del tablero, con la misma nota: solo para la pagina suelta. -->
+  <link rel="stylesheet" href="../assets/css/datos-info.css">
+  <script src="../assets/js/datos-info.js"></script>
+  <!-- Datos simulados (MOCK_DATA). mock-data.js cubre los cuatro
+       backlog_*.ashx, asi que con el flag en true esta pagina se puede abrir
+       sin base de datos, igual que la pestaña del tablero. El enganche lo lee
+       obtenerJSON() de backlog.js, guardado con `window.MockData &&`, asi que
+       si esta etiqueta falta el modulo simplemente va a la red. -->
+  <script src="../assets/js/mock-data.js"></script>
+  <!-- Hoja del cascaron: aporta el vocabulario visual compartido descrito
+       arriba. Solo para la pagina suelta. -->
+  <link rel="stylesheet" href="../dashboard.css">
+  <link rel="stylesheet" href="backlog.css">
+</head>
+<body>
+<div class="wrap">
+  <div id="tab-backlog" class="maintab-content active">
+    <header class="top">
+      <div>
+        <h1>Tickets Proactivanet — Backlog</h1>
+      </div>
+      <div class="acciones-top">
+        <div class="estado" id="estado-carga-bl"></div>
+      </div>
+    </header>
+
+    <section class="filtros">
+      <div class="campo">
+        <label for="f-corte-bl">Fecha de corte</label>
+        <!-- Mismo control de calendario que Fecha inicio / Fecha fin del
+             tablero de SLA. Sigue siendo UNA sola fecha; los cortes que
+             existen de verdad acotan el min/max desde backlog_catalogos. -->
+        <input type="date" id="f-corte-bl">
+      </div>
+      <div class="campo">
+        <label for="f-dias-bl">Ventana de tendencia</label>
+        <select id="f-dias-bl">
+          <option value="15">Ultimos 15 dias</option>
+          <option value="30" selected>Ultimos 30 dias</option>
+          <option value="90">Ultimos 90 dias</option>
+          <option value="365">Ultimo año</option>
+        </select>
+      </div>
+      <div class="campo">
+        <label for="f-granularidad-bl">Agrupar tendencia por</label>
+        <select id="f-granularidad-bl">
+          <option value="Dia" selected>Dia</option>
+          <option value="Semana">Semana</option>
+          <option value="Mes">Mes</option>
+        </select>
+      </div>
+      <div class="campo">
+        <label for="f-c1-bl">Servicio / C1 (elige varios)</label>
+        <select id="f-c1-bl" multiple></select>
+      </div>
+      <div class="campo">
+        <label for="f-grupos-bl">Grupos (elige varios)</label>
+        <select id="f-grupos-bl" multiple></select>
+      </div>
+      <div class="campo">
+        <label for="f-lideres-bl">Lideres (elige varios)</label>
+        <select id="f-lideres-bl" multiple></select>
+      </div>
+      <div class="campo acciones">
+        <button class="btn gris" id="btn-limpiar-bl" type="button">Limpiar</button>
+      </div>
+    </section>
+
+    <div id="aviso-historico-bl"></div>
+    <p class="tendencia-linea" id="tendencia-linea-bl"></p>
+
+    <section class="kpis" id="kpis-bl"></section>
+
+    <section class="grid2">
+      <div class="card">
+        <h3>Tendencia del backlog<span class="hint" id="hint-tendencia-bl"></span></h3>
+        <div class="lienzo alta"><canvas id="chart-tendencia-bl"></canvas></div>
+      </div>
+      <div class="card">
+        <h3>Tendencia por lider<span class="hint" id="hint-tendencia-lider-bl">avance de cada torre</span></h3>
+        <div class="lienzo alta"><canvas id="chart-tendencia-lider-bl"></canvas></div>
+      </div>
+    </section>
+
+    <section class="grid3">
+      <div class="card">
+        <h3>Backlog por lider</h3>
+        <div class="lienzo"><canvas id="chart-lider-bl"></canvas></div>
+      </div>
+      <div class="card">
+        <h3>Por prioridad</h3>
+        <div class="lienzo"><canvas id="chart-prioridad-bl"></canvas></div>
+      </div>
+      <div class="card">
+        <h3>Por antiguedad</h3>
+        <div class="lienzo"><canvas id="chart-aging-bl"></canvas></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="tabs">
+        <div class="tab active" data-panel="p-lideres-bl">Lideres (drill-down)</div>
+        <div class="tab" data-panel="p-aging-bl">Resumen por antiguedad</div>
+        <div class="tab" data-panel="p-antiguos-bl">Tickets mas antiguos</div>
+      </div>
+
+      <div class="panel active" id="p-lideres-bl">
+        <div class="nota">Clic en la flecha para desplegar los grupos del lider; clic en el nombre
+          para filtrar todo el tablero.</div>
+        <div class="cap" id="cap-lideres-bl"></div>
+        <div class="scroll-x" id="tabla-lideres-bl"></div>
+      </div>
+
+      <div class="panel" id="p-aging-bl">
+        <div class="cap" id="cap-aging-bl"></div>
+        <div class="scroll-x" id="tabla-aging-bl"></div>
+      </div>
+
+      <div class="panel" id="p-antiguos-bl">
+        <div class="cap" id="cap-antiguos-bl"></div>
+        <div class="scroll-x" id="tabla-antiguos-bl"></div>
+      </div>
+    </section>
+
+    <footer>
+      Fuente: cortes diarios guardados en <b>dbo.CorreoBacklogSnapshot</b> ·
+      El color de cada lider es el mismo que usa el correo diario.
+    </footer>
+  </div>
+</div>
+
+<script src="backlog.js"></script>
+</body>
+</html>

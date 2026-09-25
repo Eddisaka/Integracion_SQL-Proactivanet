@@ -66,8 +66,12 @@
 
   <system.web>
     <!-- App_Code/ se compila sola en el primer request: sin Visual Studio
-         y sin paso de build. -->
-    <compilation debug="true" targetFramework="4.8" />
+         y sin paso de build. debug="false" siempre en un sitio real: con
+         "true" cualquier error sin capturar imprime el stack trace completo
+         al navegador (rutas del servidor, nombres de metodo) y ademas la
+         compilacion queda mas lenta. Solo se pone "true" a mano, en la
+         maquina local, mientras se depura algo puntual. -->
+    <compilation debug="false" targetFramework="4.8" />
     <!-- executionTimeout: los correos reales (SQL + reporte + SMTP) tardan
          mas que los 110 s por defecto. El handler tiene ademas su propio
          limite de 600 s sobre el proceso de PowerShell. -->

@@ -1,0 +1,115 @@
+/* =========================================================================
+   assets/css/kpi.css
+
+   La tarjeta KPI: `.kpi` dentro de una rejilla `.kpis`. UNA sola definicion
+   para todas las vistas que la pintan, que hoy son cuatro: dashboard.js
+   (SLA, Backlog y Call Center), experiencia/experiencia.js y qa/qa.js.
+
+   Hermana de assets/css/barra-mini.css, y por el mismo motivo: antes vivia
+   copiada en cada hoja y las copias se habian ido separando. Habia TRES, y
+   ninguna medida coincidia con las demas:
+
+     dashboard.css     pista 180px, valor 27px, rotulo 10.5/700.
+     experiencia.css   pista 175px, valor 25px, rotulo 11/600, y sin el
+                       lavado ::after ni el hover que si tenian las otras.
+     qa.css            pista 210px, valor 26px, y otro juego de nombres
+                       para los hijos (kpi-tit / kpi-val / kpi-nota).
+
+   Los valores que quedan son los de dashboard.css, que es lo que se ve hoy
+   en Backlog y es la referencia aprobada.
+
+   ---- Por que la pista es auto-FILL y no auto-fit ----
+
+   Con `auto-fit` la pista sobrante se colapsa a 0, asi que el ancho de la
+   tarjeta lo acababa decidiendo el NUMERO de KPI de la pestaña, no el
+   diseño: Backlog (6) salia a 238px y SLA (8) a 202px sobre el mismo ancho
+   de pagina. Y como la tarjeta no tiene alto propio, a 202px el rotulo y el
+   pie se parten en dos lineas y la rejilla estira la fila entera: 119px de
+   alto contra los 104px de Backlog. En Call Center, que ademas es la unica
+   rejilla que vive dentro de un `.card`, la tarjeta bajaba a 196px y la fila
+   subia a 135px.
+
+   `auto-fill` conserva las pistas vacias, asi que el ancho lo fija la pista
+   minima y deja de depender de cuantas tarjetas haya. Con 210px salen las
+   mismas 6 columnas de ~238px que Backlog ya tenia, y las demas pestañas
+   caen encima de esa misma medida.
+
+   ---- Por que hay min-height ----
+
+   El alto sigue siendo del contenido, pero una tarjeta SIN pie -"Agentes
+   activos" en Call Center, o las de QA que no traen nota- se quedaba 16px
+   mas baja que sus vecinas de otra pestaña. El min-height es exactamente el
+   alto natural de una tarjeta de Backlog de una linea de rotulo y una de
+   pie: pone un piso, no un techo.
+
+   Los dos juegos de nombres de hijo se declaran juntos para no tener que
+   reescribir el HTML que emite qa.js.
+   ========================================================================= */
+
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 14px; margin-bottom: var(--gap-bloque, 16px);
+}
+.kpi {
+  position: relative; overflow: hidden;
+  background: var(--card); border-radius: var(--radius); padding: 16px 18px;
+  box-shadow: var(--shadow); border: 1px solid var(--line-soft);
+  border-left: 5px solid var(--kpi-ok);
+  min-height: 104px;
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+/* Lavado de color heredado del borde izquierdo. */
+.kpi::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(100deg, currentColor 0%, transparent 46%);
+  opacity: .07; color: var(--kpi-ok);
+}
+.kpi:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+/* Semaforo: un solo color plano en la franja izquierda por estado.
+   lima = bien, ambar = aviso, rojo = mal. No hay mas estados. */
+.kpi.sv { border-left-color: var(--kpi-ok); }
+.kpi.sa { border-left-color: var(--ambr); }
+.kpi.sr { border-left-color: var(--rojo); }
+.kpi.sv::after { color: var(--kpi-ok); }
+.kpi.sa::after { color: var(--ambr); }
+.kpi.sr::after { color: var(--rojo); }
+/* El rotulo se queda en UNA linea, por lo mismo que el pie de abajo: es el
+   otro texto que se partia en dos y estiraba la fila entera. En escritorio
+   no recorta nada; solo entra en juego en la franja de anchos donde la
+   columna se estrecha -unos 700px de pagina- y ahi lo hace en las cinco
+   pestañas por igual. */
+.kpi .lbl, .kpi .kpi-tit {
+  font-size: 10.5px; color: var(--muted); text-transform: uppercase;
+  letter-spacing: .5px; font-weight: 700;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+/* Excepcion: el rotulo que trae una etiqueta dentro. Hoy es uno solo -el
+   "Volumen Actual" de Experiencia, que en modo mes cuelga un
+   <span class="tag-pron">Pronostico</span> del titulo- y con nowrap la
+   etiqueta se quedaba fuera del recorte, que es justo el dato que avisa de
+   que la cifra es una proyeccion. Ese rotulo si puede irse a dos lineas. */
+.kpi .lbl:has(*), .kpi .kpi-tit:has(*) { white-space: normal; }
+
+.kpi .val, .kpi .kpi-val {
+  font-size: 27px; font-weight: 800; margin-top: 5px; line-height: 1.1;
+  letter-spacing: -.6px; font-variant-numeric: tabular-nums;
+}
+/* El pie se queda en UNA linea. Es lo unico que hacia que el alto de la
+   tarjeta cambiara de pestaña a pestaña: con dos pies largos -"esperaron mas
+   de un minuto antes de colgar" en Call Center y "oportunidades · N tickets
+   sin iniciativa" en Experiencia- la linea se partia en dos y la rejilla
+   estiraba la fila entera a 120px, contra los 104px de Backlog. El texto no
+   se toca: sigue completo en el DOM y solo se recorta al pintarlo. */
+.kpi .foot, .kpi .kpi-nota {
+  font-size: 11px; color: var(--muted); margin-top: 4px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.kpi .badge { vertical-align: 2px; }
+
+/* Movido aqui desde el bloque de 700px de dashboard.css. Alli era una regla
+   sin @scope y no alcanzaba a las pestañas inyectadas, asi que Experiencia y
+   QA se quedaban con el valor de escritorio en movil. */
+@media (max-width: 700px) {
+  .kpi .val, .kpi .kpi-val { font-size: 23px; }
+}

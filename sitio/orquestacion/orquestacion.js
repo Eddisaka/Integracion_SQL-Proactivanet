@@ -44,8 +44,25 @@ const J = MOCK;
 const REG_CATEGORIA = Paleta.registro('orq-categoria');
 
 // Helpers compartidos en el monolito (bloque de Experiencia); Orquestacion usa estos dos.
+/* Escape de HTML compartido (assets/js/escape.js): lo que viene del JSON
+   -categorias, candidatos, nombres de director y de Product Owner- se pega
+   con innerHTML y tiene que entrar como TEXTO, no como marcado. */
+const esc = v => Escape.html(v);
+
 const FMT = n => Math.round(n||0).toLocaleString('es-MX');
 const PCT = n => Math.round((n||0)*100)+'%';
+
+/* Geometria de barra del juego COMPARTIDO (assets/js/barras.js) como DEFAULT
+   del tipo `bar`, igual que dashboard.js, experiencia.js y qa.js. Antes este
+   modulo no lo llamaba y su unica grafica de barras copiaba Barras.GRUESA y
+   Barras.RADIO dentro del dataset. Es idempotente: embebido en dashboard.html
+   el tablero ya lo llamo. */
+Barras.aplicarDefaults();
+
+/* La cifra dentro de la barra: el plugin COMPARTIDO, atado al FMT de este
+   modulo. Es la misma cifra -misma fuente, mismo contraste, misma salida
+   afuera cuando la barra es corta- que en SLA, Backlog, QA y Experiencia. */
+const ETIQUETAS_DENTRO = Barras.etiquetasDentro(FMT);
 
 // Declarado en el monolito dentro del bloque de navegacion de pestanas, pero solo usado aqui.
 let chartCatJobs=null;
@@ -104,16 +121,20 @@ function renderOrq(){
   const ccolors=['#982a18','#d97706','#356b2c','#8a8578'];
   const bctx=document.getElementById('chartCatJobs');
   if(chartCatJobs)chartCatJobs.destroy();
-  // Medidas y radio del juego COMPARTIDO (assets/js/barras.js), el mismo que
-  // usan SLA, Backlog, QA y Experiencia. Antes eran un arreglo propio -tope de
-  // 24px y .72/.8 de ranura- que con cuatro categorias dejaba cuatro palitos.
+  /* Medidas y radio ya son el DEFAULT compartido (Barras.aplicarDefaults,
+     arriba), el mismo que usan SLA, Backlog, QA y Experiencia. Antes eran un
+     arreglo propio -tope de 24px y .72/.8 de ranura- que con cuatro
+     categorias dejaba cuatro palitos. La cifra va dentro de la barra como en
+     el resto; la leyenda de abajo sigue dando el conteo por escrito, que es
+     lo que traduce color -> clasificacion. */
   chartCatJobs=new Chart(bctx,{type:'bar',data:{labels:orden,datasets:[
-    Object.assign({},Barras.GRUESA,{data:cvals,backgroundColor:ccolors,borderRadius:Barras.RADIO})]},
+    {data:cvals,backgroundColor:ccolors}]},
     options:{indexAxis:'y',responsive:true,plugins:{legend:{display:false},
       tooltip:{callbacks:{label:c=>FMT(c.raw)+' jobs'}}},
-      scales:{x:{beginAtZero:true,ticks:{callback:v=>FMT(v)}}}}});
+      scales:{x:{beginAtZero:true,ticks:{callback:v=>FMT(v)}}}},
+    plugins:[ETIQUETAS_DENTRO]});
   document.getElementById('legendCatJobs').innerHTML=orden.map((l,i)=>
-    `<span><i style="background:${ccolors[i]}"></i>${l}: ${FMT(cvals[i])}</span>`).join('');
+    `<span><i style="background:${ccolors[i]}"></i>${esc(l)}: ${FMT(cvals[i])}</span>`).join('');
   // [ORQ-GRAF2] PIE por Categoria (col A)
   const ent=Object.entries(o.por_categoria).sort((a,b)=>b[1]-a[1]);
   const labels=ent.map(e=>e[0]), data=ent.map(e=>e[1]);
@@ -125,7 +146,7 @@ function renderOrq(){
   chartClasif=new Chart(pctx,{type:'pie',data:{labels,datasets:[{data,backgroundColor:colors,borderWidth:2,borderColor:'#fff'}]},
     options:{responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.label+': '+FMT(c.raw)}}}}});
   document.getElementById('legendClasif').innerHTML=labels.map((l,i)=>
-    `<span><i style="background:${colors[i]}"></i>${l}: ${FMT(data[i])}</span>`).join('');
+    `<span><i style="background:${colors[i]}"></i>${esc(l)}: ${FMT(data[i])}</span>`).join('');
   // [ORQ-GRAF3] PIE por Candidato (col B)
   const cOrden=(J.orquestacion.candidatos||[]).slice();
   const candVals=cOrden.map(k=>(o.por_candidato&&o.por_candidato[k])||0);
@@ -138,10 +159,14 @@ function renderOrq(){
     datasets:[{data:candVals,backgroundColor:cOrden.map((_,i)=>candColors[i%candColors.length]),borderWidth:2,borderColor:'#fff'}]},
     options:{responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.label+': '+FMT(c.raw)}}}}});
   document.getElementById('legendCand').innerHTML=cOrden.map((l,i)=>
-    `<span><i style="background:${candColors[i%candColors.length]}"></i>${l}: ${FMT(candVals[i])}</span>`).join('');
+    `<span><i style="background:${candColors[i%candColors.length]}"></i>${esc(l)}: ${FMT(candVals[i])}</span>`).join('');
   // [ORQ-TABL] tabla resumen de KPIs por director
   renderOrqDirTable();
-  if(J.liga_detalle){const h=document.getElementById('ligaHeaderOr');if(h){h.href=J.liga_detalle;h.style.display='inline-flex';}}
+  /* Misma regla que en Observabilidad: la liga viene del JSON y solo se
+     pone en el href si resuelve a http o https. Si no, el <a> se queda
+     oculto como estaba. */
+  const ligaOr=Escape.url(J.liga_detalle);
+  if(ligaOr){const h=document.getElementById('ligaHeaderOr');if(h){h.href=ligaOr;h.style.display='inline-flex';}}
 }
 function renderOrqDirTable(){
   const cel=(J.orquestacion.celdas||[]).filter(c=>{
@@ -162,7 +187,7 @@ function renderOrqDirTable(){
   const body=document.getElementById('bodyOrqDir');
   if(!body)return;
   body.innerHTML=rows.map(r=>
-    `<tr><td><b>${r.dir}</b></td><td class="num">${FMT(r.n_jobs)}</td>
+    `<tr><td><b>${esc(r.dir)}</b></td><td class="num">${FMT(r.n_jobs)}</td>
      <td class="num">${FMT(r.n_tareas)}</td><td class="num">${PCT(r.pct_migrados)}</td>
      <td class="num">${PCT(r.completitud)}</td></tr>`).join('')
     || '<tr><td colspan="5" class="empty">Sin datos</td></tr>';
@@ -170,12 +195,12 @@ function renderOrqDirTable(){
 (function(){
   if(!J.orquestacion)return;
   const sd=document.getElementById('selDirOr');
-  J.orquestacion.directores.forEach(d=>sd.insertAdjacentHTML('beforeend',`<option>${d}</option>`));
+  J.orquestacion.directores.forEach(d=>sd.insertAdjacentHTML('beforeend',`<option>${esc(d)}</option>`));
   const sp=document.getElementById('selPOOr');
   function fillPOor(){
     sp.innerHTML='<option value="">— Todos —</option>';
     const pos = orDir? (J.orquestacion.jerarquia[orDir]||[]) : J.orquestacion.product_owners;
-    pos.forEach(p=>sp.insertAdjacentHTML('beforeend',`<option>${p}</option>`));
+    pos.forEach(p=>sp.insertAdjacentHTML('beforeend',`<option>${esc(p)}</option>`));
   }
   // filtro multi-seleccion por columna B (Candidato)
   const cont=document.getElementById('filtroCand');
@@ -184,7 +209,7 @@ function renderOrqDirTable(){
     cont.insertAdjacentHTML('beforeend',
       `<label style="display:inline-flex;align-items:center;gap:5px;font-size:12px;color:#191919;
         background:rgba(25,25,25,.06);padding:4px 10px;border-radius:14px;cursor:pointer">
-        <input type="checkbox" class="candChk" value="${v}" id="${id}"> ${v}</label>`);
+        <input type="checkbox" class="candChk" value="${Escape.attr(v)}" id="${Escape.attr(id)}"> ${esc(v)}</label>`);
   });
   cont.addEventListener('change',e=>{
     if(!e.target.classList.contains('candChk'))return;

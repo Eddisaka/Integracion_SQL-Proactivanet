@@ -9,7 +9,6 @@ REM  Web.config esta en .gitignore: no se sube nunca.
 REM
 REM    http://localhost:8081/                       tablero (dashboard.html)
 REM    http://localhost:8081/qa/qa.html             tablero de QA (suelto)
-REM    http://localhost:8081/handlers/qa_diag.ashx  prueba de conexion
 REM ---------------------------------------------------------------------
 setlocal
 

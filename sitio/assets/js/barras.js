@@ -34,6 +34,19 @@
    3) Barras.tintaSobre(hex) — carbon o blanco, el que mas contraste de
       contra ese relleno. Es la tinta que usa el plugin.
 
+   4bis) El COLOR por defecto de una barra ordinaria. Barras.aplicarDefaults()
+      deja Paleta.AZUL_SERIE como backgroundColor del tipo `bar`: una grafica
+      de UNA serie que compara magnitudes -un top 10, un ranking por persona-
+      no declara color y sale del azul compartido. Declaran color solo las que
+      lo usan para DECIR algo (semaforo, severidad, estado, rampa ordinal) y
+      las que pintan una IDENTIDAD que se repite en otras vistas.
+
+   4) Barras.fuente(px) y Barras.TINTA_FUERA — la tipografia y la tinta de
+      cualquier cifra pintada sobre una barra. Las usan tambien los dos
+      plugins de dashboard.js que NO son este -ETIQUETAS_SEGMENTO y
+      CIFRA_PUNTA-, para que las tres cifras del tablero se lean como una
+      sola familia y solo cambie el tamaño segun el hueco.
+
    NO sirve para barras APILADAS: ahi el valor de cada segmento lo pinta
    ETIQUETAS_SEGMENTO (dashboard.js), que sabe de segmentos y omite los que
    no dan el alto en vez de sacar la cifra fuera -fuera caeria encima del
@@ -48,6 +61,20 @@
      para que las cuatro vistas redondeen igual. */
   var RADIO = 6;
 
+  /* Tipografia de la cifra de una barra. Vive aqui -y no suelta en cada
+     plugin- para que la cifra DENTRO de la barra (etiquetasDentro), la de
+     cada SEGMENTO de una apilada (ETIQUETAS_SEGMENTO en dashboard.js) y la
+     del TOTAL en la punta (CIFRA_PUNTA) se lean como la misma familia: la
+     misma pila de fuentes y el mismo peso, y solo el tamaño baja cuando el
+     hueco es mas chico -11px dentro de un segmento, 12px dentro de una
+     barra entera-. */
+  var PILA_FUENTE = 'system-ui, -apple-system, sans-serif';
+  function fuente(px, peso) { return (peso || 'bold') + ' ' + (px || 12) + 'px ' + PILA_FUENTE; }
+
+  /* Tinta del fallback: la cifra que no cabe se pinta FUERA de la barra,
+     sobre el fondo de la tarjeta, asi que no depende del relleno. */
+  var TINTA_FUERA = '#191919';
+
   /* Deja GRUESA + RADIO como DEFAULT de Chart.js para el tipo `bar`, y solo
      para ese tipo: `Chart.defaults.datasets.bar` no lo miran ni linea, ni
      dona, ni pastel. Es lo que hace que una grafica de barras nueva salga ya
@@ -61,6 +88,16 @@
     if (typeof Chart === 'undefined') return;
     if (!Chart.defaults.datasets || !Chart.defaults.datasets.bar) return;
     Object.assign(Chart.defaults.datasets.bar, GRUESA, { borderRadius: RADIO });
+    /* Y el COLOR de una barra ordinaria, por el mismo motivo que las medidas:
+       una grafica de una sola serie mide una magnitud, no ocho identidades.
+       El azul sale de la paleta compartida (Paleta.AZUL_SERIE), no de aqui:
+       este archivo no define colores. Es solo un DEFAULT -cualquier dataset
+       que declare backgroundColor sigue mandando-, asi que los sistemas
+       semanticos -semaforo de SLA, severidad, prioridad, rampa de antiguedad,
+       estados de QA- y las series de identidad -lider, categoria- no se
+       enteran: ya pasan su color hecho. */
+    if (typeof Paleta !== 'undefined' && Paleta.AZUL_SERIE)
+      Chart.defaults.datasets.bar.backgroundColor = Paleta.AZUL_SERIE;
   }
 
   /* Tinta legible encima de un relleno. Devuelve #191919 o #fff segun la
@@ -101,7 +138,7 @@
             if (val == null) return;
             var texto = FMT(val);
             ctx.save();
-            ctx.font = 'bold 12px system-ui, -apple-system, sans-serif';
+            ctx.font = fuente(12);
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
 
@@ -125,7 +162,7 @@
                  caia del lado del eje, encimada con la etiqueta de la
                  categoria. */
               var TOL = 1;
-              ctx.fillStyle = '#191919';
+              ctx.fillStyle = TINTA_FUERA;
               if (horizontal) {
                 var haciaDerecha = bar.x >= bar.base - TOL;
                 ctx.textAlign = haciaDerecha ? 'left' : 'right';
@@ -144,5 +181,6 @@
   }
 
   raiz.Barras = { GRUESA: GRUESA, RADIO: RADIO, aplicarDefaults: aplicarDefaults,
-                  tintaSobre: tintaSobre, etiquetasDentro: etiquetasDentro };
+                  tintaSobre: tintaSobre, etiquetasDentro: etiquetasDentro,
+                  fuente: fuente, TINTA_FUERA: TINTA_FUERA };
 })(window);

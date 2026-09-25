@@ -33,7 +33,8 @@ function mockFechaISO(d) {
 
 function crearMockSla() {
   const rnd = mockRand(240824);
-  const grupos = ['Soporte Aplicaciones','Infraestructura','Operaciones TI','Retail','Mesa de Ayuda'];
+  // 'Proveedor Mock' esta para poder probar "Sin proveedores" en local.
+  const grupos = ['Soporte Aplicaciones','Infraestructura','Operaciones TI','Retail','Mesa de Ayuda','Proveedor Mock'];
   // Mismo formato que Tickets.TecnicoSegundaLinea en la base real:
   // "Apellidos, Nombre", con coma dentro del nombre. Es justo lo que rompia el
   // filtro cuando la lista viajaba separada por comas.
@@ -248,7 +249,10 @@ function crearMockBacklog() {
     catalogos:{c1:['Aplicaciones','Infraestructura','Operaciones','Retail'],grupos,lideres,fechas},
     resumen,
     historico:{total:totalSeries,porLider},
-    antiguos:{diasMinimo:30,tickets:antiguos}
+    // Sin umbral de antiguedad: el endpoint real elige, POR LIDER, los
+    // tickets mas viejos por FechaRegistro y manda solo esos, con `total`
+    // aparte. mockBacklog() hace lo mismo antes de responder.
+    antiguos:{tickets:antiguos}
   };
 }
 
@@ -268,10 +272,16 @@ function mockSla(ruta) {
   const tecnicos = lista('tecnicos', '|');
   const fi = qs.get('fecha_inicio') || '';
   const ff = qs.get('fecha_fin') || '';
-  const clave = JSON.stringify([fi, ff, grupos, tecnicos]);
+  // ?proveedores=excluir: copia SOLO para el mock de la regla del servidor
+  // (DashboardQueries.GrupoProveedor): Grupo sin espacios a la izquierda que
+  // empieza por "Proveedor", sin distinguir mayusculas; NULL no es proveedor.
+  const sinProveedores = (qs.get('proveedores') || '').toLowerCase() === 'excluir';
+  const esProveedor = g => g != null && /^ *proveedor/i.test(g);
+  const clave = JSON.stringify([fi, ff, grupos, tecnicos, sinProveedores]);
   if (!MOCK_SLA_CACHE.has(clave)) {
     const filas = MOCK_SLA.detalle.filter(x => {
       if (grupos.length && !grupos.includes(x.Grupo)) return false;
+      if (sinProveedores && esProveedor(x.Grupo)) return false;
       if (tecnicos.length && !tecnicos.includes(x.Tecnico)) return false;
       const d = mockFechaISO(x.FechaRegistro);
       if (fi && d < fi) return false;
@@ -351,9 +361,27 @@ function mockBacklog(ruta) {
     ? [...porFecha.entries()].sort().map(([Periodo, TicketsBacklog]) => ({ Periodo, TicketsBacklog }))
     : (MOCK_BACKLOG.historico.total || []);
 
+  /* Mismo contrato que backlog_antiguos.ashx: de cada lider, sus TOPE_MOCK
+     tickets mas viejos por FechaRegistro -los sin fecha al final-, y `total`
+     con cuantos habia en el corte antes de recortar. */
+  const todosAntiguos = f(MOCK_BACKLOG.antiguos.tickets);
+  const TOPE_MOCK = 10;
+  const porLiderAnt = new Map();
+  for (const t of todosAntiguos) {
+    if (!porLiderAnt.has(t.Lider)) porLiderAnt.set(t.Lider, []);
+    porLiderAnt.get(t.Lider).push(t);
+  }
   const antiguos = {
-    diasMinimo: MOCK_BACKLOG.antiguos.diasMinimo,
-    tickets: f(MOCK_BACKLOG.antiguos.tickets),
+    tickets: [...porLiderAnt.values()].flatMap(lista => lista
+      .slice()
+      .sort((a, b) => {
+        const fa = a.FechaRegistro || '', fb = b.FechaRegistro || '';
+        if (!fa) return fb ? 1 : 0;
+        if (!fb) return -1;
+        return fa < fb ? -1 : (fa > fb ? 1 : 0);
+      })
+      .slice(0, TOPE_MOCK)),
+    total: todosAntiguos.length,
   };
 
   const salida = { catalogos: MOCK_BACKLOG.catalogos, resumen, historico: { total, porLider }, antiguos };
