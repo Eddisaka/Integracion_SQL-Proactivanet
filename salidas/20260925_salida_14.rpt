@@ -15,10 +15,10 @@ Bloque                     Validacion   Tickets
 
 Bloque            Lider                                                                                                                                                  Tickets     Tecnicos    CuentasSistema
 ----------------- ------------------------------------------------------------------------------------------------------------------------------------------------------ ----------- ----------- --------------
-3. Se avisaria de Laura Cardenas                                                                                                                                         2           1           1
-3. Se avisaria de Sergio Gonzalez                                                                                                                                        1           1           0
-3. Se avisaria de Adriana Lozano                                                                                                                                         1           1           0
-3. Se avisaria de Jesus Campa                                                                                                                                            1           1           0
+3. Se avisaria de Lider 1                                                                                                                                                2           1           1
+3. Se avisaria de Lider 2                                                                                                                                                1           1           0
+3. Se avisaria de Lider 3                                                                                                                                                1           1           0
+3. Se avisaria de Lider 4                                                                                                                                                1           1           0
 Warning: Null value is eliminated by an aggregate or other SET operation.
 
 Bloque                                          Tecnico                                                                                                                                                                                                                                                          Tickets     Grupos      EnCatalogo  SiempreProveedor Cobertura

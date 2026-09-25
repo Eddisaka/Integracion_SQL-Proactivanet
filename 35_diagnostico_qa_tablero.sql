@@ -28,8 +28,9 @@
 
    QUE DICE CADA BLOQUE
 
-   1) Cuando se modifico por ultima vez cada objeto de QA, y si la vista de
-      hoy es la de 05 del repositorio o alguien le cambio los filtros.
+   1) Cuando se modifico por ultima vez cada objeto de QA, si la vista de
+      hoy es la de 05 del repositorio o alguien le cambio los filtros, y si
+      la herencia de grupos esta al dia con la ultima carga del catalogo.
    2) Si alguien los modifico en el servidor ANTES de hoy. Sale de la traza
       por omision de SQL Server, que solo guarda los ultimos dias y pide
       permiso ALTER TRACE; si no se puede, lo dice y sigue.
@@ -46,10 +47,11 @@
    9) Desde cuando conoce el catalogo dbo.Categorias cada arbol de Punto de
       Venta, y con que grupo. Va en su propio lote: si la tabla no tuviera
       alguna columna, falla solo ese bloque.
-  10) Que pasaria si cada categoria sin grupo heredara el del nivel de arriba
-      mas cercano que si lo tiene, como dice Proactivanet que hace: cuantos
+  10) La herencia de grupos calculada aqui mismo, desde el catalogo: cuantos
       tickets de la ventana cambian y a que, que categorias, y en que arboles
-      del catalogo falta el grupo. Solo lo calcula; no cambia nada.
+      del catalogo falta el grupo. Solo lo calcula; no cambia nada. Antes del
+      05 que hereda, dice que pasaria; despues, Hoy y ConHerencia deben
+      coincidir, salvo que la herencia este atrasada (bloque 1c).
 
    Todas las horas salen en hora de Mexico.
 
@@ -126,6 +128,28 @@ LEFT JOIN (VALUES
     ('B1B0343DF284', N'05 actual (vw_Tickets; sin grupo en el catalogo = Sin catalogo)')
 ) AS k (Huella, Version) ON k.Huella = h.Huella
 WHERE m.object_id = OBJECT_ID(N'dbo.vw_CorreoQA_Base');
+
+
+/* ---------------------------------------------------------------------------
+   1c) La herencia de grupos (05, seccion 0): si ya existe, cuando se calculo
+       y si es posterior a la ultima carga del catalogo. Las dos fechas son
+       del reloj del servidor, asi que se comparan tal cual.
+   --------------------------------------------------------------------------- */
+IF OBJECT_ID(N'dbo.CategoriaGrupoHeredado', N'U') IS NULL
+    PRINT N'1c) Todavia no hay herencia de grupos: falta correr el 05 que la trae.';
+ELSE
+    SELECT
+        Bloque = N'1c) La herencia de grupos',
+        Rutas = COUNT_BIG(*),
+        LoHeredan = SUM(CASE WHEN h.GrupoPropio IS NULL AND h.GrupoEfectivo IS NOT NULL THEN 1 ELSE 0 END),
+        SinGrupo = SUM(CASE WHEN h.GrupoEfectivo IS NULL THEN 1 ELSE 0 END),
+        CalculadaMexico = DATEADD(HOUR, -6, MAX(h.CalculadoEn)),
+        UltimaCargaCatalogoMexico = DATEADD(HOUR, -6, u.UltimaCarga),
+        AlDia = CASE WHEN MAX(h.CalculadoEn) >= u.UltimaCarga THEN N'si'
+                     ELSE N'NO: correr EXEC dbo.usp_Categorias_HeredarGrupo' END
+    FROM dbo.CategoriaGrupoHeredado AS h
+    CROSS JOIN (SELECT UltimaCarga = MAX(FechaUltimaCargaDW) FROM dbo.Categorias) AS u
+    GROUP BY u.UltimaCarga;
 
 
 /* ---------------------------------------------------------------------------
@@ -417,11 +441,23 @@ DECLARE @Hoy DATE = CONVERT(date, DATEADD(HOUR, -6, SYSUTCDATETIME()));
 DECLARE @Ff DATE = DATEADD(DAY, -1, @Hoy);
 DECLARE @Fi DATE = DATEADD(DAY, -14, @Ff);
 
-SELECT
-    Ruta = c.RutaCompleta,
-    GrupoPropio = NULLIF(LTRIM(RTRIM(c.GrupoIncidenciasPeticiones)), N'')
+-- El grupo PROPIO de cada ruta, directo de dbo.Categorias con la misma
+-- eleccion de fila que vw_CorreoQA_CategoriaUnica. De la vista no: desde que
+-- 05 hereda, su GrupoIncidenciasPeticiones ya trae el heredado.
+SELECT q.Ruta, q.GrupoPropio
 INTO #Cat
-FROM dbo.vw_CorreoQA_CategoriaUnica AS c;
+FROM (
+    SELECT
+        Ruta = LTRIM(RTRIM(REPLACE(c.RutaCompleta, NCHAR(160), N' '))),
+        GrupoPropio = NULLIF(LTRIM(RTRIM(c.GrupoIncidenciasPeticiones)), N''),
+        rn = ROW_NUMBER() OVER (
+            PARTITION BY LTRIM(RTRIM(REPLACE(c.RutaCompleta, NCHAR(160), N' ')))
+            ORDER BY c.VigenteEnOrigen DESC, c.FechaUltimaCargaDW DESC
+        )
+    FROM dbo.Categorias AS c
+    WHERE c.RutaCompleta IS NOT NULL
+) AS q
+WHERE q.rn = 1;
 
 SELECT
     Ruta,

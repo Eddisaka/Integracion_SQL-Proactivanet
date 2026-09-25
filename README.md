@@ -85,6 +85,25 @@ quitado `Lider` a `vw_Dash_ProductividadBase`.
 o cuenta de mas: dice cuando se cambio `vw_CorreoQA_Base`, que categorias
 llenan la ventana de 15 dias y cuanto tarda leerla. Solo lee.
 
+## Categorias sin grupo: el grupo heredado
+
+Desde septiembre de 2026 Proactivanet solo pone "Grupo incidencias /
+peticiones" en un nivel alto del arbol, y los de abajo lo heredan. El catalogo
+que carga el ETL trae solo el valor propio de cada ruta. `05` calcula el
+heredado (el del nivel de arriba mas cercano que si tiene) en
+`dbo.CategoriaGrupoHeredado`, y el tablero, el correo y la alerta de QA lo
+usan. Si ni la categoria ni nada arriba de ella tiene grupo, el ticket sale
+"Sin catalogo", no Incorrecto.
+
+Despues de cada carga del catalogo hay que recalcularlo:
+
+```sql
+EXEC dbo.usp_Categorias_HeredarGrupo;
+```
+
+Mientras no se haga, una categoria nueva sin grupo sale "Sin catalogo". El
+bloque 1c de `35` dice si esta al dia.
+
 ## Lo que no se versiona
 
 El repositorio es publico. No se suben credenciales (`config*.json`,
