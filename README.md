@@ -59,6 +59,12 @@ del agente mide la edad de la carga contra `SYSDATETIME()` del mismo servidor.
 `pruebas/prueba_reloj_sql.py` revisa todos los `.sql` y falla si alguno vuelve
 a comparar contra el reloj del servidor.
 
+Dos vistas de produccion no las crea ningun script numerado y vivian solo en la
+base: `dbo.vw_Tickets` y `dbo.vw_Backlog`. Sus espejos, ya con la hora de
+Mexico, son `15_vw_tickets.sql` y `30_vw_backlog.sql`, en ese orden. Los dos
+llevan BOM (hay acentos que son datos) y al final refrescan las vistas que
+dependen de ellas.
+
 ## Lo que no se versiona
 
 El repositorio es publico. No se suben credenciales (`config*.json`,
