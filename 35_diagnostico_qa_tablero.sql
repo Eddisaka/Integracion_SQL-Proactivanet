@@ -28,7 +28,8 @@
 
    QUE DICE CADA BLOQUE
 
-   1) Cuando se modifico por ultima vez cada objeto de QA.
+   1) Cuando se modifico por ultima vez cada objeto de QA, y si la vista de
+      hoy es la de 05 del repositorio o alguien le cambio los filtros.
    2) Si alguien los modifico en el servidor ANTES de hoy. Sale de la traza
       por omision de SQL Server, que solo guarda los ultimos dias y pide
       permiso ALTER TRACE; si no se puede, lo dice y sigue.
@@ -37,9 +38,24 @@
    5) Semana por semana, en dbo.Tickets, cuantos tickets trae cada nombre del
       arbol de Punto de Venta: muestra cuando aparecio cada uno.
    6) Cuantas filas quitaria cada regla candidata, y que hay dentro de
-      'S-Aplicativos Punto de Venta'.
+      'S-Aplicativos Punto de Venta' y de 'S-Ampliacion Punto de Venta'.
+   7) De los incorrectos, que grupo pide el catalogo y cual lo atendio.
+   8) Lo que habria dado el correo de QA de hoy y de los tres dias antes,
+      calculado con la vista de AHORA. Si un correo que ya llego dice otra
+      cosa, la vista cambio despues de mandarlo.
+   9) Desde cuando conoce el catalogo dbo.Categorias cada arbol de Punto de
+      Venta, y con que grupo. Va en su propio lote: si la tabla no tuviera
+      alguna columna, falla solo ese bloque.
 
    Todas las horas salen en hora de Mexico.
+
+   LO QUE MOSTRO LA PRIMERA CORRIDA (2026-09-25, salidas/20260925_salida_35.rpt)
+
+   Proactivanet cambio de nombre '/S-Punto de Venta/Aplicativo/...' a
+   '/S-Aplicativos Punto de Venta/...' la semana del 14 de septiembre: el
+   nombre viejo deja de aparecer esa semana y el nuevo empieza. En la ventana
+   del tablero, ese arbol trae 202 tickets y 173 de ellos salen Incorrecto,
+   la mitad de todos los incorrectos. La lectura de la ventana tardo 1,3 s.
 
    No trae nombres de personas: solo categorias, conteos y fechas.
    ========================================================================== */
@@ -71,6 +87,31 @@ WHERE o.name LIKE N'vw[_]CorreoQA[_]%'
    OR o.name LIKE N'usp[_]QaWeb[_]%'
    OR o.name = N'vw_GruposValidos'
 ORDER BY o.modify_date DESC;
+
+
+/* ---------------------------------------------------------------------------
+   1b) La vista tal como esta hoy, comparada con la de 05 del repositorio.
+       La huella es un SHA-256 del texto sin espacios, tabuladores ni saltos
+       de linea, asi que no la cambia abrir el archivo en Windows o en Linux.
+       6A33EAFFED94 es la de la vista de 05 al 2026-09-25 (commit e0335c1);
+       si 05 cambia, hay que actualizarla aqui. La del repositorio tiene 6
+       filtros NOT LIKE: 2 por grupo y 4 por categoria (el de SorIA es <>).
+   --------------------------------------------------------------------------- */
+SELECT
+    Bloque = N'1b) La vista de hoy',
+    EsLaDelRepositorio = CASE WHEN h.Huella = '6A33EAFFED94' THEN N'si' ELSE N'NO' END,
+    h.Huella,
+    FiltrosNotLike = (LEN(m.definition) - LEN(REPLACE(m.definition, N'NOT LIKE', N''))) / 8,
+    NombraAplicativosPV = CASE WHEN m.definition LIKE N'%Aplicativos Punto de Venta%' THEN N'si' ELSE N'no' END,
+    NombraAmpliacionPV = CASE WHEN m.definition LIKE N'%Ampliacion Punto de Venta%' THEN N'si' ELSE N'no' END,
+    Largo = LEN(m.definition)
+FROM sys.sql_modules AS m
+CROSS APPLY (
+    SELECT Huella = LEFT(CONVERT(VARCHAR(66), HASHBYTES('SHA2_256',
+        REPLACE(REPLACE(REPLACE(REPLACE(m.definition, NCHAR(13), N''), NCHAR(10), N''),
+                NCHAR(9), N''), N' ', N'')), 2), 12)
+) AS h
+WHERE m.object_id = OBJECT_ID(N'dbo.vw_CorreoQA_Base');
 
 
 /* ---------------------------------------------------------------------------
@@ -149,6 +190,8 @@ DECLARE @Inicio DATETIME2(7) = DATEADD(HOUR, -6, SYSUTCDATETIME());
 SELECT
     q.Validacion,
     q.FechaFirmaSolucion,
+    q.GrupoCorrecto,
+    q.Grupo,
     Ruta = CASE WHEN LEFT(n.p, 1) = N'/' THEN SUBSTRING(n.p, 2, 1000) ELSE n.p END
 INTO #Ventana
 FROM dbo.vw_CorreoQA_Base AS q
@@ -248,6 +291,101 @@ WHERE v.Ruta LIKE N'S-Aplicativos Punto de Venta%'
 GROUP BY v.Ruta
 ORDER BY COUNT_BIG(*) DESC;
 
+SELECT TOP (10)
+    Bloque = N'6c) Dentro de S-Ampliacion Punto de Venta',
+    Categoria = N'/' + v.Ruta,
+    Tickets = COUNT_BIG(*),
+    Incorrectos = SUM(CASE WHEN v.Validacion = N'Incorrecto' THEN 1 ELSE 0 END)
+FROM #Ventana AS v
+WHERE v.Ruta LIKE N'S-Ampliacion Punto de Venta%'
+GROUP BY v.Ruta
+ORDER BY COUNT_BIG(*) DESC;
+
+
+/* ---------------------------------------------------------------------------
+   7) Incorrecto quiere decir que el grupo del ticket no es el que el catalogo
+      pide para su categoria, ni uno de sus grupos validos. Si casi todos
+      salen de la misma pareja, no es mala categorizacion: el catalogo pide
+      un grupo que ya no es el que atiende.
+   --------------------------------------------------------------------------- */
+SELECT TOP (15)
+    Bloque = N'7) Incorrectos: grupo que pide el catalogo y grupo del ticket',
+    GrupoQuePideElCatalogo = ISNULL(v.GrupoCorrecto, N'(el catalogo no dice)'),
+    GrupoDelTicket = v.Grupo,
+    Tickets = COUNT_BIG(*),
+    DeAplicativosPuntoDeVenta = SUM(CASE WHEN v.Ruta LIKE N'S-Aplicativos Punto de Venta%' THEN 1 ELSE 0 END)
+FROM #Ventana AS v
+WHERE v.Validacion = N'Incorrecto'
+GROUP BY v.GrupoCorrecto, v.Grupo
+ORDER BY COUNT_BIG(*) DESC;
+
 DROP TABLE #Ventana;
+
+
+/* ---------------------------------------------------------------------------
+   8) El correo de QA (Enviar_CorreoQA.ps1) usa la misma vista, del dia del
+      envio menos 15 hasta el dia del envio. Aqui se recalcula para hoy y los
+      tres dias anteriores con la vista de ahora. Los totales crecen un poco
+      solos -un ticket que se cerro despues ya cuenta-, pero si un correo que
+      ya llego no traia la columna IncorrectosDeAplicativosPV y aqui si sale,
+      la vista cambio despues de mandarlo.
+   --------------------------------------------------------------------------- */
+SELECT
+    q.Validacion,
+    q.FechaRegistroDia,
+    EsAplicativosPV = CASE WHEN LTRIM(REPLACE(ISNULL(q.Categoria, N''), NCHAR(160), N' '))
+                               LIKE N'/S-Aplicativos Punto de Venta%' THEN 1 ELSE 0 END
+INTO #Correo
+FROM dbo.vw_CorreoQA_Base AS q
+WHERE q.FechaRegistroDia >= DATEADD(DAY, -18, @Hoy)
+  AND q.FechaRegistroDia <= @Hoy;
+
+SELECT
+    Bloque = N'8) Lo que habria dado el correo',
+    CorreoDel = d.Dia,
+    Desde = DATEADD(DAY, -15, d.Dia),
+    Tickets = COUNT_BIG(c.FechaRegistroDia),
+    Incorrectos = SUM(CASE WHEN c.Validacion = N'Incorrecto' THEN 1 ELSE 0 END),
+    PctIncorrectos = CAST(100.0 * SUM(CASE WHEN c.Validacion = N'Incorrecto' THEN 1 ELSE 0 END)
+                          / NULLIF(COUNT_BIG(c.FechaRegistroDia), 0) AS DECIMAL(6,2)),
+    IncorrectosDeAplicativosPV = SUM(CASE WHEN c.Validacion = N'Incorrecto' AND c.EsAplicativosPV = 1
+                                          THEN 1 ELSE 0 END)
+FROM (VALUES (0), (1), (2), (3)) AS o (Atras)
+CROSS APPLY (SELECT Dia = DATEADD(DAY, -o.Atras, @Hoy)) AS d
+LEFT JOIN #Correo AS c
+       ON c.FechaRegistroDia >= DATEADD(DAY, -15, d.Dia)
+      AND c.FechaRegistroDia <= d.Dia
+GROUP BY d.Dia
+ORDER BY d.Dia;
+
+DROP TABLE #Correo;
+GO
+
+
+/* ---------------------------------------------------------------------------
+   9) El catalogo. FechaAltaDW es cuando la carga vio la ruta por primera vez;
+      va en la hora del servidor (UTC), por eso el -6.
+   --------------------------------------------------------------------------- */
+SELECT
+    Bloque = N'9) En el catalogo dbo.Categorias',
+    a.Arbol,
+    GrupoQuePide = ISNULL(c.GrupoIncidenciasPeticiones, N'(vacio)'),
+    Rutas = COUNT_BIG(*),
+    Vigentes = SUM(CASE WHEN c.VigenteEnOrigen = 1 THEN 1 ELSE 0 END),
+    PrimeraAltaMexico = DATEADD(HOUR, -6, MIN(c.FechaAltaDW)),
+    UltimaAltaMexico = DATEADD(HOUR, -6, MAX(c.FechaAltaDW)),
+    UltimaCargaMexico = DATEADD(HOUR, -6, MAX(c.FechaUltimaCargaDW))
+FROM dbo.Categorias AS c
+CROSS APPLY (SELECT r = LTRIM(RTRIM(REPLACE(ISNULL(c.RutaCompleta, N''), NCHAR(160), N' ')))) AS n
+CROSS APPLY (
+    SELECT Arbol = CASE
+        WHEN n.r LIKE N'/S-Aplicativos Punto de Venta%' THEN N'S-Aplicativos Punto de Venta (nuevo)'
+        WHEN n.r LIKE N'/S-Punto de Venta/Aplicativo%'  THEN N'S-Punto de Venta/Aplicativo (viejo)'
+        WHEN n.r LIKE N'/S-Ampliacion Punto de Venta%'  THEN N'S-Ampliacion Punto de Venta'
+    END
+) AS a
+WHERE a.Arbol IS NOT NULL
+GROUP BY a.Arbol, c.GrupoIncidenciasPeticiones
+ORDER BY a.Arbol, COUNT_BIG(*) DESC;
 
 PRINT N'Fin: ' + CONVERT(NVARCHAR(40), SYSDATETIMEOFFSET(), 127);
