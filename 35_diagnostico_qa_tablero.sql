@@ -50,7 +50,7 @@
       alguna columna, falla solo ese bloque.
   10) La herencia de grupos calculada aqui mismo, desde el catalogo: cuantos
       tickets de la ventana cambian y a que, que categorias, y en que arboles
-      del catalogo falta el grupo. Solo lo calcula; no cambia nada. Antes del
+      ACTIVOS del catalogo falta el grupo. Solo lo calcula; no cambia nada. Antes del
       05 que hereda, dice que pasaria; despues, Hoy y ConHerencia deben
       coincidir, salvo que la herencia este atrasada (bloque 1c).
 
@@ -466,12 +466,15 @@ DECLARE @Fi DATE = DATEADD(DAY, -14, @Ff);
 -- El grupo PROPIO de cada ruta, directo de dbo.Categorias con la misma
 -- eleccion de fila que vw_CorreoQA_CategoriaUnica. De la vista no: desde que
 -- 05 hereda, su GrupoIncidenciasPeticiones ya trae el heredado.
-SELECT q.Ruta, q.GrupoPropio
+SELECT q.Ruta, q.GrupoPropio, q.Activa
 INTO #Cat
 FROM (
     SELECT
         Ruta = LTRIM(RTRIM(REPLACE(c.RutaCompleta, NCHAR(160), N' '))),
         GrupoPropio = NULLIF(LTRIM(RTRIM(c.GrupoIncidenciasPeticiones)), N''),
+        -- Solo para el bloque 10d: la herencia se calcula con todas, porque
+        -- un ticket viejo puede traer una categoria que hoy esta inactiva.
+        Activa = CASE WHEN ISNULL(c.Inactiva, 0) = 0 AND c.VigenteEnOrigen = 1 THEN 1 ELSE 0 END,
         rn = ROW_NUMBER() OVER (
             PARTITION BY LTRIM(RTRIM(REPLACE(c.RutaCompleta, NCHAR(160), N' ')))
             ORDER BY c.VigenteEnOrigen DESC, c.FechaUltimaCargaDW DESC
@@ -484,6 +487,7 @@ WHERE q.rn = 1;
 SELECT
     Ruta,
     GrupoPropio,
+    Activa,
     Busca = Ruta,
     GrupoEfectivo = GrupoPropio,
     HeredaDe = CAST(NULL AS NVARCHAR(1000))
@@ -569,10 +573,12 @@ WHERE s.Validacion <> s.ConHerencia
 GROUP BY s.Ruta, s.HeredaDe, s.GrupoEfectivo
 ORDER BY COUNT_BIG(*) DESC;
 
--- Todo el catalogo, por primer nivel: donde falta el grupo y si la herencia
--- lo resuelve.
+-- El catalogo ACTIVO, por primer nivel: donde falta el grupo y si la herencia
+-- lo resuelve. Las categorias inactivas o dadas de baja no cuentan: en ellas
+-- ya no se registran tickets, asi que no hace falta ponerles grupo (asi quedo
+-- fuera '/S-Aplicativo Punto de Venta', en singular, que es un arbol inactivo).
 SELECT TOP (20)
-    Bloque = N'10d) Catalogo sin grupo, por primer nivel',
+    Bloque = N'10d) Catalogo activo sin grupo, por primer nivel',
     PrimerNivel = n.PrimerNivel,
     Rutas = COUNT_BIG(*),
     SinGrupoPropio = SUM(CASE WHEN h.GrupoPropio IS NULL THEN 1 ELSE 0 END),
@@ -584,6 +590,7 @@ CROSS APPLY (
                               THEN LEFT(h.Ruta, CHARINDEX(N'/', h.Ruta, 2) - 1)
                               ELSE h.Ruta END
 ) AS n
+WHERE h.Activa = 1
 GROUP BY n.PrimerNivel
 HAVING SUM(CASE WHEN h.GrupoPropio IS NULL THEN 1 ELSE 0 END) > 0
 ORDER BY SUM(CASE WHEN h.GrupoPropio IS NULL THEN 1 ELSE 0 END) DESC;
