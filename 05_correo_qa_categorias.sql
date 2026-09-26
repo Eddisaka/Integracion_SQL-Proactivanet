@@ -590,7 +590,13 @@ BEGIN
     WHERE FechaRegistroDia >= @Fi
       AND FechaRegistroDia <= @Ff
       AND (@SoloIncorrectos = 0 OR Validacion = N'Incorrecto')
-    ORDER BY FechaRegistro DESC;
+    ORDER BY FechaRegistro DESC
+    -- Sin esto, TOP con una variable hace que el optimizador suponga 100
+    -- filas y arme Nested Loops con un Lazy Spool de dbo.Categorias que se
+    -- rebobina una vez por ticket: ~110 s por pasada en el tablero, contra
+    -- ~1 s asi. Medido el 2026-09-25; el analisis completo esta en
+    -- salidas/fix_qa_detalle_option_recompile.sql.
+    OPTION (RECOMPILE);
 END;
 GO
 

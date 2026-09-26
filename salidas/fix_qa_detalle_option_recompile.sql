@@ -1,4 +1,9 @@
-﻿/* =====================================================================================
+﻿/* YA NO HACE FALTA CORRERLO. Desde el 2026-09-26 05_correo_qa_categorias.sql
+   trae el mismo OPTION (RECOMPILE). Este archivo, ademas, es de antes del
+   cambio de hora: correrlo despues de 05 regresaria GETDATE() a @Ff. Se
+   queda como registro del analisis. */
+
+/* =====================================================================================
    FIX - dbo.usp_CorreoQA_Detalle: OPTION (RECOMPILE) en el SELECT final
    -------------------------------------------------------------------------------------
    SINTOMA
