@@ -25,10 +25,15 @@ Bloque                    Rutas                LoHeredan   SinGrupo    Calculada
 ------------------------- -------------------- ----------- ----------- --------------------------- --------------------------- -----------------------------------------------
 1c) La herencia de grupos 6340                 825         1487        2026-09-25 18:27:52         2026-09-25 18:22:31         si
 
+Bloque                       Objeto                               Debe                            Tiene
+---------------------------- ------------------------------------ ------------------------------- -------------
+1d) Lo que no se debe perder dbo.usp_CorreoQA_Detalle             OPTION (RECOMPILE)              si
+1d) Lo que no se debe perder dbo.usp_CargarCategoriasDesdeStaging recalcular la herencia al final si
+
 2) No se pudo leer la traza por omision: You do not have permission to run 'SYS.TRACES'.
 Bloque                   Filas                Incorrectos PctIncorrectos                          Milisegundos TopDelTablero
 ------------------------ -------------------- ----------- --------------------------------------- ------------ -------------
-3) Lectura de la ventana 3943                 160         4.06                                    1360         50000
+3) Lectura de la ventana 3943                 160         4.06                                    1640         50000
 
 Bloque                       Categoria                                                                                                                                                                                                                                                        Tickets              Incorrectos PctDelTotal
 ---------------------------- ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- -------------------- ----------- ---------------------------------------
@@ -172,6 +177,6 @@ Bloque                                    PrimerNivel                           
 10d) Catalogo sin grupo, por primer nivel /Horarios Produccion Linea de Cajas                                                                                                                                                                                                                              20                   19             19          0
 10d) Catalogo sin grupo, por primer nivel /Soporte OAT                                                                                                                                                                                                                                                     20                   18             16          2
 
-Fin: 2026-09-26T00:29:07.3767661Z
+Fin: 2026-09-26T00:45:47.2117640Z
 
-Hora de finalización: 2026-09-25T18:29:07.3932102-06:00
+Hora de finalización: 2026-09-25T18:45:47.2276990-06:00
