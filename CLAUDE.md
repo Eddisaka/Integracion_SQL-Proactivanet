@@ -27,6 +27,8 @@ seccion "La hora" del README.md; `pruebas/prueba_reloj_sql.py` lo vigila.
 ## Antes de subir
 
 - `python3 pruebas/prueba_reloj_sql.py`
+- `python3 pruebas/prueba_qa.py` (los arreglos de QA del 2026-09-25; si
+  cambias `vw_CorreoQA_Base` en 05, agrega su huella nueva al bloque 1b de 35)
 - `python3 pruebas/prueba_programar_aviso.py`
 - `sh pruebas/correr_problems.sh` (necesita Docker con SQL Server)
 
@@ -34,3 +36,12 @@ seccion "La hora" del README.md; `pruebas/prueba_reloj_sql.py` lo vigila.
 
 Nada de credenciales (`config*.json`, `Web.config`) ni nombres, apellidos o
 correos del personal. Ver "Lo que no se versiona" en el README.md.
+
+## Antes de volver a correr un script en la base
+
+En produccion se han cambiado objetos a mano, directo en el servidor, y al
+volver a correr el script del repositorio esos cambios se perdieron (el
+`Lider` de `vw_Dash_ProductividadBase`, el `vw_Tickets` de `vw_CorreoQA_Base`).
+Antes de pedir que se corra un script sobre objetos que ya existen, pedir su
+version de produccion (SSMS: Incluir como → CREATE To → Archivo, a `salidas/`)
+y compararla con la del repositorio.

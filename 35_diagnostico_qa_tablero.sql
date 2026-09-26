@@ -29,8 +29,9 @@
    QUE DICE CADA BLOQUE
 
    1) Cuando se modifico por ultima vez cada objeto de QA, si la vista de
-      hoy es la de 05 del repositorio o alguien le cambio los filtros, y si
-      la herencia de grupos esta al dia con la ultima carga del catalogo.
+      hoy es la de 05 del repositorio o alguien le cambio los filtros, si
+      la herencia de grupos esta al dia con la ultima carga del catalogo, y
+      si siguen el OPTION (RECOMPILE) del detalle y el recalculo de la carga.
    2) Si alguien los modifico en el servidor ANTES de hoy. Sale de la traza
       por omision de SQL Server, que solo guarda los ultimos dias y pide
       permiso ALTER TRACE; si no se puede, lo dice y sigue.
@@ -150,6 +151,27 @@ ELSE
     FROM dbo.CategoriaGrupoHeredado AS h
     CROSS JOIN (SELECT UltimaCarga = MAX(FechaUltimaCargaDW) FROM dbo.Categorias) AS u
     GROUP BY u.UltimaCarga;
+
+
+/* ---------------------------------------------------------------------------
+   1d) Dos cosas que una copia vieja de un script deshace sin que nadie lo
+       note: el OPTION (RECOMPILE) del detalle (sin el, ~110 s por pasada en
+       la pestana QA; ver "Rendimiento" en CORREO_QA.md) y el recalculo de la
+       herencia al final de la carga del catalogo (36).
+   --------------------------------------------------------------------------- */
+SELECT
+    Bloque = N'1d) Lo que no se debe perder',
+    x.Objeto,
+    x.Debe,
+    Tiene = CASE WHEN m.definition IS NULL THEN N'NO EXISTE'
+                 WHEN m.definition LIKE x.Patron THEN N'si'
+                 ELSE N'NO: correr ' + x.Script END
+FROM (VALUES
+    (1, N'dbo.usp_CorreoQA_Detalle',             N'OPTION (RECOMPILE)',               N'%OPTION (RECOMPILE)%',                    N'05'),
+    (2, N'dbo.usp_CargarCategoriasDesdeStaging', N'recalcular la herencia al final',  N'%EXEC dbo.usp_Categorias_HeredarGrupo%',  N'36')
+) AS x (Orden, Objeto, Debe, Patron, Script)
+LEFT JOIN sys.sql_modules AS m ON m.object_id = OBJECT_ID(x.Objeto)
+ORDER BY x.Orden;
 
 
 /* ---------------------------------------------------------------------------

@@ -37,7 +37,11 @@ piezas — ver la tabla de equivalencias mas abajo.
 
 Para cada ticket:
 - Su `Categoria` se busca en `dbo.Categorias.RutaCompleta` → de ahi sale el
-  **Grupo Correcto** (`GrupoIncidenciasPeticiones`).
+  **Grupo Correcto** (`GrupoIncidenciasPeticiones`). Si la categoria no tiene
+  grupo propio, vale el del nivel de arriba mas cercano que si lo tiene: ver
+  "El grupo heredado", abajo.
+- La categoria no esta en el catalogo, o ni ella ni nada arriba de ella
+  tiene grupo → **Sin catalogo**: no hay contra que validar.
 - `Grupo` del ticket = Grupo Correcto → **OK**.
 - No coinciden, pero `(GrupoCorrecto, Grupo)` esta en
   `dbo.vw_GruposValidos` (un grupo con permiso de cerrar tickets de otro)
@@ -48,8 +52,11 @@ Esta regla se dedujo comparando fila por fila los 3 archivos de ejemplo en
 `Envio_correos/` — coincide exactamente con la columna `Validacion` que ya
 traen.
 
-**Alcance del reporte:** `dbo.vw_CorreoQA_Base` excluye por completo (ni
-cuentan en el total, ni en ningun KPI/tabla) lo siguiente:
+**Alcance del reporte:** `dbo.vw_CorreoQA_Base` lee de `dbo.vw_Tickets`
+(asi quedo en produccion el 2026-09-25), que ya quita su propia lista de
+categorias y los tickets con `TipoRelacion = 'Dependiente'`. Encima de eso
+excluye por completo (ni cuentan en el total, ni en ningun KPI/tabla) lo
+siguiente:
 - Solo tickets con `Estado = 'Cerrada'` — los demas estados no cuentan.
 - `Grupo` que empiece con `Datos Maestros`, que empiece con `Servicios al
   personal`, o sea exactamente `SorIA`.
@@ -67,7 +74,8 @@ de Categoria y el filtro de Estado terminan de cerrar la diferencia.
 ## 1) Catalogos: los mantiene tu ETL, no este script
 
 `05_correo_qa_categorias.sql` **no crea tablas propias** para categorias ni
-grupos validos — usa directo las que ya tienes:
+grupos validos -la unica tabla que crea es la del grupo heredado, que se
+calcula a partir de `dbo.Categorias`-; usa directo las que ya tienes:
 
 - `dbo.Categorias` (catalogo de categorias, `RutaCompleta` /
   `GrupoIncidenciasPeticiones` / `VigenteEnOrigen`), cargada por tu ETL
@@ -86,6 +94,72 @@ ejemplo una version vigente y otra vieja que quedo inactiva-. Para que eso
 no duplique tickets en el cruce, se agrego `dbo.vw_CorreoQA_CategoriaUnica`,
 que se queda con una sola fila por `RutaCompleta` (prefiriendo la vigente,
 y si hay empate la de carga mas reciente) antes de unirla con los tickets.
+
+### El grupo heredado
+
+Desde septiembre de 2026 Proactivanet solo pide poner "Grupo incidencias /
+peticiones" en un nivel alto del arbol; los de abajo lo heredan. El reporte
+que baja el ETL trae el valor **propio** de cada ruta, asi que las de abajo
+llegan vacias, y antes de esto cada ticket suyo salia Incorrecto: el
+2026-09-25 eran 175 de los 332 incorrectos de la pestana QA, casi todos de
+`/S-Aplicativos Punto de Venta/`.
+
+- `dbo.usp_Categorias_HeredarGrupo` llena `dbo.CategoriaGrupoHeredado`: para
+  cada ruta sin grupo sube un nivel por vuelta (`/A/B/C` → `/A/B` → `/A`)
+  hasta el primero que tiene grupo, saltando los niveles que no estan en el
+  catalogo. **El grupo propio siempre gana.** Solo se hereda "Grupo
+  incidencias / peticiones".
+- `dbo.vw_CorreoQA_CategoriaUnica` devuelve en `GrupoIncidenciasPeticiones`
+  el propio o el heredado, y dice de donde salio en `GrupoPropio` y
+  `GrupoHeredadoDe`. Lo usan la pestana QA, el correo y la alerta de QA
+  (`14_alerta_qa_resueltos.sql`).
+- El adjunto *Cat_detalle* (`usp_CorreoQA_CatalogoCategorias`) sigue
+  mostrando el grupo **como esta en Proactivanet**, sin heredar.
+- Se recalcula solo al final de cada carga del catalogo
+  (`36_carga_categorias.sql`), y al final de `05`. A mano:
+  `EXEC dbo.usp_Categorias_HeredarGrupo;`. El bloque 1c de
+  `35_diagnostico_qa_tablero.sql` dice si esta al dia.
+- El grupo propio se lee en vivo; solo el heredado sale de la tabla. Si la
+  tabla se atrasara, una categoria nueva sin grupo sale Sin catalogo hasta
+  el siguiente calculo, nunca Incorrecto.
+
+## Rendimiento: por que el detalle lleva `OPTION (RECOMPILE)`
+
+**Sintoma (2026-09-25).** La pestana QA del tablero tardaba unos 110 s por
+cada pasada de `dbo.usp_CorreoQA_Detalle`, y la carga inicial hace dos
+(`action=summary` y `action=qare`): casi 4 minutos para unos 15 KB.
+
+**Causa.** El `SELECT` final usa `TOP (@TopSeguro)`. Con una variable local
+el optimizador no conoce el valor y supone 100 filas. Esa meta de 100 filas
+se propaga al resto del plan, que elige Nested Loops contra
+`vw_CorreoQA_CategoriaUnica` con un Lazy Spool de `dbo.Categorias` (unas
+6,400 filas) que se rebobina **una vez por ticket**: con 4,000 tickets son
+unos 25 millones de comparaciones de texto, en serie. `usp_CorreoQA_Kpis`
+hace los mismos cruces sin `TOP`, elige Hash Match y tarda segundos.
+`@SoloIncorrectos = 1` no ayudaba: el filtro se aplica despues del cruce.
+
+**Arreglo.** `OPTION (RECOMPILE)` en ese `SELECT`. El plan se compila con el
+valor real de `@TopSeguro` y las fechas reales, la meta de 100 filas
+desaparece y vuelve el Hash Match: de ~108 s a ~1 s, con las mismas filas.
+No cambia el resultado (ni filas, ni orden, ni columnas). Cuesta una
+compilacion por llamada, unos 14 ms.
+
+**Donde vive.** En `05_correo_qa_categorias.sql`, desde el 2026-09-26. El
+analisis original, con las mediciones, esta en
+`salidas/fix_qa_detalle_option_recompile.sql`. **Ese archivo ya no se
+corre**: es de antes del cambio de hora, y correrlo despues de `05`
+regresaria `GETDATE()`.
+
+**Como se vigila.**
+- `pruebas/prueba_qa.py` falla si `05` pierde el `OPTION (RECOMPILE)`.
+- El bloque 1d de `35` dice si en la base el procedimiento lo tiene. Si
+  alguien vuelve a correr una copia vieja de `05`, ahi se ve.
+
+**Si se agrega otro `TOP (@variable)`** sobre `vw_CorreoQA_Base`, lleva el
+mismo riesgo y el mismo arreglo. `usp_CorreoQA_TopCategorias` tambien usa
+`TOP (@TopSeguro)`, pero despues de un `GROUP BY` y un `ORDER BY`: el
+ordenamiento tiene que leer todo antes de devolver la primera fila, asi que
+la meta no baja al cruce.
 
 ## 2) Equivalencia correo actual → procedimiento SQL
 

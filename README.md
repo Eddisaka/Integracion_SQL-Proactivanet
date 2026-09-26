@@ -82,27 +82,34 @@ antes y despues de aplicar scripts: asi se vio que volver a correr 04 le habia
 quitado `Lider` a `vw_Dash_ProductividadBase`.
 
 `35_diagnostico_qa_tablero.sql` es para cuando la pestaña QA del tablero tarda
-o cuenta de mas: dice cuando se cambio `vw_CorreoQA_Base`, que categorias
-llenan la ventana de 15 dias y cuanto tarda leerla. Solo lee.
+o cuenta de mas: dice cuando se cambio `vw_CorreoQA_Base`, si la herencia de
+grupos esta al dia, si sigue el `OPTION (RECOMPILE)` del detalle, que
+categorias llenan la ventana de 15 dias y cuanto tarda leerla. Solo lee.
 
-## Categorias sin grupo: el grupo heredado
+`36_carga_categorias.sql` es `dbo.usp_CargarCategoriasDesdeStaging`, la carga
+del catalogo que llama el ETL. Vivia en `04_esquema_categorias.sql`; en una
+base nueva, correr 36 despues de 04.
 
-Desde septiembre de 2026 Proactivanet solo pone "Grupo incidencias /
-peticiones" en un nivel alto del arbol, y los de abajo lo heredan. El catalogo
-que carga el ETL trae solo el valor propio de cada ruta. `05` calcula el
-heredado (el del nivel de arriba mas cercano que si tiene) en
-`dbo.CategoriaGrupoHeredado`, y el tablero, el correo y la alerta de QA lo
-usan. Si ni la categoria ni nada arriba de ella tiene grupo, el ticket sale
-"Sin catalogo", no Incorrecto.
+## La pestaña QA: el grupo heredado y el `OPTION (RECOMPILE)`
 
-Despues de cada carga del catalogo hay que recalcularlo:
+Los dos estan explicados, con sus numeros, en [`CORREO_QA.md`](CORREO_QA.md),
+en "El grupo heredado" y en "Rendimiento".
 
-```sql
-EXEC dbo.usp_Categorias_HeredarGrupo;
-```
+- **El grupo heredado.** Desde septiembre de 2026 Proactivanet solo pone
+  "Grupo incidencias / peticiones" en un nivel alto del arbol, y los de abajo
+  lo heredan. El catalogo que carga el ETL trae solo el valor propio de cada
+  ruta. `05` calcula el heredado (el del nivel de arriba mas cercano que si
+  tiene; el propio siempre gana) en `dbo.CategoriaGrupoHeredado`, y la
+  pestaña, el correo y la alerta de QA lo usan. Si ni la categoria ni nada
+  arriba de ella tiene grupo, el ticket sale "Sin catalogo", no Incorrecto.
+  La carga del catalogo (36) lo recalcula sola; a mano:
+  `EXEC dbo.usp_Categorias_HeredarGrupo;`.
+- **`OPTION (RECOMPILE)` en `usp_CorreoQA_Detalle`.** Sin el, la pestaña QA
+  tardaba ~110 s por pasada; con el, ~1 s. Esta en `05`. El analisis original
+  es `salidas/fix_qa_detalle_option_recompile.sql`, que **ya no se corre**.
 
-Mientras no se haga, una categoria nueva sin grupo sale "Sin catalogo". El
-bloque 1c de `35` dice si esta al dia.
+`pruebas/prueba_qa.py` falla si un cambio a los scripts pierde cualquiera de
+las dos cosas, y el bloque 1d de `35` dice si la base todavia las tiene.
 
 ## Lo que no se versiona
 
