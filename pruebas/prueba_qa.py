@@ -5,6 +5,8 @@ Ese dia se juntaron cuatro cosas que un script viejo deshace sin avisar:
 
 - usp_CorreoQA_Detalle con OPTION (RECOMPILE). Sin eso la pestana QA tardaba
   ~110 s por pasada (ver "Rendimiento" en CORREO_QA.md).
+- usp_CorreoQA_Kpis con los conteos en una pasada, la misma consulta que el
+  tablero (QaDb.cs, KpisUnaPasada). Antes tardaba ~28,6 s.
 - vw_CorreoQA_Base leyendo de dbo.vw_Tickets, como quedo en produccion.
 - Una categoria sin grupo en el catalogo es 'Sin catalogo', no 'Incorrecto'
   (en 05 y en la alerta, 14).
@@ -112,6 +114,27 @@ afirmar(re.search(r"COALESCE\s*\(\s*q\.GrupoPropio\s*,\s*h\.GrupoEfectivo\s*\)",
         "y el grupo propio gana sobre el heredado")
 afirmar(re.search(r"^\s*EXEC\s+dbo\.usp_Categorias_HeredarGrupo\s*;", sin_comentarios(s05), re.M),
         "05 recalcula la herencia al terminar")
+
+kpis = sin_comentarios(lote_de(s05, r"PROCEDURE\s+dbo\.usp_CorreoQA_Kpis\b"))
+afirmar(kpis, "define usp_CorreoQA_Kpis")
+afirmar(not re.search(r"CONVERT\s*\(\s*date\s*,\s*FechaFirmaSolucion\s*\)", kpis, re.I),
+        "usp_CorreoQA_Kpis ya no envuelve FechaFirmaSolucion en CONVERT (~28 s)")
+afirmar(len(re.findall(r"OPTION\s*\(\s*RECOMPILE\s*\)", kpis)) == 2,
+        "y sus dos SELECT llevan OPTION (RECOMPILE)")
+
+
+def cruce(texto):
+    """El FROM ... WHERE de los conteos de ayer y semana anterior, sin blancos."""
+    m = re.search(r"FROM\s+dbo\.vw_CorreoQA_Base\s+AS\s+b\s+WHERE\s+b\.Validacion\s*=\s*N'Incorrecto'"
+                  r".*?@SemAntFin\s*\)\s*\)", texto, re.S)
+    return re.sub(r"\s+", "", m.group(0)) if m else None
+
+
+sitio = leer(os.path.join("sitio", "App_Code", "QaDb.cs"))
+del_sitio = cruce(sitio)
+del_proc = cruce(kpis)
+afirmar(del_sitio and del_proc and del_sitio == del_proc,
+        "el procedimiento y el tablero (QaDb.cs, KpisUnaPasada) cuentan con el mismo cruce")
 
 print("\n3. 14_alerta_qa_resueltos.sql\n" + "-" * 62)
 alerta = sin_comentarios(lote_de(s14, r"VIEW\s+dbo\.vw_AlertaQA_Base\b"))
