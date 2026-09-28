@@ -347,6 +347,44 @@ BEGIN
     -- contado por separado (no la suma de toda esa semana).
     DECLARE @SemanaAnt DATE = DATEADD(DAY, -8, @Ff);
 
+    -- Ayer / semana anterior se miden por FechaFirmaSolucion (cuando el
+    -- tecnico cerro el ticket), no por FechaRegistroDia (cuando se
+    -- creo) -confirmado con Edgar: lo que importa aqui es cuando se
+    -- cometio/detecto la mala categorizacion al cerrar, no cuando
+    -- entro el ticket, que puede ser de dias o semanas antes.
+    --
+    -- UNA pasada para los dos conteos, con rangos medio abiertos [dia, dia+1).
+    -- Antes eran dos subconsultas escalares con CONVERT(date,
+    -- FechaFirmaSolucion) = @dia: la columna envuelta en una funcion no deja
+    -- estimar nada, el plan salia con Nested Loops y un Lazy Spool de
+    -- dbo.Categorias, y el procedimiento tardaba ~28,6 s. El tablero dejo de
+    -- llamarlo por eso y hacia esta misma consulta por su cuenta
+    -- (sitio/App_Code/QaDb.cs, KpisUnaPasada, ~0,6 s); desde el 2026-09-26 es
+    -- la misma aqui, expresion por expresion. Cuentan exactamente las mismas
+    -- filas que CONVERT(date, ...) = @dia.
+    DECLARE @AyerIni   DATETIME2(0) = CONVERT(DATETIME2(0), @Ayer);
+    DECLARE @AyerFin   DATETIME2(0) = CONVERT(DATETIME2(0), DATEADD(DAY, 1, @Ayer));
+    DECLARE @SemAntIni DATETIME2(0) = CONVERT(DATETIME2(0), @SemanaAnt);
+    DECLARE @SemAntFin DATETIME2(0) = CONVERT(DATETIME2(0), DATEADD(DAY, 1, @SemanaAnt));
+
+    DECLARE @IncAyer BIGINT;
+    DECLARE @IncSemAnt BIGINT;
+
+    SELECT
+        @IncAyer   = COUNT_BIG(CASE WHEN b.FechaFirmaSolucion >= @AyerIni
+                                     AND b.FechaFirmaSolucion <  @AyerFin THEN 1 END),
+        @IncSemAnt = COUNT_BIG(CASE WHEN b.FechaFirmaSolucion >= @SemAntIni
+                                     AND b.FechaFirmaSolucion <  @SemAntFin THEN 1 END)
+    FROM dbo.vw_CorreoQA_Base AS b
+    WHERE b.Validacion = N'Incorrecto'
+      AND (   (b.FechaFirmaSolucion >= @AyerIni   AND b.FechaFirmaSolucion < @AyerFin)
+           OR (b.FechaFirmaSolucion >= @SemAntIni AND b.FechaFirmaSolucion < @SemAntFin))
+    -- Con las fechas reales y no con estimaciones de variable local, igual
+    -- que la consulta del tablero, que las recibe como parametros.
+    OPTION (RECOMPILE);
+
+    -- Las mismas columnas y en el mismo orden de siempre; FechaAyer y
+    -- FechaSemanaAnterior van al final y son nuevas (el tablero ya las lee).
     SELECT
         FechaInicio = @Fi,
         FechaFin = @Ff,
@@ -357,22 +395,14 @@ BEGIN
             / NULLIF(COUNT_BIG(*), 0)
             AS DECIMAL(6,2)
         ),
-        -- Ayer / semana anterior se miden por FechaFirmaSolucion (cuando el
-        -- tecnico cerro el ticket), no por FechaRegistroDia (cuando se
-        -- creo) -confirmado con Edgar: lo que importa aqui es cuando se
-        -- cometio/detecto la mala categorizacion al cerrar, no cuando
-        -- entro el ticket, que puede ser de dias o semanas antes.
-        TicketsIncorrectosAyer = (
-            SELECT COUNT_BIG(*) FROM dbo.vw_CorreoQA_Base
-            WHERE Validacion = N'Incorrecto' AND CONVERT(date, FechaFirmaSolucion) = @Ayer
-        ),
-        TicketsIncorrectosSemanaAnterior = (
-            SELECT COUNT_BIG(*) FROM dbo.vw_CorreoQA_Base
-            WHERE Validacion = N'Incorrecto' AND CONVERT(date, FechaFirmaSolucion) = @SemanaAnt
-        )
+        TicketsIncorrectosAyer = ISNULL(@IncAyer, CONVERT(BIGINT, 0)),
+        TicketsIncorrectosSemanaAnterior = ISNULL(@IncSemAnt, CONVERT(BIGINT, 0)),
+        FechaAyer = @Ayer,
+        FechaSemanaAnterior = @SemanaAnt
     FROM dbo.vw_CorreoQA_Base
     WHERE FechaRegistroDia >= @Fi
-      AND FechaRegistroDia <= @Ff;
+      AND FechaRegistroDia <= @Ff
+    OPTION (RECOMPILE);
 END;
 GO
 

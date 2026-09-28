@@ -154,10 +154,11 @@ ELSE
 
 
 /* ---------------------------------------------------------------------------
-   1d) Dos cosas que una copia vieja de un script deshace sin que nadie lo
+   1d) Tres cosas que una copia vieja de un script deshace sin que nadie lo
        note: el OPTION (RECOMPILE) del detalle (sin el, ~110 s por pasada en
-       la pestana QA; ver "Rendimiento" en CORREO_QA.md) y el recalculo de la
-       herencia al final de la carga del catalogo (36).
+       la pestana QA), los KPIs en una pasada (antes ~28,6 s; ver
+       "Rendimiento" en CORREO_QA.md) y el recalculo de la herencia al final
+       de la carga del catalogo (36).
    --------------------------------------------------------------------------- */
 SELECT
     Bloque = N'1d) Lo que no se debe perder',
@@ -168,7 +169,8 @@ SELECT
                  ELSE N'NO: correr ' + x.Script END
 FROM (VALUES
     (1, N'dbo.usp_CorreoQA_Detalle',             N'OPTION (RECOMPILE)',               N'%OPTION (RECOMPILE)%',                    N'05'),
-    (2, N'dbo.usp_CargarCategoriasDesdeStaging', N'recalcular la herencia al final',  N'%EXEC dbo.usp_Categorias_HeredarGrupo%',  N'36')
+    (2, N'dbo.usp_CorreoQA_Kpis',                N'conteos en una pasada',            N'%@IncAyer%',                              N'05'),
+    (3, N'dbo.usp_CargarCategoriasDesdeStaging', N'recalcular la herencia al final',  N'%EXEC dbo.usp_Categorias_HeredarGrupo%',  N'36')
 ) AS x (Orden, Objeto, Debe, Patron, Script)
 LEFT JOIN sys.sql_modules AS m ON m.object_id = OBJECT_ID(x.Objeto)
 ORDER BY x.Orden;

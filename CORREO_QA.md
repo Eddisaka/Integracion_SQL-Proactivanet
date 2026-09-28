@@ -161,6 +161,29 @@ mismo riesgo y el mismo arreglo. `usp_CorreoQA_TopCategorias` tambien usa
 ordenamiento tiene que leer todo antes de devolver la primera fila, asi que
 la meta no baja al cruce.
 
+### `usp_CorreoQA_Kpis`: los conteos de ayer y de la semana anterior
+
+Hasta el 2026-09-26 el procedimiento tardaba ~28,6 s. Calculaba
+`TicketsIncorrectosAyer` y `TicketsIncorrectosSemanaAnterior` con dos
+subconsultas que recorrian la vista entera y comparaban
+`CONVERT(date, FechaFirmaSolucion) = @dia`: con la columna envuelta en una
+funcion el optimizador no puede estimar nada y armaba el mismo Nested Loops
+con Lazy Spool de `dbo.Categorias`. Por eso la pestana QA dejo de llamarlo y
+hacia los conteos con su propia consulta (`sitio/App_Code/QaDb.cs`,
+`KpisUnaPasada`, ~0,6 s), y el correo seguia esperando al procedimiento.
+
+Ahora el procedimiento hace **esa misma consulta**: los dos conteos en una
+sola pasada, con rangos `[dia, dia+1)` sobre `FechaFirmaSolucion` en vez de
+`CONVERT(date, ...)`, y `OPTION (RECOMPILE)` para que compile con las fechas
+reales. Cuenta exactamente las mismas filas; se comparo contra la version
+anterior con tickets firmados a las 00:00:00 y a las 23:59:59, y dieron lo
+mismo en todos los casos.
+
+- Las columnas son las de siempre y en el mismo orden. Al final se agregaron
+  `FechaAyer` y `FechaSemanaAnterior`, que el tablero ya sabia leer.
+- La pestana QA sigue usando su propia consulta. Las dos tienen que decir lo
+  mismo: `pruebas/prueba_qa.py` falla si dejan de tener el mismo cruce.
+
 ## 2) Equivalencia correo actual → procedimiento SQL
 
 | Pieza del correo | Procedimiento |

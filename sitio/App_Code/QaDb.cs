@@ -282,7 +282,10 @@ public static class QaDb
     // son EXEC de procedimientos que la base ya tenia --, con el mismo patron
     // que ya usan App_Code/DashboardQueries.cs y ExperienciaQueries.cs: texto
     // constante y valores como SqlParameter. Existe porque
-    // dbo.usp_CorreoQA_Kpis tarda ~28,6 s y no se puede tocar la base:
+    // dbo.usp_CorreoQA_Kpis tardaba ~28,6 s y no se podia tocar la base.
+    // Desde el 2026-09-26 el procedimiento hace esta misma consulta
+    // (05_correo_qa_categorias.sql); si se cambia una, hay que cambiar la
+    // otra -pruebas/prueba_qa.py lo revisa-. Lo que se midio entonces:
     //
     //   El procedimiento resuelve TicketsIncorrectosAyer y
     //   TicketsIncorrectosSemanaAnterior con DOS subconsultas escalares
