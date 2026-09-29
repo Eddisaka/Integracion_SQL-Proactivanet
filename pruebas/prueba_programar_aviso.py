@@ -254,6 +254,76 @@ comprobar("sin tarea, estado sale con 1", codigo, 1)
 comprobar("y lo dice con todas sus letras",
           any("NO ESTA PROGRAMADA" in a for a in avisos), True)
 
+# ------------------------------------ la tarea es de OTRA cuenta de Windows
+# 2026-09-29, en un segundo equipo: 'estado' decia "NO ESTA PROGRAMADA" y
+# 'instalar' fallaba dos veces con "Acceso denegado". La cuenta si podia crear
+# tareas; el nombre ya lo tenia una tarea de otra cuenta.
+print("la tarea es de otra cuenta")
+CUANDO = datetime.datetime(2026, 9, 29, 12, 20)
+comprobar("'Acceso denegado' al preguntar es una tarea ajena",
+          pa.situacion_de_la_tarea(correr_orden=Doble([(1, "ERROR: Acceso denegado.")])),
+          "ajena")
+comprobar("   tambien en ingles",
+          pa.situacion_de_la_tarea(correr_orden=Doble([(1, "ERROR: Access is denied.")])),
+          "ajena")
+comprobar("'no existe' sigue siendo que no esta",
+          pa.situacion_de_la_tarea(correr_orden=Doble(
+              [(1, "ERROR: El sistema no puede encontrar el archivo especificado.")])),
+          "no esta")
+comprobar("y tarea_existe no la da por programada",
+          pa.tarea_existe(correr_orden=Doble([(1, "ERROR: Acceso denegado.")])), False)
+
+avisos = []
+codigo = pa.estado(informar=avisos.append,
+                   correr_orden=Doble([(1, "ERROR: Acceso denegado.")]))
+comprobar("estado ya no dice NO ESTA PROGRAMADA",
+          any("NO ESTA PROGRAMADA" in a for a in avisos), False)
+comprobar("   dice que existe y es de otra cuenta",
+          any("EXISTE, pero es de otra cuenta" in a for a in avisos), True)
+comprobar("   y avisa del correo doble", any("DOS veces" in a for a in avisos), True)
+comprobar("   y sale con 1", codigo, 1)
+
+original = pa.AQUI
+carpeta = tempfile.mkdtemp()
+try:
+    pa.AQUI = carpeta
+    io.open(os.path.join(carpeta, pa.GUION), "w").close()
+
+    doble = Doble([(1, "ERROR: Acceso denegado."), (1, "ERROR: Acceso denegado.")])
+    avisos = []
+    creada = pa.crear_tarea(12, ["Monday"], informar=avisos.append,
+                            correr_orden=doble, ahora=CUANDO)
+    comprobar("crear_tarea con la tarea ajena no la da por creada", creada, False)
+    comprobar("   no intenta las banderas sueltas, que fallarian igual",
+              any("/sc" in orden for orden in doble.ordenes), False)
+    comprobar("   pregunto de quien es despues del rechazo",
+              doble.ordenes[-1], ["schtasks", "/query", "/tn", "AvisoProblemsVencidos"])
+    comprobar("   y lo explica", any("OTRA cuenta" in a for a in avisos), True)
+
+    doble = Doble([(1, "ERROR: Acceso denegado."), (1, "ERROR: no existe")])
+    avisos = []
+    creada = pa.crear_tarea(12, ["Monday"], informar=avisos.append,
+                            correr_orden=doble, ahora=CUANDO)
+    comprobar("sin tarea ajena, 'Acceso denegado' es que la cuenta no puede",
+              any("no puede crear tareas" in a for a in avisos), True)
+    comprobar("   y tampoco intenta las banderas", any("/sc" in o for o in doble.ordenes), False)
+
+    doble = Doble([(1, "ERROR: el XML no es valido"), (0, "")])
+    creada = pa.crear_tarea(12, ["Monday"], informar=lambda *_: None,
+                            correr_orden=doble, ahora=CUANDO)
+    comprobar("un XML rechazo por otra cosa si prueba las banderas",
+              any("/sc" in o for o in doble.ordenes), True)
+finally:
+    pa.AQUI = original
+
+doble = Doble([(1, "ERROR: Acceso denegado.")])
+avisos = []
+codigo = pa.al_iniciar(informar=avisos.append, correr_orden=doble, ahora=CUANDO)
+comprobar("al iniciar sesion, con la tarea ajena no intenta reponerla",
+          len(doble.ordenes), 1)
+comprobar("   lo deja dicho y sale con 1",
+          (codigo, any("otra cuenta" in a for a in avisos)), (1, True))
+
 # ------------------------------ estado: corrio o no corrio, no solo "existe"
 # La primera vez que hizo falta -jueves 2026-09-24, la VDI se reciclo de noche
 # y la tarea se repuso a las 09:15- la pregunta era si el correo de las 12:00
