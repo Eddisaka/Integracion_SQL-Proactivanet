@@ -328,10 +328,39 @@ def _correr_orden(orden):
     return proceso.returncode, (proceso.stdout or "") + (proceso.stderr or "")
 
 
-def tarea_existe(correr_orden=None):
+def _es_acceso_denegado(salida):
+    texto = (salida or "").lower()
+    return "acceso denegado" in texto or "access is denied" in texto
+
+
+# Paso el 2026-09-29, al instalar en un segundo equipo: 'estado' decia "NO ESTA
+# PROGRAMADA" y 'instalar' fallaba dos veces con "Acceso denegado", y no era
+# falta de permisos -esa cuenta si podia crear tareas-. Ya habia una tarea con
+# este nombre, creada con OTRA cuenta de Windows: schtasks no deja verla ni
+# reemplazarla, y contesta "Acceso denegado" a las dos cosas.
+EXPLICACION_AJENA = [
+    "   Ya hay una tarea con ese nombre en este equipo, creada con OTRA cuenta",
+    "   de Windows: desde esta no se puede ver ni reemplazar (Acceso denegado).",
+    "   Antes de instalar aqui, averigua de quien es. Si es otra copia del aviso",
+    "   que sigue activa, instalar esta mandaria cada correo DOS veces.",
+    "   La borra quien la creo (programar_desinstalar.cmd, desde esa cuenta) o",
+    "   TI, que ve la cuenta en el Programador de tareas. Luego se instala aqui.",
+]
+
+
+def situacion_de_la_tarea(correr_orden=None):
+    """'programada', 'no esta' o 'ajena' (existe, pero es de otra cuenta)."""
     correr_orden = correr_orden or _correr_orden
-    codigo, _ = correr_orden(["schtasks", "/query", "/tn", NOMBRE_TAREA])
-    return codigo == 0
+    codigo, salida = correr_orden(["schtasks", "/query", "/tn", NOMBRE_TAREA])
+    if codigo == 0:
+        return "programada"
+    if _es_acceso_denegado(salida):
+        return "ajena"
+    return "no esta"
+
+
+def tarea_existe(correr_orden=None):
+    return situacion_de_la_tarea(correr_orden=correr_orden) == "programada"
 
 
 def primer_dia(hora, ahora=None):
@@ -377,6 +406,7 @@ def crear_tarea(hora, dias, informar=print, correr_orden=None, ahora=None):
     # por que.
     mango, ruta_xml = tempfile.mkstemp(suffix=".xml")
     os.close(mango)
+    denegado = False
     try:
         with io.open(ruta_xml, "w", encoding="utf-16") as archivo:
             archivo.write(xml)
@@ -387,11 +417,23 @@ def crear_tarea(hora, dias, informar=print, correr_orden=None, ahora=None):
         informar("Windows rechazo el XML de la tarea:")
         for linea in salida.strip().splitlines():
             informar("   " + linea)
+        denegado = _es_acceso_denegado(salida)
     finally:
         try:
             os.remove(ruta_xml)
         except OSError:
             pass
+
+    # "Acceso denegado" no es un XML mal armado: las banderas sueltas fallarian
+    # igual, y el segundo fallo solo confunde. Se dice cual de los dos es.
+    if denegado:
+        if situacion_de_la_tarea(correr_orden=correr_orden) == "ajena":
+            for linea in EXPLICACION_AJENA:
+                informar(linea)
+        else:
+            informar("   Esta cuenta no puede crear tareas programadas en este")
+            informar("   equipo. Eso lo decide TI.")
+        return False
 
     informar("Se intenta con las banderas sueltas de schtasks.")
     abreviaturas = ",".join(clave for clave, nombre in DIAS.items()
@@ -712,9 +754,15 @@ def estado(informar=print, correr_orden=None, ahora=None):
     """
     ahora = ahora or datetime.datetime.now()
     memoria = leer_estado()
-    hay = tarea_existe(correr_orden=correr_orden)
-    informar("Tarea '%s': %s" % (NOMBRE_TAREA,
-                                 "programada" if hay else "NO ESTA PROGRAMADA"))
+    situacion = situacion_de_la_tarea(correr_orden=correr_orden)
+    hay = situacion == "programada"
+    if situacion == "ajena":
+        informar("Tarea '%s': EXISTE, pero es de otra cuenta de Windows" % NOMBRE_TAREA)
+        for linea in EXPLICACION_AJENA:
+            informar(linea)
+    else:
+        informar("Tarea '%s': %s" % (NOMBRE_TAREA,
+                                     "programada" if hay else "NO ESTA PROGRAMADA"))
     if memoria:
         informar("Se instalo para: %s a las %02d:00."
                  % (", ".join(memoria.get("dias", [])), memoria.get("hora", 0)))
@@ -780,9 +828,16 @@ def al_iniciar(informar=print, correr_orden=None, ahora=None):
     veces el mismo correo.
     """
     ahora = ahora or datetime.datetime.now()
-    if tarea_existe(correr_orden=correr_orden):
+    situacion = situacion_de_la_tarea(correr_orden=correr_orden)
+    if situacion == "programada":
         informar("La tarea sigue programada; no hay nada que reponer.")
         return 0
+    if situacion == "ajena":
+        # Reponerla fallaria igual, en cada inicio de sesion. Se deja dicho.
+        informar("No se repone: la tarea '%s' es de otra cuenta." % NOMBRE_TAREA)
+        for linea in EXPLICACION_AJENA:
+            informar(linea)
+        return 1
     informar("La tarea NO estaba (se reciclo la VDI?). Se repone.")
     memoria = leer_estado()
     codigo = instalar(hora=memoria.get("hora"), dias=memoria.get("dias"),

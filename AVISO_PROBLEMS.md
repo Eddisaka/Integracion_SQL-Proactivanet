@@ -534,6 +534,34 @@ La cuenta necesita acceso a SQL Server, permiso de escritura en la carpeta
 (para `Logs\` y `registros\`) y acceso al relay SMTP. No hacen falta
 permisos de administrador.
 
+#### "Acceso denegado" al instalar en otro equipo
+
+Paso el 2026-09-29. `programar_instalar.cmd` fallaba dos veces con
+"Acceso denegado", y `programar_estado.cmd` decia "NO ESTA PROGRAMADA". No era
+falta de archivos ni de permisos: esa cuenta si podia crear tareas. En ese
+equipo ya habia una tarea `AvisoProblemsVencidos` creada con **otra cuenta de
+Windows**, y `schtasks` no deja ver ni reemplazar la tarea de otro usuario: a
+las dos cosas contesta "Acceso denegado".
+
+Ahora el instalador y `estado` lo distinguen y lo dicen. Para comprobarlo a
+mano:
+
+```text
+schtasks /query /tn AvisoProblemsVencidos
+schtasks /create /tn PruebaPermisoTarea /sc once /st 23:59 /tr "cmd /c exit" /f
+schtasks /delete /tn PruebaPermisoTarea /f
+```
+
+- La primera dice "Acceso denegado" y la segunda se crea: la tarea es de
+  otra cuenta. **Antes de instalar, averiguar de quien es**: si es otra copia
+  del aviso que sigue activa, instalar esta mandaria cada correo dos veces.
+  La borra quien la creo (`programar_desinstalar.cmd` desde esa cuenta) o TI.
+- La segunda tambien dice "Acceso denegado": esa cuenta no puede crear
+  tareas en ese equipo, y eso lo decide TI.
+
+**El aviso debe estar instalado en un solo equipo.** Al moverlo, se desinstala
+en el anterior con `programar_desinstalar.cmd`.
+
 ### Codigos de salida
 
 | | |
@@ -600,7 +628,7 @@ sh pruebas/correr_problems.sh
 # PowerShell: 60 comprobaciones, sin base, sin red y sin mandar nada.
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File pruebas\Prueba_AvisoProblems.ps1
 
-# El programador: 45 comprobaciones. Corre en cualquier sitio, sin Windows.
+# El programador: 142 comprobaciones. Corre en cualquier sitio, sin Windows.
 python pruebas\prueba_programar_aviso.py
 ```
 
