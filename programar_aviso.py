@@ -56,6 +56,7 @@ from __future__ import print_function
 
 import argparse
 import datetime
+import getpass
 import io
 import json
 import os
@@ -66,7 +67,35 @@ import tempfile
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
 
-NOMBRE_TAREA = "AvisoProblemsVencidos"
+def _usuario_de_windows():
+    """El usuario de la sesion, solo con letras, digitos, '.', '_' y '-'."""
+    crudo = os.environ.get("USERNAME") or ""
+    if not crudo:
+        try:
+            crudo = getpass.getuser()
+        except Exception:
+            crudo = ""
+    limpio = re.sub(r"[^A-Za-z0-9._-]", "_", crudo).strip("._-")
+    return limpio or "usuario"
+
+
+# EL NOMBRE LLEVA EL USUARIO DE WINDOWS. Las tareas se guardan por EQUIPO, no
+# por usuario, y en el grupo de escritorios virtuales una misma maquina la usa
+# hoy una persona y manana otra. El re-armado repone la tarea en cada equipo
+# donde se inicia sesion, asi que una cuenta va dejando su tarea en varias
+# maquinas. Con un solo nombre para todos, la segunda cuenta que llegaba a una
+# de ellas no podia instalar: "Acceso denegado", porque esa tarea era de otra
+# (paso el 2026-09-29). Con el usuario en el nombre, cada cuenta tiene la
+# suya.
+#
+# Eso NO permite tener el aviso en dos cuentas: si las dos tienen sesion
+# abierta a la hora, cada correo sale dos veces. Va en una sola cuenta.
+NOMBRE_BASE = "AvisoProblemsVencidos"
+NOMBRE_TAREA = "%s_%s" % (NOMBRE_BASE, _usuario_de_windows())
+# El de antes del 2026-09-29. Si en este equipo hay una con ese nombre y es de
+# esta cuenta, instalar la borra: dos tareas de la misma cuenta mandarian dos
+# veces cada correo.
+NOMBRE_ANTERIOR = NOMBRE_BASE
 NOMBRE_ARRANQUE = "AvisoProblems_al_iniciar.cmd"
 NOMBRE_PUENTE = "al_iniciar.py"
 NOMBRE_ESTADO = "estado_aviso.json"
@@ -363,6 +392,29 @@ def tarea_existe(correr_orden=None):
     return situacion_de_la_tarea(correr_orden=correr_orden) == "programada"
 
 
+def retirar_la_anterior(informar=print, correr_orden=None):
+    """Borra la tarea con el nombre anterior, sin usuario, si es de ESTA cuenta.
+
+    Si es de otra cuenta, schtasks contesta "Acceso denegado" y no se toca: no
+    se puede, y tampoco estorba, porque esas tareas se crean para correr solo
+    con la sesion de su cuenta abierta. Devuelve True si borro algo."""
+    correr_orden = correr_orden or _correr_orden
+    codigo, _ = correr_orden(["schtasks", "/query", "/tn", NOMBRE_ANTERIOR])
+    if codigo != 0:
+        return False
+    codigo, salida = correr_orden(["schtasks", "/delete", "/tn", NOMBRE_ANTERIOR, "/f"])
+    if codigo == 0:
+        informar("Se borro la tarea con el nombre anterior ('%s'); ahora se llama '%s'."
+                 % (NOMBRE_ANTERIOR, NOMBRE_TAREA))
+        return True
+    informar("OJO: no se pudo borrar la tarea con el nombre anterior ('%s')." % NOMBRE_ANTERIOR)
+    informar("     Mientras siga, cada correo puede salir DOS veces. Borrala en el")
+    informar("     Programador de tareas. Windows contesto:")
+    for linea in (salida or "").strip().splitlines():
+        informar("        " + linea)
+    return False
+
+
 def primer_dia(hora, ahora=None):
     """El dia desde el que arranca la tarea: hoy si aun no es la hora, si no manana.
 
@@ -590,6 +642,9 @@ def instalar(hora=None, dias=None, informar=print, correr_orden=None, ahora=None
     guardar_estado({"hora": hora, "dias": dias})
     informar("Tarea '%s' programada: %s a las %02d:00."
              % (NOMBRE_TAREA, ", ".join(dias), hora))
+    # Despues de crear la nueva, no antes: si crearla fallara, la anterior
+    # sigue mandando el aviso.
+    retirar_la_anterior(informar=informar, correr_orden=correr_orden)
 
     if poner_en_inicio(informar=informar):
         informar("Re-armado instalado: si la VDI se recicla, la tarea vuelve")
@@ -808,6 +863,7 @@ def desinstalar(informar=print, correr_orden=None):
     codigo, salida = correr_orden(
         ["schtasks", "/delete", "/tn", NOMBRE_TAREA, "/f"])
     informar("Tarea borrada." if codigo == 0 else "La tarea no estaba.")
+    retirar_la_anterior(informar=informar, correr_orden=correr_orden)
     for ruta in (os.path.join(carpeta_de_inicio(), NOMBRE_ARRANQUE),
                  os.path.join(carpeta_de_trabajo(), NOMBRE_PUENTE)):
         try:

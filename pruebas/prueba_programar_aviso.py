@@ -220,7 +220,7 @@ doble = Doble([(0, "")])
 comprobar("tarea_existe dice que si con codigo 0",
           pa.tarea_existe(correr_orden=doble), True)
 comprobar("y pregunta por la tarea correcta",
-          doble.ordenes[0], ["schtasks", "/query", "/tn", "AvisoProblemsVencidos"])
+          doble.ordenes[0], ["schtasks", "/query", "/tn", pa.NOMBRE_TAREA])
 
 doble = Doble([(1, "ERROR: no existe")])
 comprobar("tarea_existe dice que no con codigo != 0",
@@ -297,7 +297,7 @@ try:
     comprobar("   no intenta las banderas sueltas, que fallarian igual",
               any("/sc" in orden for orden in doble.ordenes), False)
     comprobar("   pregunto de quien es despues del rechazo",
-              doble.ordenes[-1], ["schtasks", "/query", "/tn", "AvisoProblemsVencidos"])
+              doble.ordenes[-1], ["schtasks", "/query", "/tn", pa.NOMBRE_TAREA])
     comprobar("   y lo explica", any("OTRA cuenta" in a for a in avisos), True)
 
     doble = Doble([(1, "ERROR: Acceso denegado."), (1, "ERROR: no existe")])
@@ -323,6 +323,90 @@ comprobar("al iniciar sesion, con la tarea ajena no intenta reponerla",
           len(doble.ordenes), 1)
 comprobar("   lo deja dicho y sale con 1",
           (codigo, any("otra cuenta" in a for a in avisos)), (1, True))
+
+# ------------------------------------------- el nombre lleva el usuario
+# En el grupo de escritorios virtuales una maquina la usan varias cuentas, y
+# con un solo nombre la segunda no podia instalar (2026-09-29).
+print("el nombre lleva el usuario de Windows")
+comprobar("el nombre empieza como antes y sigue con el usuario",
+          pa.NOMBRE_TAREA.startswith("AvisoProblemsVencidos_"), True)
+comprobar("   y el anterior es el de siempre", pa.NOMBRE_ANTERIOR, "AvisoProblemsVencidos")
+guardado = os.environ.get("USERNAME")
+try:
+    os.environ["USERNAME"] = u"Juan P\u00e9rez"
+    comprobar("un usuario con espacio y acento queda en ASCII",
+              pa._usuario_de_windows(), "Juan_P_rez")
+    os.environ["USERNAME"] = "ana.lopez"
+    comprobar("   y uno normal queda igual", pa._usuario_de_windows(), "ana.lopez")
+finally:
+    if guardado is None:
+        os.environ.pop("USERNAME", None)
+    else:
+        os.environ["USERNAME"] = guardado
+
+doble = Doble([(0, ""), (0, "")])
+avisos = []
+comprobar("la anterior de esta cuenta se borra",
+          pa.retirar_la_anterior(informar=avisos.append, correr_orden=doble), True)
+comprobar("   con el nombre anterior, no con el nuevo",
+          doble.ordenes, [["schtasks", "/query", "/tn", "AvisoProblemsVencidos"],
+                          ["schtasks", "/delete", "/tn", "AvisoProblemsVencidos", "/f"]])
+comprobar("   y lo dice", any("nombre anterior" in a for a in avisos), True)
+
+doble = Doble([(1, "ERROR: Acceso denegado.")])
+comprobar("la anterior de OTRA cuenta no se toca",
+          (pa.retirar_la_anterior(informar=lambda *_: None, correr_orden=doble),
+           len(doble.ordenes)), (False, 1))
+
+doble = Doble([(1, "ERROR: no existe")])
+comprobar("sin anterior no se borra nada",
+          (pa.retirar_la_anterior(informar=lambda *_: None, correr_orden=doble),
+           len(doble.ordenes)), (False, 1))
+
+avisos = []
+pa.retirar_la_anterior(informar=avisos.append,
+                       correr_orden=Doble([(0, ""), (1, "ERROR: algo")]))
+comprobar("si no se puede borrar, avisa del correo doble",
+          any("DOS veces" in a for a in avisos), True)
+
+doble = Doble([(0, ""), (0, ""), (0, "")])
+pa.desinstalar(informar=lambda *_: None, correr_orden=doble)
+comprobar("desinstalar borra la nueva y la anterior",
+          [o for o in doble.ordenes if o[1] == "/delete"],
+          [["schtasks", "/delete", "/tn", pa.NOMBRE_TAREA, "/f"],
+           ["schtasks", "/delete", "/tn", "AvisoProblemsVencidos", "/f"]])
+
+entorno_nombre = {k: os.environ.get(k) for k in ("APPDATA", "LOCALAPPDATA")}
+perfil_nombre = tempfile.mkdtemp()
+original_nombre = pa.AQUI
+try:
+    os.environ["APPDATA"] = os.path.join(perfil_nombre, "Roaming")
+    os.environ["LOCALAPPDATA"] = os.path.join(perfil_nombre, "Local")
+    os.makedirs(pa.carpeta_de_inicio())
+    pa.AQUI = tempfile.mkdtemp()
+    io.open(os.path.join(pa.AQUI, pa.GUION), "w").close()
+
+    doble = Doble([(0, ""), (0, ""), (0, "")])
+    pa.instalar(hora=12, dias=["Monday"], informar=lambda *_: None,
+                correr_orden=doble, ahora=CUANDO)
+    tipos = [(o[1], o[3]) for o in doble.ordenes]
+    comprobar("instalar crea la nueva y DESPUES borra la anterior",
+              tipos, [("/create", pa.NOMBRE_TAREA),
+                      ("/query", "AvisoProblemsVencidos"),
+                      ("/delete", "AvisoProblemsVencidos")])
+
+    doble = Doble([(1, "ERROR: el XML no es valido"), (1, "ERROR: tampoco")])
+    pa.instalar(hora=12, dias=["Monday"], informar=lambda *_: None,
+                correr_orden=doble, ahora=CUANDO)
+    comprobar("   y si no pudo crearla, la anterior se queda",
+              any(o[1] == "/delete" for o in doble.ordenes), False)
+finally:
+    pa.AQUI = original_nombre
+    for clave, valor in entorno_nombre.items():
+        if valor is None:
+            os.environ.pop(clave, None)
+        else:
+            os.environ[clave] = valor
 
 # ------------------------------ estado: corrio o no corrio, no solo "existe"
 # La primera vez que hizo falta -jueves 2026-09-24, la VDI se reciclo de noche
@@ -363,7 +447,7 @@ try:
     comprobar("la segunda orden es Get-ScheduledTaskInfo",
               "Get-ScheduledTaskInfo" in " ".join(doble.ordenes[1]), True)
     comprobar("por su nombre",
-              "AvisoProblemsVencidos" in " ".join(doble.ordenes[1]), True)
+              pa.NOMBRE_TAREA in " ".join(doble.ordenes[1]), True)
 
     # EL CASO QUE IMPORTA: tocaba y no salio.
     codigo, texto, _ = correr_estado(
@@ -626,7 +710,7 @@ lanzo = con_registros({}, lambda: pa.recuperar_ultimo_aviso(
     informar=lambda *_: None, correr_orden=doble, ahora=JUE_1330))
 comprobar("si toca, se lanza", lanzo, True)
 comprobar("   con schtasks /Run sobre la tarea",
-          doble.ordenes, [["schtasks", "/Run", "/TN", "AvisoProblemsVencidos"]])
+          doble.ordenes, [["schtasks", "/Run", "/TN", pa.NOMBRE_TAREA]])
 
 doble = Doble()
 lanzo = con_registros({hoy: [inicio(datetime.datetime(2026, 9, 24, 12, 0, 5), "False")]},

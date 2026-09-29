@@ -354,7 +354,7 @@ programar_desinstalar.cmd
 verdad se pregunta un lunes o un jueves por la tarde: **si el correo salio**.
 
 ```text
-Tarea 'AvisoProblemsVencidos': programada
+Tarea 'AvisoProblemsVencidos_<usuario>': programada
 Se instalo para: Monday, Thursday a las 12:00.
 Re-armado en Inicio: si
 Guion: ...\Enviar_AvisoProblems.ps1
@@ -419,7 +419,7 @@ Lo que queda en `registros\arranque_*.log`:
 
 ```text
   La tarea NO estaba (se reciclo la VDI?). Se repone.
-  Tarea 'AvisoProblemsVencidos' programada: Monday, Thursday a las 12:00.
+  Tarea 'AvisoProblemsVencidos_<usuario>' programada: Monday, Thursday a las 12:00.
   Recuperacion: el aviso del 2026-09-24 12:00 no salio; se manda ahora, una sola vez.
      Lanzada. El resultado queda en ...\Logs
 ```
@@ -469,7 +469,7 @@ correo que nunca llego.
 La carpeta de Inicio **si** vive en el perfil. Por eso `programar_instalar`
 hace dos cosas, no una:
 
-1. crea la tarea `AvisoProblemsVencidos`;
+1. crea la tarea `AvisoProblemsVencidos_<usuario>` (el usuario de Windows);
 2. deja en Inicio algo que, cada vez que esa persona entra, comprueba que la
    tarea siga ahi y **la repone** si no esta, con el mismo horario con que se
    instalo.
@@ -524,7 +524,7 @@ corto en silencio.
 #### Comprobar sin esperar al lunes
 
 ```text
-schtasks /Run /TN "AvisoProblemsVencidos"
+schtasks /Run /TN "AvisoProblemsVencidos_<usuario>"
 ```
 
 Y revisar `Logs\AvisoProblems_AAAAMMDD.log`. Es la unica forma de confirmar
@@ -543,11 +543,22 @@ equipo ya habia una tarea `AvisoProblemsVencidos` creada con **otra cuenta de
 Windows**, y `schtasks` no deja ver ni reemplazar la tarea de otro usuario: a
 las dos cosas contesta "Acceso denegado".
 
-Ahora el instalador y `estado` lo distinguen y lo dicen. Para comprobarlo a
-mano:
+**Por que paso, y el arreglo.** Las tareas se guardan por equipo, y en el
+grupo de escritorios virtuales una misma maquina la usa hoy una cuenta y
+manana otra. El re-armado repone la tarea en cada equipo donde la cuenta
+inicia sesion, asi que una cuenta va dejando su tarea en varias maquinas. Por
+eso, desde ese dia, **el nombre de la tarea lleva el usuario de Windows**
+(`AvisoProblemsVencidos_<usuario>`, `programar_estado.cmd` dice el exacto):
+cada cuenta tiene la suya y no chocan. Al instalar, si hay una con el nombre
+anterior (`AvisoProblemsVencidos`) y es de la misma cuenta, se borra despues
+de crear la nueva; si es de otra cuenta no se puede tocar, y no estorba: esas
+tareas solo corren con la sesion de su cuenta abierta.
+
+Si aun asi saliera "Acceso denegado", el instalador y `estado` dicen cual de
+los dos casos es. Para comprobarlo a mano:
 
 ```text
-schtasks /query /tn AvisoProblemsVencidos
+schtasks /query /tn AvisoProblemsVencidos_<usuario>
 schtasks /create /tn PruebaPermisoTarea /sc once /st 23:59 /tr "cmd /c exit" /f
 schtasks /delete /tn PruebaPermisoTarea /f
 ```
@@ -559,8 +570,12 @@ schtasks /delete /tn PruebaPermisoTarea /f
 - La segunda tambien dice "Acceso denegado": esa cuenta no puede crear
   tareas en ese equipo, y eso lo decide TI.
 
-**El aviso debe estar instalado en un solo equipo.** Al moverlo, se desinstala
-en el anterior con `programar_desinstalar.cmd`.
+**El aviso va en UNA sola cuenta.** Con el usuario en el nombre ya pueden
+convivir las tareas de dos cuentas, pero si las dos tienen sesion abierta a la
+hora del aviso, cada correo sale dos veces: el envio no revisa si otro ya lo
+mando. Para pasarlo a otra cuenta, se desinstala en la anterior con
+`programar_desinstalar.cmd`, desde esa cuenta: quita su tarea de ese equipo y
+el re-armado de su perfil.
 
 ### Codigos de salida
 
@@ -628,7 +643,7 @@ sh pruebas/correr_problems.sh
 # PowerShell: 60 comprobaciones, sin base, sin red y sin mandar nada.
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File pruebas\Prueba_AvisoProblems.ps1
 
-# El programador: 142 comprobaciones. Corre en cualquier sitio, sin Windows.
+# El programador: 155 comprobaciones. Corre en cualquier sitio, sin Windows.
 python pruebas\prueba_programar_aviso.py
 ```
 
