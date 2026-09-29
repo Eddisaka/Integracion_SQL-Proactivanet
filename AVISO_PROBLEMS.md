@@ -101,8 +101,8 @@ Manager.
 iniciativas de ese Owner Problem y de cada una se suman su Owner del Servicio,
 su Direccion y los duenos de las categorias que ataca. Un mismo Owner Problem
 puede tener iniciativas de servicios distintos, y cada una arrastra a los
-suyos. Por eso el tamano de la copia no sigue al numero de filas: Bendrix Zuir
-Rios llega a 13 direcciones con 24 iniciativas, y Adriana Lydia Lozano Leal
+suyos. Por eso el tamano de la copia no sigue al numero de filas: en
+produccion, un Owner Problem llega a 13 direcciones con 24 iniciativas, y otro
 llega a 9 con **una sola**, porque esa unica iniciativa ataca varias
 categorias y cada una tiene sus tres duenos.
 
@@ -122,10 +122,10 @@ Las dos formas escriben al log, asi que se pueden subir al repositorio:
 Y con `modo_prueba` en true, cada correo deja en el log las tres lineas:
 
 ```text
-MODO PRUEBA: Laura Graciela Cardenas Gonzalez
-   Para habria sido : lauragcg@soriana.com
-   Copia habria sido: eduardool@soriana.com; javierch@soriana.com; ...
-   Va a             : TU_CORREO@soriana.com
+MODO PRUEBA: <Owner Problem>
+   Para habria sido : owner.problem@dominio
+   Copia habria sido: director@dominio; owner.servicio@dominio; ...
+   Va a             : TU_CORREO@dominio
 ```
 
 > Antes esa linea decia solo `(+7 en copia)`. Un numero que no se puede
@@ -237,8 +237,8 @@ quiera corregir el tablero.
 palabras**. En produccion eso deja fuera a una persona real:
 
 ```text
-Problem.OwnerServicio   'Lomas Malacara Luis Gerardo'
-CatPersona.Nombre       'Luis Gerardo Lomas Malacara'
+Problem.OwnerServicio   'Apellido1 Apellido2 Nombre1 Nombre2'
+CatPersona.Nombre       'Nombre1 Nombre2 Apellido1 Apellido2'
 ```
 
 Es la misma persona y arrastra **32 iniciativas** que se quedarian sin Service
@@ -799,10 +799,8 @@ dia**. Resultado contra produccion:
 
 - las diez dan `VENCIDA` al 19 de agosto;
 - los responsables que resuelve la base son los mismos que llevaba el correo:
-  Laura Graciela Cardenas Gonzalez (9 filas) y Luis Enrique Mendoza Martinez
-  (`PRB 2026-000124`) como Owner Problem -los dos iban en "Para"-, Javier de
-  la Cruz Hinostroza como Owner del Servicio, y Eduardo Andres Ortiz Lopez y
-  Yuri Vladimir Lopez Martinez -las dos Direcciones- en copia.
+  los dos Owner Problem -uno con 9 filas y otro con `PRB 2026-000124`, los dos
+  en "Para"-, el Owner del Servicio y las dos Direcciones en copia.
 
 O sea que la regla y la resolucion de destinatarios reproducen el criterio de
 quien lo escribio a mano. Ese bloque se puede volver a correr cuando se quiera.
