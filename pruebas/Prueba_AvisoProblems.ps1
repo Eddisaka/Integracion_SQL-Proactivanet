@@ -25,6 +25,17 @@
                              que se puede equivocar EN SILENCIO: si renuncia
                              de mas, el correo sale incompleto sin que nada lo
                              diga; si renuncia de menos, no sale.
+      Test-EntregaParcial    si el servidor rechazo solo ALGUNAS direcciones,
+                             el correo ya les llego a las demas. Si dijera
+                             que no, el reintento se los mandaria dos veces.
+      Get-UltimoHorario / Get-ClaveDestinatario
+                             lo que se le pasa al registro de envios (37). Si
+                             el horario sale mal, la recuperacion repite el
+                             aviso; si la llave cambia con una mayuscula, dos
+                             corridas no se reconocen como el mismo correo.
+
+    El registro de envios contra una base de verdad se prueba en
+    pruebas/correr_problems.sh.
 
 .COMO SE PRUEBA LO QUE SE ENVIA
     No se copian las funciones aqui: se leen de Enviar_AvisoProblems.ps1 y de
@@ -75,9 +86,11 @@ function Importar([string]$ruta, [string[]]$queremos) {
 }
 
 $deComun  = Importar $comun  @("Html", "Get-DestinatariosRechazados",
-                              "Remove-Destinatarios", "Get-SiguienteIntento")
+                              "Remove-Destinatarios", "Get-SiguienteIntento",
+                              "Test-EntregaParcial")
 $deScript = Importar $script @("Txt", "Fecha", "Correos-De", "Add-Sin-Repetir",
-                               "ConvertTo-TablaHtml")
+                               "ConvertTo-TablaHtml", "Get-UltimoHorario",
+                               "Get-ClaveDestinatario")
 foreach ($t in ($deComun + $deScript)) { . ([scriptblock]::Create($t)) }
 
 # ---- 2. Andamio ----------------------------------------------------------
@@ -284,8 +297,118 @@ $envuelta = New-Object Exception ("Excepcion al llamar a 'Send'", $uno)
 Comprobar "la encuentra aunque venga envuelta" `
     ((Get-DestinatariosRechazados $envuelta) -join ";") "malo@ejemplo.com"
 
+# Asi la trae .NET de verdad: como la mando en el RCPT, entre < >. Visto
+# con pruebas/smtp_de_mentira.py el 2026-09-29.
+$conPicos = New-Object Net.Mail.SmtpFailedRecipientException (
+    [Net.Mail.SmtpStatusCode]::MailboxUnavailable, "<Malo@Ejemplo.com>")
+Comprobar "le quita los < > con que la entrega .NET" `
+    ((Get-DestinatariosRechazados $conPicos) -join ";") "Malo@Ejemplo.com"
+$s = Get-SiguienteIntento $P $C (Get-DestinatariosRechazados (New-Object Net.Mail.SmtpFailedRecipientException (
+    [Net.Mail.SmtpStatusCode]::MailboxUnavailable, "<servicio@ejemplo.com>")))
+Comprobar "y con eso el segundo intento si la quita" ($s.Copia -join ";") (($C | Where-Object { $_ -ne "servicio@ejemplo.com" }) -join ";")
+
 Comprobar "sin rechazos nombrados da lista vacia" `
     ((Get-DestinatariosRechazados (New-Object Exception "cualquier cosa")).Count) 0
+
+# ================================================== Test-EntregaParcial
+# Comprobado con pruebas/smtp_de_mentira.py: con un 550 en el RCPT de una
+# copia, $smtp.Send() entrega a los demas y DESPUES lanza la excepcion.
+Write-Host "Test-EntregaParcial"
+$tres = @("owner@ejemplo.com"), @("c1@ejemplo.com", "c2@ejemplo.com")
+Comprobar "una copia rechazada de tres: ya salio a los demas" `
+    (Test-EntregaParcial $uno $tres[0] $tres[1]) $true
+Comprobar "igual si viene envuelta como la deja PowerShell" `
+    (Test-EntregaParcial $envuelta $tres[0] $tres[1]) $true
+Comprobar "tres rechazadas de tres: no salio a nadie" `
+    (Test-EntregaParcial $varias $tres[0] $tres[1]) $false
+Comprobar "tres rechazadas de cuatro: salio a uno" `
+    (Test-EntregaParcial $varias $tres[0] @("c1@ejemplo.com", "c2@ejemplo.com", "c3@ejemplo.com")) $true
+Comprobar "el unico destinatario rechazado: no salio" `
+    (Test-EntregaParcial $uno @("owner@ejemplo.com") @()) $false
+# El rechazo al final del mensaje no nombra a nadie y no entrega a nadie: ahi
+# si hay que reintentar.
+$enData = New-Object Net.Mail.SmtpException ([Net.Mail.SmtpStatusCode]::MailboxUnavailable, "rechazado al final del DATA")
+Comprobar "el rechazo al final del mensaje no es entrega parcial" `
+    (Test-EntregaParcial $enData $tres[0] $tres[1]) $false
+Comprobar "una falla cualquiera tampoco" `
+    (Test-EntregaParcial (New-Object Exception "se cayo la red") $tres[0] $tres[1]) $false
+
+# ================================================== Get-ClaveDestinatario
+Write-Host "Get-ClaveDestinatario"
+Comprobar "minusculas, sin espacios y ordenada" `
+    (Get-ClaveDestinatario @(" Owner.B@Ejemplo.com ", "owner.a@ejemplo.com")) "owner.a@ejemplo.com;owner.b@ejemplo.com"
+Comprobar "la misma direccion dos veces cuenta una" `
+    (Get-ClaveDestinatario @("x@ejemplo.com", "X@EJEMPLO.COM")) "x@ejemplo.com"
+Comprobar "un ArrayList como el del envio" `
+    (Get-ClaveDestinatario (New-Object System.Collections.ArrayList (,@("Uno@Ejemplo.com")))) "uno@ejemplo.com"
+
+# ==================================================== Get-UltimoHorario
+# La misma cuenta que ultima_ocurrencia() de programar_aviso.py. El
+# 2026-09-28 es lunes.
+Write-Host "Get-UltimoHorario"
+$rutaEstado = Join-Path ([IO.Path]::GetTempPath()) ("estado_prueba_{0}.json" -f [guid]::NewGuid())
+function Estado([string]$json) { [IO.File]::WriteAllText($rutaEstado, $json) }
+function Horario([string]$ahora) {
+    $h = Get-UltimoHorario $rutaEstado ([datetime]$ahora)
+    if ($null -eq $h) { return "<nulo>" }
+    return $h.ToString("yyyy-MM-dd HH:mm")
+}
+try {
+    Estado '{"hora": 12, "dias": ["Monday", "Thursday"]}'
+    Comprobar "martes: el del lunes"               (Horario "2026-09-29 10:00") "2026-09-28 12:00"
+    Comprobar "jueves antes de la hora: el lunes"  (Horario "2026-10-01 11:59") "2026-09-28 12:00"
+    Comprobar "jueves a la hora: el del jueves"    (Horario "2026-10-01 12:00") "2026-10-01 12:00"
+    Comprobar "domingo: el del jueves"             (Horario "2026-10-04 09:00") "2026-10-01 12:00"
+    Comprobar "lunes antes de la hora: el jueves"  (Horario "2026-10-05 08:00") "2026-10-01 12:00"
+    Estado '{"hora": 9, "dias": ["Wednesday"], "otra": 1}'
+    Comprobar "una vez por semana, la misma hora" (Horario "2026-09-30 09:00") "2026-09-30 09:00"
+    Comprobar "y un minuto antes, la de hace 7 dias" (Horario "2026-09-30 08:59") "2026-09-23 09:00"
+    Estado '{"dias": ["Monday"]}'
+    Comprobar "sin hora no hay horario"  (Horario "2026-09-29 10:00") "<nulo>"
+    Estado '{"hora": 12, "dias": []}'
+    Comprobar "sin dias no hay horario"  (Horario "2026-09-29 10:00") "<nulo>"
+    Estado '{ esto no es json'
+    Comprobar "un json roto no truena"   (Horario "2026-09-29 10:00") "<nulo>"
+    Remove-Item -LiteralPath $rutaEstado -Force
+    Comprobar "sin archivo no hay horario" (Horario "2026-09-29 10:00") "<nulo>"
+} finally {
+    Remove-Item -LiteralPath $rutaEstado -Force -ErrorAction SilentlyContinue
+}
+
+# ---- 2a. El registro de envios, en el cuerpo del script -------------------
+# No son funciones sino el orden de las cosas en el bucle de envio, y por eso
+# se miran en el texto.
+Write-Host "Registro de envios en el envio"
+$texto = [IO.File]::ReadAllText($script)
+# Con Invoke-SpDataSet delante: los nombres solos tambien salen antes, en la
+# consulta que revisa si el 37 ya se corrio.
+$oReservar  = $texto.IndexOf("Invoke-SpDataSet 'dbo.usp_AvisoProblems_Reservar'")
+$oSend      = $texto.IndexOf('$smtp.Send($msg)')
+$oConfirmar = $texto.IndexOf("Invoke-SpDataSet 'dbo.usp_AvisoProblems_Confirmar'")
+Comprobar "se reserva ANTES de mandar" (($oReservar -ge 0) -and ($oReservar -lt $oSend)) $true
+Comprobar "y se confirma DESPUES"      (($oConfirmar -gt $oSend)) $true
+$oParcial   = $texto.IndexOf('Test-EntregaParcial $_ $para $copia')
+$oSiguiente = $texto.IndexOf('Get-SiguienteIntento $para $copia $rechazados')
+Comprobar "la entrega parcial se mira antes de pensar en reintentar" `
+    (($oParcial -gt $oSend) -and ($oParcial -lt $oSiguiente)) $true
+
+# $usarRegistro solo se puede encender dentro del if que excluye -Listar y
+# modo prueba: un correo de prueba anotado bloquearia el de verdad.
+$arbolReg = [System.Management.Automation.Language.Parser]::ParseFile($script, [ref]$null, [ref]$null)
+$guarda = $arbolReg.FindAll({
+    param($n) $n -is [System.Management.Automation.Language.IfStatementAst] -and
+              $n.Clauses[0].Item1.Extent.Text -eq '-not $Listar -and -not $modoPrueba'
+}, $true) | Select-Object -First 1
+$encendidos = @($arbolReg.FindAll({
+    param($n) $n -is [System.Management.Automation.Language.AssignmentStatementAst] -and
+              $n.Left.Extent.Text -eq '$usarRegistro' -and $n.Right.Extent.Text -ne '$false'
+}, $true))
+Comprobar "existe la guarda de -Listar y modo prueba" ([bool]$guarda) $true
+Comprobar "el registro se enciende en un solo lugar" $encendidos.Count 1
+Comprobar "y ese lugar esta dentro de la guarda" `
+    ($guarda -and $encendidos.Count -eq 1 -and
+     $encendidos[0].Extent.StartOffset -gt $guarda.Extent.StartOffset -and
+     $encendidos[0].Extent.EndOffset -lt $guarda.Extent.EndOffset) $true
 
 # ---- 2b. El ORDEN de -Listar y modo prueba -------------------------------
 # No es una funcion, es el orden de dos bloques en el cuerpo del script, y por

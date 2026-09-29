@@ -30,7 +30,9 @@ seccion "La hora" del README.md; `pruebas/prueba_reloj_sql.py` lo vigila.
 - `python3 pruebas/prueba_qa.py` (los arreglos de QA del 2026-09-25; si
   cambias `vw_CorreoQA_Base` en 05, agrega su huella nueva al bloque 1b de 35)
 - `python3 pruebas/prueba_programar_aviso.py`
-- `sh pruebas/correr_problems.sh` (necesita Docker con SQL Server)
+- `sh pruebas/correr_problems.sh` (necesita Docker con SQL Server; el envio de
+  punta a punta del aviso, ademas, `pwsh`)
+- `pwsh -File pruebas/Prueba_AvisoProblems.ps1`
 
 ## El repositorio es publico
 

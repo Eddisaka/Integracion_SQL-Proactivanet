@@ -1,7 +1,7 @@
 #!/bin/sh
-# Corre contra un SQL Server de verdad los tres .sql del correo de PRBs
-# vencidos: 28_diagnostico_problems_vencidos.sql,
-# 26_aviso_problems_vencidos.sql y 27_verificar_aviso_problems.sql.
+# Corre contra un SQL Server de verdad los .sql del correo de PRBs vencidos:
+# 28_diagnostico_problems_vencidos.sql, 26_aviso_problems_vencidos.sql,
+# 27_verificar_aviso_problems.sql y 37_aviso_problems_registro.sql.
 #
 # POR QUE EXISTE
 #
@@ -564,6 +564,331 @@ afirmar "el procedimiento devuelve 12 filas" \
      INSERT INTO #r EXEC dbo.usp_AvisoProblems_Pendientes;
      SELECT COUNT(*) FROM #r;" \
     "12"
+
+# ------------------------------------------------- el registro de envios
+# 37_aviso_problems_registro.sql: que a nadie le llegue el aviso dos veces,
+# corra desde la cuenta o la maquina que corra.
+echo "== 37_aviso_problems_registro.sql =="
+docker cp "$REPO/37_aviso_problems_registro.sql" "$CONTENEDOR:/tmp/r.sql" >/dev/null
+for vuelta in 1 2; do
+    salida37=$(sqlcmd -d Tickets_Proactivanet -i /tmp/r.sql 2>&1 || true)
+    err37=$(printf '%s' "$salida37" | grep -cE '^(Msg|Mens)[. ]' || true)
+    if [ "$err37" -gt 0 ]; then
+        echo "   FALLA la vuelta $vuelta con $err37 error(es):"
+        printf '%s\n' "$salida37" | grep -E '^(Msg|Mens)[. ]' -A2 | head -30 | sed 's/^/      /'
+        FALLOS=$((FALLOS+1))
+    else
+        echo "   bien   vuelta $vuelta sin errores de SQL"
+    fi
+    # Entre las dos vueltas se anota algo: la segunda no lo puede borrar.
+    [ "$vuelta" = 1 ] && sqlcmd -d Tickets_Proactivanet -Q "SET NOCOUNT ON;
+        INSERT INTO dbo.AvisoProblemsEnvio (Destinatario, Estado) VALUES (N'marca@ejemplo.com', 'enviado');" >/dev/null
+done
+afirmar "correrlo otra vez no borra lo anotado" \
+    "SELECT COUNT(*) FROM dbo.AvisoProblemsEnvio WHERE Destinatario = N'marca@ejemplo.com';" \
+    "1"
+
+# Lo que devuelve usp_AvisoProblems_Reservar, para leerlo con INSERT ... EXEC.
+T="DECLARE @t TABLE (Reservado BIT, Id INT, Desde DATETIME2(0), PrevioEstado VARCHAR(10),
+     PrevioEn DATETIME2(0), PrevioEquipo NVARCHAR(128), PrevioCuenta NVARCHAR(128));
+   DECLARE @u TABLE (Reservado BIT, Id INT, Desde DATETIME2(0), PrevioEstado VARCHAR(10),
+     PrevioEn DATETIME2(0), PrevioEquipo NVARCHAR(128), PrevioCuenta NVARCHAR(128));
+   DECLARE @c TABLE (Filas INT);
+   DECLARE @Ahora DATETIME2(0) = DATEADD(HOUR, -6, SYSUTCDATETIME());
+   DECLARE @Id INT;"
+
+afirmar "la primera vez se reserva" \
+    "$T INSERT INTO @t EXEC dbo.usp_AvisoProblems_Reservar @Destinatario = N'r1@ejemplo.com';
+     SELECT Reservado FROM @t;" \
+    "1"
+
+afirmar "ya enviado hoy: no se repite, y dice desde donde salio" \
+    "$T INSERT INTO @t EXEC dbo.usp_AvisoProblems_Reservar @Destinatario = N'r2@ejemplo.com',
+        @Equipo = N'VDI-UNO', @Cuenta = N'cuenta.uno';
+     SET @Id = (SELECT Id FROM @t);
+     INSERT INTO @c EXEC dbo.usp_AvisoProblems_Confirmar @Id = @Id, @Enviado = 1;
+     INSERT INTO @u EXEC dbo.usp_AvisoProblems_Reservar @Destinatario = N'r2@ejemplo.com',
+        @Equipo = N'VDI-DOS', @Cuenta = N'cuenta.dos';
+     SELECT CONCAT(Reservado, N'/', PrevioEstado, N'/', PrevioEquipo, N'/', PrevioCuenta) FROM @u;" \
+    "0/enviado/VDI-UNO/cuenta.uno"
+
+afirmar "la direccion no distingue mayusculas ni espacios" \
+    "$T INSERT INTO @t EXEC dbo.usp_AvisoProblems_Reservar @Destinatario = N'  R2@Ejemplo.COM ';
+     SELECT Reservado FROM @t;" \
+    "0"
+
+afirmar "un fallido NO bloquea: no le llego, y otra corrida lo intenta" \
+    "$T INSERT INTO @t EXEC dbo.usp_AvisoProblems_Reservar @Destinatario = N'r3@ejemplo.com';
+     SET @Id = (SELECT Id FROM @t);
+     INSERT INTO @c EXEC dbo.usp_AvisoProblems_Confirmar @Id = @Id, @Enviado = 0, @Detalle = N'550';
+     INSERT INTO @u EXEC dbo.usp_AvisoProblems_Reservar @Destinatario = N'r3@ejemplo.com';
+     SELECT Reservado FROM @u;" \
+    "1"
+
+afirmar "una reserva sin confirmar SI bloquea: en la duda no se reenvia" \
+    "$T INSERT INTO @t EXEC dbo.usp_AvisoProblems_Reservar @Destinatario = N'r4@ejemplo.com';
+     INSERT INTO @u EXEC dbo.usp_AvisoProblems_Reservar @Destinatario = N'r4@ejemplo.com';
+     SELECT CONCAT(Reservado, N'/', PrevioEstado) FROM @u;" \
+    "0/reservado"
+
+afirmar "con @Repetir se manda otra vez, y queda marcado como repetido" \
+    "$T INSERT INTO @t EXEC dbo.usp_AvisoProblems_Reservar @Destinatario = N'r2@ejemplo.com', @Repetir = 1;
+     SELECT CONCAT(t.Reservado, N'/', e.Repetido) FROM @t AS t
+     JOIN dbo.AvisoProblemsEnvio AS e ON e.Id = t.Id;" \
+    "1/1"
+
+# Las de dias anteriores se meten a mano: el procedimiento siempre anota la
+# hora de ahora.
+afirmar "lo de ayer no bloquea si no hay horario" \
+    "$T INSERT INTO dbo.AvisoProblemsEnvio (Destinatario, Estado, ReservadoEn)
+        VALUES (N'r5@ejemplo.com', 'enviado', DATEADD(HOUR, -26, @Ahora));
+     INSERT INTO @t EXEC dbo.usp_AvisoProblems_Reservar @Destinatario = N'r5@ejemplo.com';
+     SELECT Reservado FROM @t;" \
+    "1"
+
+afirmar "la recuperacion no repite el del horario que ya salio (lunes -> martes)" \
+    "$T INSERT INTO dbo.AvisoProblemsEnvio (Destinatario, Estado, ReservadoEn)
+        VALUES (N'r6@ejemplo.com', 'enviado', DATEADD(HOUR, -26, @Ahora));
+     DECLARE @Horario DATETIME2(0) = DATEADD(HOUR, -27, @Ahora);
+     INSERT INTO @t EXEC dbo.usp_AvisoProblems_Reservar @Destinatario = N'r6@ejemplo.com',
+        @UltimoHorario = @Horario;
+     SELECT CONCAT(Reservado, N'/', CASE WHEN Desde = @Horario THEN N'desde el horario' ELSE N'desde otra cosa' END) FROM @t;" \
+    "0/desdeelhorario"
+
+afirmar "el siguiente horario si sale (recuperado el miercoles, el jueves va)" \
+    "$T INSERT INTO dbo.AvisoProblemsEnvio (Destinatario, Estado, ReservadoEn)
+        VALUES (N'r7@ejemplo.com', 'enviado', DATEADD(HOUR, -26, @Ahora));
+     DECLARE @Horario DATETIME2(0) = DATEADD(MINUTE, -1, @Ahora);
+     INSERT INTO @t EXEC dbo.usp_AvisoProblems_Reservar @Destinatario = N'r7@ejemplo.com',
+        @UltimoHorario = @Horario;
+     SELECT Reservado FROM @t;" \
+    "1"
+
+afirmar "un horario de hace mas de 7 dias no cuenta: queda la regla del dia" \
+    "$T INSERT INTO dbo.AvisoProblemsEnvio (Destinatario, Estado, ReservadoEn)
+        VALUES (N'r8@ejemplo.com', 'enviado', DATEADD(DAY, -3, @Ahora));
+     DECLARE @Viejo DATETIME2(0) = DATEADD(DAY, -8, @Ahora);
+     INSERT INTO @t EXEC dbo.usp_AvisoProblems_Reservar @Destinatario = N'r8@ejemplo.com',
+        @UltimoHorario = @Viejo;
+     SELECT CONCAT(Reservado, N'/', CASE WHEN Desde = CONVERT(DATETIME2(0), CONVERT(DATE, @Ahora))
+                                        THEN N'desde-hoy' ELSE N'desde-otra-cosa' END) FROM @t;" \
+    "1/desde-hoy"
+
+afirmar "confirmar dos veces no cambia lo primero" \
+    "$T INSERT INTO @t EXEC dbo.usp_AvisoProblems_Reservar @Destinatario = N'r9@ejemplo.com';
+     SET @Id = (SELECT Id FROM @t);
+     INSERT INTO @c EXEC dbo.usp_AvisoProblems_Confirmar @Id = @Id, @Enviado = 1;
+     INSERT INTO @c EXEC dbo.usp_AvisoProblems_Confirmar @Id = @Id, @Enviado = 0;
+     SELECT CONCAT((SELECT SUM(Filas) FROM @c), N'/', Estado, N'/',
+                   CASE WHEN TerminadoEn IS NULL THEN N'sin hora' ELSE N'con hora' END)
+     FROM dbo.AvisoProblemsEnvio WHERE Id = @Id;" \
+    "1/enviado/conhora"
+
+afirmar "sin destinatario es un error, no una reserva" \
+    "BEGIN TRY EXEC dbo.usp_AvisoProblems_Reservar @Destinatario = N'   '; SELECT 0; END TRY
+     BEGIN CATCH SELECT ERROR_NUMBER(); END CATCH;" \
+    "50371"
+
+# Dos maquinas a la vez. La otra corrida se simula a mano, con la misma
+# lectura que el procedimiento: revisa, se queda 4 segundos con el bloqueo, y
+# reserva. El procedimiento que entra a mitad tiene que ESPERAR y ver esa
+# reserva. Sin UPDLOCK, HOLDLOCK no espera en la lectura: ve el rango vacio,
+# reserva tambien, y la direccion queda con dos.
+sqlcmd -d Tickets_Proactivanet -Q "SET NOCOUNT ON;
+    DECLARE @Ahora DATETIME2(0) = DATEADD(HOUR, -6, SYSUTCDATETIME());
+    DECLARE @Desde DATETIME2(0) = CONVERT(DATETIME2(0), CONVERT(DATE, @Ahora));
+    BEGIN TRANSACTION;
+    SELECT TOP (1) Id FROM dbo.AvisoProblemsEnvio WITH (UPDLOCK, HOLDLOCK)
+    WHERE Destinatario = N'carrera@ejemplo.com' AND ReservadoEn >= @Desde
+      AND Estado IN ('reservado', 'enviado');
+    WAITFOR DELAY '00:00:04';
+    INSERT INTO dbo.AvisoProblemsEnvio (Destinatario, Estado, ReservadoEn, Equipo)
+    VALUES (N'carrera@ejemplo.com', 'reservado', @Ahora, N'LA-OTRA');
+    COMMIT;" >/dev/null 2>&1 &
+OTRA=$!
+sleep 1
+afirmar "dos corridas a la vez: la segunda espera y no manda" \
+    "$T DECLARE @t0 DATETIME2(3) = SYSUTCDATETIME();
+     INSERT INTO @t EXEC dbo.usp_AvisoProblems_Reservar @Destinatario = N'carrera@ejemplo.com';
+     SELECT CONCAT((SELECT Reservado FROM @t), N'/',
+        (SELECT COUNT(*) FROM dbo.AvisoProblemsEnvio WHERE Destinatario = N'carrera@ejemplo.com'), N'/',
+        CASE WHEN DATEDIFF(MILLISECOND, @t0, SYSUTCDATETIME()) >= 2000 THEN N'espero' ELSE N'no-espero' END);" \
+    "0/1/espero"
+wait "$OTRA" || true
+
+# ------------------------------------------- el envio, de punta a punta
+# Enviar_AvisoProblems.ps1 de verdad, contra esta base y contra
+# pruebas/smtp_de_mentira.py, que anota cada correo que le llega. Es lo unico
+# que prueba que el registro se usa COMO SE DEBE desde el envio: que la
+# segunda corrida no mande nada, que un fallido si se reintente, que -Listar
+# y modo prueba no anoten.
+#
+# Necesita pwsh. En la VDI de Windows esto no aplica.
+if ! command -v pwsh >/dev/null 2>&1; then
+    echo "== el envio de punta a punta: se omite, no hay pwsh =="
+else
+    echo "== el envio de punta a punta (pwsh + SMTP de mentira) =="
+    IP=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$CONTENEDOR")
+    ENV="$TMP/envio"
+    mkdir -p "$ENV"
+    cp "$REPO/Enviar_AvisoProblems.ps1" "$REPO/CorreoComun.ps1" "$ENV/"
+    # Las graficas de CorreoComun.ps1 son de Windows y aqui no existen. El
+    # aviso no las usa; se quita SOLO esa linea, y SOLO en la copia.
+    sed -i 's/^Add-Type -AssemblyName System.Windows.Forms.DataVisualization/# (quitada para la prueba) &/' \
+        "$ENV/CorreoComun.ps1"
+    PUERTO=$(python3 -c 'import socket; s = socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])')
+    # Los .json se arman aqui, en la carpeta temporal: config.json lleva la
+    # clave de ESTE motor de prueba y nunca debe quedar dentro del repositorio.
+    python3 - "$REPO/config_aviso_problems.ejemplo.json" "$ENV" "$IP" "$CLAVE" "$PUERTO" <<'PY'
+import io, json, os, sys
+ejemplo, env, ip, clave, puerto = sys.argv[1:]
+cfg = json.load(io.open(ejemplo, encoding="utf-8-sig"))
+cfg.update({"modo_prueba": False, "destinatario_prueba": "prueba@ejemplo.com",
+            "remitente": "aviso@ejemplo.com", "copia_fija": ["pm@ejemplo.com"],
+            "smtp_servidor": "127.0.0.1", "smtp_puerto": int(puerto), "smtp_usuario": ""})
+json.dump(cfg, io.open(os.path.join(env, "config_aviso_problems.json"), "w", encoding="utf-8"),
+          ensure_ascii=False)
+cfg["modo_prueba"] = True
+json.dump(cfg, io.open(os.path.join(env, "config_modo_prueba.json"), "w", encoding="utf-8"),
+          ensure_ascii=False)
+sql = {"servidor": ip + ",1433", "base_datos": "Tickets_Proactivanet",
+       "autenticacion_windows": False, "usuario": "sa", "password": clave,
+       "encriptar": False, "confiar_certificado": True, "timeout": 15}
+json.dump({"sql": sql}, io.open(os.path.join(env, "config.json"), "w", encoding="utf-8"))
+PY
+    : > "$ENV/entregas.txt"; : > "$ENV/rcpt.txt"; : > "$ENV/data.txt"
+    python3 "$AQUI/smtp_de_mentira.py" "$PUERTO" "$ENV/entregas.txt" \
+        --rechazar-rcpt "$ENV/rcpt.txt" --rechazar-data "$ENV/data.txt" &
+    SMTP=$!
+    sleep 1
+
+    # enviar EQUIPO CUENTA [argumentos]: corre el envio y deja en $CODIGO lo
+    # que devolvio. En hora de Mexico, como la VDI: el horario de
+    # estado_aviso.json se compara contra la hora del servidor SQL en Mexico.
+    enviar() {
+        equipo="$1"; cuenta="$2"; shift 2
+        CODIGO=0
+        TZ=America/Mexico_City COMPUTERNAME="$equipo" USERNAME="$cuenta" \
+            pwsh -NoProfile -File "$ENV/Enviar_AvisoProblems.ps1" "$@" > "$ENV/salida.txt" 2>&1 || CODIGO=$?
+        cat "$ENV/salida.txt" >> "$ENV/todas.txt"
+    }
+    entregas() { wc -l < "$ENV/entregas.txt" | tr -d ' '; }
+    en_log() { grep -c "$1" "$ENV/salida.txt" || true; }
+    esperar() {
+        nombre="$1"; real="$2"; esperado="$3"
+        if [ "$real" = "$esperado" ]; then
+            echo "   bien   $nombre"
+        else
+            echo "   FALLA  $nombre: esperaba '$esperado', dio '$real'"
+            FALLOS=$((FALLOS+1))
+        fi
+    }
+    registro() {
+        sqlcmd -d Tickets_Proactivanet -h -1 -W -Q "SET NOCOUNT ON; $1" 2>&1 | head -1 | tr -d '\r '
+    }
+
+    sqlcmd -d Tickets_Proactivanet -Q "SET NOCOUNT ON; DELETE FROM dbo.AvisoProblemsEnvio;" >/dev/null
+
+    # Cuantos correos tocan: un Owner Problem con direccion, uno.
+    enviar VDI-UNO cuenta.uno
+    N=$(entregas)
+    CODIGO_BASE=$CODIGO
+    echo "   ($N correo(s) por corrida; el envio sale con $CODIGO_BASE)"
+    if [ "$N" -lt 2 ]; then
+        # Sin correos todo lo que sigue daria "bien" sin probar nada.
+        echo "   FALLA  la primera corrida no mando nada; lo que dijo el envio:"
+        tail -20 "$ENV/salida.txt" | sed 's/^/      /'
+        FALLOS=$((FALLOS+1))
+    else
+    esperar "la primera corrida manda y anota" \
+        "$([ "$N" -ge 2 ] && echo si || echo no)/$(registro "SELECT COUNT(*) FROM dbo.AvisoProblemsEnvio WHERE Estado = 'enviado';")" \
+        "si/$N"
+    esperar "cada correo va a un Para distinto" \
+        "$(cut -d';' -f1 "$ENV/entregas.txt" | sort -u | wc -l | tr -d ' ')" "$N"
+    esperar "y anota desde que equipo y cuenta" \
+        "$(registro "SELECT COUNT(*) FROM dbo.AvisoProblemsEnvio WHERE Equipo = N'VDI-UNO' AND Cuenta = N'cuenta.uno';")" "$N"
+
+    enviar VDI-DOS cuenta.dos
+    esperar "otra maquina y otra cuenta, el mismo dia: no manda nada" \
+        "$(entregas)/$(en_log 'YA SALIO')/$CODIGO" "$N/$N/$CODIGO_BASE"
+    esperar "y lo dice en la linea de Fin" \
+        "$(grep -c "0 enviado(s), .* $N ya habia(n) salido antes" "$ENV/salida.txt" || true)" "1"
+
+    enviar VDI-UNO cuenta.uno -Listar
+    esperar "-Listar no manda ni anota" \
+        "$(entregas)/$(registro "SELECT COUNT(*) FROM dbo.AvisoProblemsEnvio;")" "$N/$N"
+
+    enviar VDI-UNO cuenta.uno -RutaCorreo "$ENV/config_modo_prueba.json"
+    esperar "modo prueba manda al de prueba y no anota" \
+        "$(tail -n "$N" "$ENV/entregas.txt" | sort -u)/$(entregas)/$(registro "SELECT COUNT(*) FROM dbo.AvisoProblemsEnvio;")" \
+        "prueba@ejemplo.com/$((2*N))/$N"
+
+    : > "$ENV/entregas.txt"
+    enviar VDI-UNO cuenta.uno -Repetir
+    esperar "-Repetir manda otra vez y lo marca" \
+        "$(entregas)/$(registro "SELECT COUNT(*) FROM dbo.AvisoProblemsEnvio WHERE Repetido = 1 AND Estado = 'enviado';")" \
+        "$N/$N"
+
+    # Una copia rechazada en el RCPT. .NET entrega a los demas y despues
+    # lanza la excepcion: si se reintentara, cada Owner lo recibiria dos
+    # veces.
+    sqlcmd -d Tickets_Proactivanet -Q "SET NOCOUNT ON; DELETE FROM dbo.AvisoProblemsEnvio;" >/dev/null
+    : > "$ENV/entregas.txt"; echo "pm@ejemplo.com" > "$ENV/rcpt.txt"
+    enviar VDI-UNO cuenta.uno
+    esperar "una copia rechazada: un correo por Owner, no dos" \
+        "$(entregas)/$(cut -d';' -f1 "$ENV/entregas.txt" | sort -u | wc -l | tr -d ' ')/$(grep -c 'pm@ejemplo.com' "$ENV/entregas.txt" || true)" \
+        "$N/$N/0"
+    esperar "y se anota como enviado, diciendo a quien no llego" \
+        "$(registro "SELECT COUNT(*) FROM dbo.AvisoProblemsEnvio WHERE Estado = 'enviado' AND Detalle LIKE N'%pm@ejemplo.com%';")/$(en_log 'MENOS a pm@ejemplo.com')" \
+        "$N/$N"
+    : > "$ENV/rcpt.txt"
+
+    # Un Owner rechazado al final del mensaje: ese no le llega a nadie. Queda
+    # fallido, y la corrida siguiente le manda SOLO a el.
+    sqlcmd -d Tickets_Proactivanet -Q "SET NOCOUNT ON; DELETE FROM dbo.AvisoProblemsEnvio;" >/dev/null
+    MALO=$(head -1 "$ENV/entregas.txt" | cut -d';' -f1)
+    : > "$ENV/entregas.txt"; echo "$MALO" > "$ENV/data.txt"
+    enviar VDI-UNO cuenta.uno
+    esperar "rechazado al final del mensaje: no sale, queda fallido" \
+        "$(entregas)/$(registro "SELECT COUNT(*) FROM dbo.AvisoProblemsEnvio WHERE Estado = 'fallido' AND Destinatario = N'$MALO';")/$CODIGO" \
+        "$((N-1))/1/4"
+    : > "$ENV/data.txt"; : > "$ENV/entregas.txt"
+    enviar VDI-DOS cuenta.dos
+    esperar "la siguiente corrida le manda solo al que fallo" \
+        "$(entregas)/$(cut -d';' -f1 "$ENV/entregas.txt")" "1/$MALO"
+
+    # El horario de estado_aviso.json. Uno que salio AYER despues del horario
+    # de ayer no se repite hoy (la recuperacion del martes, con el del lunes
+    # ya enviado desde otra cuenta).
+    sqlcmd -d Tickets_Proactivanet -Q "SET NOCOUNT ON; DELETE FROM dbo.AvisoProblemsEnvio;
+        DECLARE @Ayer DATE = DATEADD(DAY, -1, CONVERT(DATE, DATEADD(HOUR, -6, SYSUTCDATETIME())));
+        INSERT INTO dbo.AvisoProblemsEnvio (Destinatario, Estado, ReservadoEn, Equipo)
+        VALUES (N'$MALO', 'enviado', DATEADD(MINUTE, 12*60 + 30, CONVERT(DATETIME2(0), @Ayer)), N'LA-OTRA');" >/dev/null
+    AYER=$(LC_ALL=C TZ=America/Mexico_City date -d yesterday +%A)
+    : > "$ENV/entregas.txt"
+    enviar VDI-UNO cuenta.uno
+    esperar "sin estado_aviso.json lo de ayer no cuenta" "$(entregas)" "$N"
+    sqlcmd -d Tickets_Proactivanet -Q "SET NOCOUNT ON; DELETE FROM dbo.AvisoProblemsEnvio WHERE Equipo = N'VDI-UNO';" >/dev/null
+    printf '{"hora": 12, "dias": ["%s"]}' "$AYER" > "$ENV/estado_aviso.json"
+    : > "$ENV/entregas.txt"
+    enviar VDI-UNO cuenta.uno
+    esperar "con el horario de ayer a las 12, lo de ayer a las 12:30 si cuenta" \
+        "$(entregas)/$(grep -c "^$MALO;" "$ENV/entregas.txt" || true)/$(en_log 'YA SALIO')" "$((N-1))/0/1"
+    rm -f "$ENV/estado_aviso.json"
+
+    # Sin el 37 en la base, el envio avisa y manda como antes.
+    sqlcmd -d Tickets_Proactivanet -Q "SET NOCOUNT ON;
+        DROP PROCEDURE dbo.usp_AvisoProblems_Reservar; DROP PROCEDURE dbo.usp_AvisoProblems_Confirmar;" >/dev/null
+    : > "$ENV/entregas.txt"
+    enviar VDI-UNO cuenta.uno
+    esperar "sin el 37: avisa en el log y manda igual" \
+        "$(entregas)/$(en_log 'No esta el registro de envios')/$CODIGO" "$N/1/$CODIGO_BASE"
+    sqlcmd -d Tickets_Proactivanet -i /tmp/r.sql >/dev/null
+    fi
+
+    kill "$SMTP" 2>/dev/null || true
+    cp "$ENV/todas.txt" /tmp/salida_envio_problems.txt 2>/dev/null || true
+fi
 
 echo
 if [ "$FALLOS" -eq 0 ]; then echo "TODO BIEN"; else echo "$FALLOS problema(s)"; fi

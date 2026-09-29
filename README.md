@@ -90,6 +90,11 @@ categorias llenan la ventana de 15 dias y cuanto tarda leerla. Solo lee.
 del catalogo que llama el ETL. Vivia en `04_esquema_categorias.sql`; en una
 base nueva, correr 36 despues de 04.
 
+`37_aviso_problems_registro.sql` es el registro de envios del aviso de PRBs
+vencidas: que a un Owner Problem no le llegue el mismo aviso dos veces, corra
+desde la cuenta o la maquina que corra. Solo crea objetos nuevos. Ver la
+seccion 8 de [`AVISO_PROBLEMS.md`](AVISO_PROBLEMS.md).
+
 ## La pestaña QA: el grupo heredado y el `OPTION (RECOMPILE)`
 
 Los dos estan explicados, con sus numeros, en [`CORREO_QA.md`](CORREO_QA.md),
