@@ -1,5 +1,11 @@
 # Integracion_SQL-Proactivanet
 
+> **ESTE REPOSITORIO YA NO SE USA (2026-09-30).** Todo se mudo, con su
+> historia completa, a
+> [`Eddisaka/IntegracionSQL-Automatizacion_Main`](https://github.com/Eddisaka/IntegracionSQL-Automatizacion_Main),
+> junto con el agente y los KB de triage. No se sube nada aqui: ni codigo ni
+> salidas.
+
 Pipeline de Proactivanet a SQL Server, correos automatizados y el tablero web.
 
 ```text
