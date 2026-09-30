@@ -618,19 +618,33 @@ function New-GraficaBarrasAgrupadas {
 #
 # POR QUE ESTA AQUI
 #
-# $smtp.Send() es todo o nada. Si el servidor rechaza UNA direccion de la
-# copia, no entrega a nadie: ni al destinatario principal, que no tiene culpa
-# ni forma de enterarse. Paso de verdad -un lider se quedo sin su aviso tres
-# corridas seguidas por una direccion ajena en copia- y por eso el envio se
-# hace en tres intentos, renunciando a lo menos posible cada vez:
+# Un rechazo puede llegar en dos momentos, y $smtp.Send() hace cosas
+# opuestas en cada uno:
+#
+#   al final del mensaje (DATA)   no entrega a nadie: ni al destinatario
+#                                 principal, que no tiene culpa ni forma de
+#                                 enterarse. Paso de verdad -un lider se quedo
+#                                 sin su aviso tres corridas seguidas por una
+#                                 direccion ajena en copia-.
+#   en la direccion (RCPT)        entrega a los que el servidor SI acepto y
+#                                 DESPUES lanza la excepcion. El correo ya
+#                                 salio. Asi esta escrito SmtpClient.Send, en
+#                                 .NET Framework y en .NET; comprobado el
+#                                 2026-09-29 con pruebas/smtp_de_mentira.py.
+#
+# Para el primero, el envio se hace en tres intentos, renunciando a lo menos
+# posible cada vez:
 #
 #   1. todos
 #   2. sin las direcciones que el servidor nombro al rechazar
 #   3. solo el "Para", sin ninguna copia
 #
-# Estas tres funciones son la parte que se puede equivocar en silencio, y
-# estan aqui separadas del bucle de envio porque asi se pueden probar sin
-# levantar un servidor de correo.
+# Para el segundo, Test-EntregaParcial dice que NO se reintente: hacerlo le
+# mandaria el correo otra vez a todos los que ya lo recibieron.
+#
+# Estas funciones son la parte que se puede equivocar en silencio, y estan
+# aqui separadas del bucle de envio porque asi se pueden probar sin levantar
+# un servidor de correo.
 # ============================================================================
 
 function Get-DestinatariosRechazados($fallo) {
@@ -645,19 +659,52 @@ function Get-DestinatariosRechazados($fallo) {
     # SmtpFailedRecipientsException HEREDA de SmtpFailedRecipientException, asi
     # que la plural se mira primero: al reves, un rechazo de cinco direcciones
     # reportaria una sola.
+    #
+    # .NET la entrega como la mando en el RCPT, entre < >: '<malo@x.com>'.
+    # Sin quitarlos no coincide con ninguna direccion de la lista, y el
+    # segundo intento -sin los rechazados- no quitaba a nadie.
     $direcciones = @()
     $e = if ($fallo -is [System.Management.Automation.ErrorRecord]) { $fallo.Exception } else { $fallo }
     while ($e) {
         if ($e -is [System.Net.Mail.SmtpFailedRecipientsException]) {
             foreach ($i in @($e.InnerExceptions)) {
-                if ($i.FailedRecipient) { $direcciones += [string]$i.FailedRecipient }
+                if ($i.FailedRecipient) { $direcciones += ([string]$i.FailedRecipient).Trim().Trim('<', '>').Trim() }
             }
         } elseif ($e -is [System.Net.Mail.SmtpFailedRecipientException]) {
-            if ($e.FailedRecipient) { $direcciones += [string]$e.FailedRecipient }
+            if ($e.FailedRecipient) { $direcciones += ([string]$e.FailedRecipient).Trim().Trim('<', '>').Trim() }
         }
         $e = $e.InnerException
     }
     return @($direcciones | Where-Object { $_ } | Sort-Object -Unique)
+}
+
+function Test-EntregaParcial($fallo, $para, $copia) {
+    # $true si el servidor rechazo en el RCPT a ALGUNOS destinatarios pero no
+    # a todos. Entonces el correo ya les llego a los demas (ver arriba), y lo
+    # que toca es anotarlo como enviado y decir a quien no le llego, no
+    # reintentar.
+    #
+    # $false si el fallo es otro -el rechazo al final del mensaje, una falla
+    # de conexion- o si los rechazo a todos: no salio a nadie, y los tres
+    # intentos siguen siendo lo correcto.
+    #
+    # Se cuentan las excepciones y no las direcciones: una excepcion puede
+    # venir sin la direccion, y contarla como cero haria pasar la entrega
+    # parcial por un fallo cualquiera, que se reintenta.
+    $e = if ($fallo -is [System.Management.Automation.ErrorRecord]) { $fallo.Exception } else { $fallo }
+    $rechazos = 0
+    while ($e) {
+        if ($e -is [System.Net.Mail.SmtpFailedRecipientsException]) {
+            $rechazos = @($e.InnerExceptions).Count
+            break
+        } elseif ($e -is [System.Net.Mail.SmtpFailedRecipientException]) {
+            $rechazos = 1
+            break
+        }
+        $e = $e.InnerException
+    }
+    $total = @(@($para) + @($copia) | Where-Object { $_ }).Count
+    return ($rechazos -gt 0 -and $rechazos -lt $total)
 }
 
 function Remove-Destinatarios($lista, $quitar) {

@@ -43,9 +43,25 @@
 
     ENTREGA
     El envio va en tres intentos -todos, sin los rechazados, solo el "Para"-
-    con Get-SiguienteIntento de CorreoComun.ps1. $smtp.Send() es todo o nada:
-    sin eso, una sola direccion mala en la copia deja al Owner Problem sin su
-    aviso, y ya paso.
+    con Get-SiguienteIntento de CorreoComun.ps1. Cuando el servidor rechaza al
+    final del mensaje no entrega a nadie: sin los intentos, una sola direccion
+    mala en la copia deja al Owner Problem sin su aviso, y ya paso.
+
+    Pero si rechaza una direccion en el RCPT, $smtp.Send() SI entrega a las
+    demas y despues lanza la excepcion. Ahi no se reintenta -seria mandarles
+    el correo dos veces- y se anota como enviado, diciendo a quien no le
+    llego (Test-EntregaParcial, en CorreoComun.ps1).
+
+    NO SE REPITE
+    Antes de mandarle a alguien se pregunta a la base si ya le salio, con
+    dbo.usp_AvisoProblems_Reservar de 37_aviso_problems_registro.sql. La
+    tarea vive en cada maquina del grupo de escritorios virtuales y puede
+    haber mas de una cuenta con el aviso instalado; lo unico que ven todas es
+    la base. La regla, completa, esta en ese script: no se repite a quien ya
+    le salio hoy o desde el ultimo horario que tocaba (el de
+    estado_aviso.json, junto a este archivo).
+
+    Si el 37 aun no se corre, se dice en el log y se manda como antes.
 
 .PARAMETER RutaCorreo
     Ruta del .json de configuracion. Por omision, config_aviso_problems.json
@@ -59,8 +75,12 @@
     No manda nada: escribe en pantalla quien recibiria que. Para revisar
     antes de la primera corrida de verdad.
 
+.PARAMETER Repetir
+    Manda aunque el registro diga que ya salio. Para reenviar a proposito,
+    a mano. El envio igual se anota, para que las demas corridas lo vean.
+
 .CODIGOS DE SALIDA
-    0: todo salio (o se listo, con -Listar).
+    0: todo salio, o ya habia salido antes (o se listo, con -Listar).
     4: hubo envios que fallaron. Revisar Logs\.
     5: error de configuracion, de SQL o de SMTP. Revisar Logs\.
 #>
@@ -70,7 +90,8 @@ param(
     [string]$RutaCorreo = '',
     [ValidateSet('', 'VENCIDA', 'SIN FECHA')]
     [string]$Veredicto = '',
-    [switch]$Listar
+    [switch]$Listar,
+    [switch]$Repetir
 )
 
 $ErrorActionPreference = 'Stop'
@@ -219,6 +240,39 @@ function ConvertTo-TablaHtml {
     return $sb.ToString()
 }
 
+function Get-UltimoHorario([string]$Ruta, [datetime]$Ahora) {
+    # La ultima vez que tocaba el aviso, a su hora, sin pasar de $Ahora,
+    # segun el horario que guardo programar_aviso.py en estado_aviso.json.
+    # Es la misma cuenta que ultima_ocurrencia() de alla, y por la misma
+    # razon: la recuperacion manda "el ultimo que tocaba", y el registro de
+    # envios tiene que saber cual era para no repetirlo.
+    # $null si no hay horario o no se puede leer: queda la regla del dia.
+    if (-not (Test-Path -LiteralPath $Ruta)) { return $null }
+    try {
+        $estado = Get-Content -LiteralPath $Ruta -Raw -Encoding UTF8 | ConvertFrom-Json
+    } catch {
+        return $null
+    }
+    $dias = @($estado.dias | Where-Object { $_ } | ForEach-Object { [string]$_ })
+    if ($null -eq $estado.hora -or $dias.Count -eq 0) { return $null }
+    $hora = [int]$estado.hora
+    for ($atras = 0; $atras -lt 8; $atras++) {
+        $dia = $Ahora.Date.AddDays(-$atras)
+        if ($dias -notcontains $dia.DayOfWeek.ToString()) { continue }
+        $momento = $dia.AddHours($hora)
+        if ($momento -le $Ahora) { return $momento }
+    }
+    return $null
+}
+
+function Get-ClaveDestinatario($Para) {
+    # La llave del registro de envios: el "Para", en minusculas y ordenado.
+    # Dos corridas que le mandarian a la misma direccion son el mismo correo,
+    # aunque una la traiga con mayusculas.
+    return ((@($Para) | ForEach-Object { ([string]$_).Trim().ToLowerInvariant() } |
+             Where-Object { $_ -ne '' } | Sort-Object -Unique) -join ';')
+}
+
 # ============================================================================
 try {
     if (-not (Test-Path -LiteralPath $RutaCorreo)) {
@@ -252,6 +306,28 @@ try {
     $script:Conexion = New-Object System.Data.SqlClient.SqlConnection (Get-ConnectionString $cnf)
     $script:Conexion.Open()
 
+    # --- el registro de envios (37_aviso_problems_registro.sql) -----------
+    # Solo en el envio de verdad: -Listar no manda nada, y un correo de modo
+    # prueba anotado bloquearia el de verdad ese dia.
+    $usarRegistro  = $false
+    $ultimoHorario = $null
+    if (-not $Listar -and -not $modoPrueba) {
+        $cmd = $script:Conexion.CreateCommand()
+        $cmd.CommandText = "SELECT CASE WHEN OBJECT_ID(N'dbo.usp_AvisoProblems_Reservar', N'P') IS NOT NULL " +
+                           "AND OBJECT_ID(N'dbo.usp_AvisoProblems_Confirmar', N'P') IS NOT NULL THEN 1 ELSE 0 END"
+        $usarRegistro = ([int]$cmd.ExecuteScalar()) -eq 1
+        $cmd.Dispose()
+        if ($usarRegistro) {
+            $ultimoHorario = Get-UltimoHorario (Join-Path $base 'estado_aviso.json') (Get-Date)
+            Write-Log ("Registro de envios: no se repite a quien ya le salio hoy{0}.{1}" -f
+                       $(if ($ultimoHorario) { ' o desde el horario del ' + $ultimoHorario.ToString('yyyy-MM-dd HH:mm') } else { '' }),
+                       $(if ($Repetir) { ' Con -Repetir: se manda aunque ya haya salido.' } else { '' }))
+        } else {
+            Write-Log ("No esta el registro de envios (37_aviso_problems_registro.sql): se manda " +
+                       "sin revisar si otra cuenta u otra maquina ya lo mando.") 'WARN'
+        }
+    }
+
     $ds = Invoke-SpDataSet 'dbo.usp_AvisoProblems_Pendientes' @{
         '@Veredicto' = $(if ($Veredicto) { $Veredicto } else { $null })
     }
@@ -267,8 +343,9 @@ try {
     $porOwner  = @($filas | Group-Object -Property OwnerProblem)
     Write-Log ("{0} Owner Problem distintos." -f $porOwner.Count)
 
-    $enviados = 0
-    $fallidos = 0
+    $enviados  = 0
+    $fallidos  = 0
+    $repetidos = 0
 
     foreach ($grupo in $porOwner) {
         $owner  = [string]$grupo.Name
@@ -366,10 +443,47 @@ try {
 
         $asunto = ([string]$cfg.asunto) -replace '\{fecha\}', (Get-Date -Format 'dd/MM/yyyy')
 
+        # --- que no le llegue dos veces --------------------------------------
+        # Va justo antes de mandar y no al principio de la vuelta: una reserva
+        # que nadie confirma bloquea esa direccion hasta el siguiente horario,
+        # asi que entre reservar y mandar no debe quedar nada que pueda fallar.
+        $reserva = $null
+        if ($usarRegistro) {
+            try {
+                $r = (Invoke-SpDataSet 'dbo.usp_AvisoProblems_Reservar' @{
+                        '@Destinatario'  = (Get-ClaveDestinatario $para)
+                        '@OwnerProblem'  = $owner
+                        '@UltimoHorario' = $ultimoHorario
+                        '@Vencidas'      = $vencidas.Count
+                        '@SinFecha'      = $sinFecha.Count
+                        '@Equipo'        = $env:COMPUTERNAME
+                        '@Cuenta'        = $env:USERNAME
+                        '@Repetir'       = [bool]$Repetir
+                     }).Tables[0].Rows[0]
+            }
+            catch {
+                # Sin poder preguntar no se manda: lo que se quiere evitar es
+                # justo mandar sin saber si ya salio.
+                Write-Log ("NO SE MANDA a {0}: no se pudo revisar el registro de envios: {1}" -f
+                           $owner, $_.Exception.Message) 'ERROR'
+                $fallidos++
+                continue
+            }
+            if (-not [bool]$r.Reservado) {
+                Write-Log ("YA SALIO: {0} lo recibio el {1} ({2}, equipo {3}, cuenta {4}). No se repite." -f
+                           $owner, ([datetime]$r.PrevioEn).ToString('yyyy-MM-dd HH:mm'),
+                           (Txt $r.PrevioEstado), (Txt $r.PrevioEquipo '?'), (Txt $r.PrevioCuenta '?')) 'OK'
+                $repetidos++
+                continue
+            }
+            $reserva = [int]$r.Id
+        }
+
         # --- envio, en tres intentos ---------------------------------------
         $enviado = $false
         $yaDicho = $false
         $renuncia = ''
+        $ultimoError = ''
         for ($intento = 1; $intento -le 3 -and -not $enviado; $intento++) {
             $msg = $null
             $smtp = $null
@@ -406,7 +520,24 @@ try {
                            ($para -join ';'), $vencidas.Count, $sinFecha.Count, $copia.Count) 'OK'
             }
             catch {
+                $ultimoError = [string]$_.Exception.Message
                 $rechazados = Get-DestinatariosRechazados $_
+                if (Test-EntregaParcial $_ $para $copia) {
+                    # Ya salio a todos menos a los rechazados. Reintentar sin
+                    # ellos se lo mandaria OTRA VEZ a todos los demas.
+                    $enviado = $true
+                    $enviados++
+                    $renuncia = "No se pudo entregar a: " + (@($rechazados) -join ", ") + "."
+                    $sinOwner = @($rechazados | Where-Object { @($para) -contains $_ }).Count -gt 0
+                    # Entre parentesis: -f va antes que +, y sin ellos solo se
+                    # formatearia el segundo pedazo.
+                    Write-Log (("Enviado a {0} ({1} vencidas, {2} sin fecha), MENOS a {3}: el servidor rechazo " +
+                                "esas direcciones y entrego a las demas. No se reintenta.{4}") -f
+                               ($para -join ';'), $vencidas.Count, $sinFecha.Count,
+                               $(if ($rechazados.Count) { $rechazados -join ', ' } else { '(no las nombro)' }),
+                               $(if ($sinOwner) { ' EL OWNER PROBLEM NO LO RECIBIO: su direccion fue rechazada.' } else { '' })) 'WARN'
+                    break
+                }
                 $siguiente  = Get-SiguienteIntento $para $copia $rechazados
                 if ($siguiente.Seguir) {
                     Write-Log ("Intento {0} para {1} fallo: {2} {3}" -f
@@ -428,11 +559,29 @@ try {
                 if ($smtp) { $smtp.Dispose() }
             }
         }
+
+        if ($null -ne $reserva) {
+            try {
+                [void](Invoke-SpDataSet 'dbo.usp_AvisoProblems_Confirmar' @{
+                    '@Id'      = $reserva
+                    '@Enviado' = $enviado
+                    '@Detalle' = $(if ($enviado) { $renuncia } else { $ultimoError })
+                })
+            }
+            catch {
+                # El correo ya salio o ya fallo; lo unico que se pierde es
+                # saber como. La reserva se queda como 'reservado', que cuenta
+                # como enviado: nadie se lo repite hasta el siguiente horario.
+                Write-Log ("No se pudo anotar como termino el envio a {0} (reserva {1}): {2}" -f
+                           $owner, $reserva, $_.Exception.Message) 'WARN'
+            }
+        }
     }
 
     if ($Listar) { exit 0 }
 
-    Write-Log ("Fin. {0} enviado(s), {1} fallido(s)." -f $enviados, $fallidos) 'OK'
+    Write-Log ("Fin. {0} enviado(s), {1} fallido(s), {2} ya habia(n) salido antes." -f
+               $enviados, $fallidos, $repetidos) 'OK'
 
     $limite = (Get-Date).AddDays(-[int]$(if ($cfg.conservar_archivos_dias) { $cfg.conservar_archivos_dias } else { 15 }))
     Get-ChildItem $logs -File | Where-Object LastWriteTime -lt $limite | Remove-Item -Force -ErrorAction SilentlyContinue

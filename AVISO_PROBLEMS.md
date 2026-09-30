@@ -101,8 +101,8 @@ Manager.
 iniciativas de ese Owner Problem y de cada una se suman su Owner del Servicio,
 su Direccion y los duenos de las categorias que ataca. Un mismo Owner Problem
 puede tener iniciativas de servicios distintos, y cada una arrastra a los
-suyos. Por eso el tamano de la copia no sigue al numero de filas: Bendrix Zuir
-Rios llega a 13 direcciones con 24 iniciativas, y Adriana Lydia Lozano Leal
+suyos. Por eso el tamano de la copia no sigue al numero de filas: en
+produccion, un Owner Problem llega a 13 direcciones con 24 iniciativas, y otro
 llega a 9 con **una sola**, porque esa unica iniciativa ataca varias
 categorias y cada una tiene sus tres duenos.
 
@@ -122,10 +122,10 @@ Las dos formas escriben al log, asi que se pueden subir al repositorio:
 Y con `modo_prueba` en true, cada correo deja en el log las tres lineas:
 
 ```text
-MODO PRUEBA: Laura Graciela Cardenas Gonzalez
-   Para habria sido : lauragcg@soriana.com
-   Copia habria sido: eduardool@soriana.com; javierch@soriana.com; ...
-   Va a             : TU_CORREO@soriana.com
+MODO PRUEBA: <Owner Problem>
+   Para habria sido : owner.problem@dominio
+   Copia habria sido: director@dominio; owner.servicio@dominio; ...
+   Va a             : TU_CORREO@dominio
 ```
 
 > Antes esa linea decia solo `(+7 en copia)`. Un numero que no se puede
@@ -237,8 +237,8 @@ quiera corregir el tablero.
 palabras**. En produccion eso deja fuera a una persona real:
 
 ```text
-Problem.OwnerServicio   'Lomas Malacara Luis Gerardo'
-CatPersona.Nombre       'Luis Gerardo Lomas Malacara'
+Problem.OwnerServicio   'Apellido1 Apellido2 Nombre1 Nombre2'
+CatPersona.Nombre       'Nombre1 Nombre2 Apellido1 Apellido2'
 ```
 
 Es la misma persona y arrastra **32 iniciativas** que se quedarian sin Service
@@ -278,6 +278,8 @@ En SSMS, contra `Tickets_Proactivanet`, en este orden:
 2. 16_cruce_llamadas_tickets.sql       (si no esta: crea fn_ClaveNombre)
 3. 26_aviso_problems_vencidos.sql      <-- crea los objetos
 4. 27_verificar_aviso_problems.sql     <-- mide lo que mandaria, sin mandar
+5. 37_aviso_problems_registro.sql      <-- el registro de envios: que a nadie
+                                           le llegue dos veces (seccion 8)
 
 (28_diagnostico_problems_vencidos.sql es el diagnostico previo, de solo
 lectura. Ya no hace falta para instalar: se conserva porque documenta como se
@@ -363,7 +365,7 @@ Resultado: termino bien
 Proxima: 2026-09-28 12:00
 Hoy SI corrio, a las 12:00.
 Registro del envio: ...\Logs\AvisoProblems_20260924.log
-   ultima linea: 2026-09-24 12:01:10 [OK] Fin. 18 enviado(s), 0 fallido(s).
+   ultima linea: 2026-09-24 12:01:10 [OK] Fin. 18 enviado(s), 0 fallido(s), 0 ya habia(n) salido antes.
 ```
 
 La ultima ejecucion y el resultado se le preguntan a Windows con
@@ -411,6 +413,11 @@ programado salio y, si no, lo manda en ese momento. Reglas, acordadas el
   afirma nada.
 - Se lanza la propia tarea (`schtasks /Run`), asi que `estado` la ve como la
   ultima ejecucion.
+- La recuperacion solo ve los `Logs\` de **su** carpeta: lo que mando otra
+  cuenta no esta ahi. Por eso el envio, antes de mandarle a cada Owner
+  Problem, le pregunta al registro de la base (seccion 8) si ya le salio el
+  aviso de ese horario. Si otra cuenta ya lo mando, la recuperacion corre
+  pero no manda nada.
 - Al reponerla despues de la hora, la tarea arranca **manana**, para que
   Windows no tenga una ejecucion "perdida" de hoy que lance por su cuenta: solo
   la recuperacion decide, y lo decide una vez.
@@ -571,17 +578,24 @@ schtasks /delete /tn PruebaPermisoTarea /f
   tareas en ese equipo, y eso lo decide TI.
 
 **El aviso va en UNA sola cuenta.** Con el usuario en el nombre ya pueden
-convivir las tareas de dos cuentas, pero si las dos tienen sesion abierta a la
-hora del aviso, cada correo sale dos veces: el envio no revisa si otro ya lo
-mando. Para pasarlo a otra cuenta, se desinstala en la anterior con
-`programar_desinstalar.cmd`, desde esa cuenta: quita su tarea de ese equipo y
-el re-armado de su perfil.
+convivir las tareas de dos cuentas, y desde el 2026-09-29 el registro de envios
+(seccion 8) impide que un Owner Problem reciba el mismo aviso dos veces aunque
+corra desde dos cuentas o dos maquinas. Aun asi, que sea una: con dos, cada
+una manda a una parte de los Owner Problem, y para saber que paso hay que
+juntar dos carpetas de `Logs\`. Para pasarlo a otra cuenta, se desinstala en
+la anterior con `programar_desinstalar.cmd`, desde esa cuenta: quita su tarea
+de ese equipo y el re-armado de su perfil.
+
+Las copias que una cuenta dejo en otras maquinas del grupo no se borran al
+desinstalar. Ya no mandan nada repetido, y el registro dice desde donde corrio
+cada envio: un `Equipo` o una `Cuenta` que no se esperaba es una de esas
+copias.
 
 ### Codigos de salida
 
 | | |
 |---|---|
-| `0` | todo salio, o se listo con `-Listar` |
+| `0` | todo salio, o ya habia salido antes, o se listo con `-Listar` |
 | `4` | hubo envios que fallaron (revisar `Logs\`) |
 | `5` | error de configuracion, de SQL o de SMTP |
 
@@ -608,23 +622,41 @@ Por eso:
 
 ## 7) Entrega: los tres intentos
 
-`$smtp.Send()` es **todo o nada**. Si el relay rechaza una sola direccion de
-la copia, no entrega a nadie: ni al Owner Problem, que no tiene culpa ni forma
-de enterarse. Ya paso con la alerta de QA -un lider se quedo sin aviso tres
-corridas seguidas por una direccion ajena en copia-, asi que aqui el envio va
-en tres intentos, renunciando a lo menos posible cada vez:
+El servidor de correo puede rechazar una direccion en dos momentos, y
+`$smtp.Send()` hace cosas opuestas en cada uno:
+
+| Cuando rechaza | Que pasa con el correo | Que hace el envio |
+|---|---|---|
+| al final del mensaje | **no le llega a nadie**, ni al Owner Problem | los tres intentos de abajo |
+| en la direccion (`RCPT`) | **les llega a todos los demas**, y despues sale el error | lo anota como enviado, dice a quien no le llego, y **no reintenta** |
+
+El primero ya paso con la alerta de QA -un lider se quedo sin aviso tres
+corridas seguidas por una direccion ajena en copia-, asi que el envio va en
+tres intentos, renunciando a lo menos posible cada vez:
 
 1. todos
 2. sin las direcciones que el servidor nombro al rechazar
 3. solo el "Para", sin ninguna copia
+
+El segundo se encontro el 2026-09-29 al probar el registro de envios con un
+servidor de correo de mentira (`pruebas/smtp_de_mentira.py`). Hasta ese dia,
+el envio lo trataba igual que el primero: reintentaba sin la direccion
+rechazada, y el Owner Problem y toda la copia **recibian el correo dos
+veces**. Asi esta escrito `SmtpClient.Send` en .NET: manda a los que el
+servidor acepto y lanza el error al final. `Test-EntregaParcial`, en
+`CorreoComun.ps1`, distingue los dos casos.
+
+Ese mismo dia salio otro detalle: .NET entrega la direccion rechazada entre
+`< >` (`<nombre@dominio>`), y por eso el segundo intento no quitaba a nadie de
+la lista. `Get-DestinatariosRechazados` ahora los quita.
 
 Cuando se renuncia a algo, el correo lleva una nota al pie diciendolo, para
 que quien lo recibe sepa que su Director no lo vio. Si ni el tercer intento
 sale, se registra en el log con nombre y numero de iniciativas.
 
 Esta logica vive en `CorreoComun.ps1` (`Get-DestinatariosRechazados`,
-`Remove-Destinatarios`, `Get-SiguienteIntento`) para que la puedan usar
-tambien los demas correos.
+`Remove-Destinatarios`, `Get-SiguienteIntento`, `Test-EntregaParcial`) para
+que la puedan usar tambien los demas correos.
 
 Una direccion que no traiga `@` se descarta antes de armar el mensaje. Suena
 exagerado hasta que se recuerda que esas celdas se capturan a mano en un
@@ -633,14 +665,89 @@ Excel: un nombre colado en una lista de correos haria fallar el envio
 
 ---
 
-## 8) Pruebas
+## 8) Que no llegue dos veces: el registro de envios
+
+`37_aviso_problems_registro.sql`, desde el 2026-09-29.
+
+**Por que.** La tarea se guarda en cada maquina del grupo de escritorios
+virtuales, y puede haber mas de una: copias que una cuenta dejo en otras
+maquinas, o dos cuentas con el aviso instalado. Ademas la recuperacion decide
+si el ultimo aviso salio leyendo los `Logs\` de su carpeta, y lo que mando
+otra cuenta no esta ahi. Lo unico que ven todas es la base, y ahi queda
+anotado a quien se le mando que, cuando, desde que equipo y con que cuenta.
+
+**La regla.** A una direccion no se le manda el aviso otra vez si ya le salio
+uno desde lo que sea mas temprano de:
+
+- el inicio del dia, en hora de Mexico;
+- el ultimo horario que tocaba, segun el `estado_aviso.json` de la maquina que
+  manda.
+
+| Caso | Que pasa |
+|---|---|
+| dos maquinas o dos cuentas a la misma hora | a cada Owner Problem le llega uno |
+| dos cuentas con horarios distintos, el mismo dia | sale el primero; el segundo no manda |
+| martes: la recuperacion del lunes, que ya mando otra cuenta | no manda |
+| miercoles se recupero el del lunes; jueves a las 12:00 | el del jueves sale |
+| el servidor de correo rechazo al Owner Problem (`fallido`) | la siguiente corrida -otra maquina, o a mano- se lo manda **solo a el** |
+| el envio se corto a medias y nunca se supo como termino (`reservado`) | no se reenvia: en la duda, no |
+
+**Dos a la vez.** La revision y la reserva son una sola transaccion con
+`UPDLOCK, HOLDLOCK`: si dos maquinas llegan al mismo Owner Problem en el mismo
+segundo, la segunda espera unos milisegundos, ve la reserva de la primera y no
+manda.
+
+**Quien lo usa.** Solo el envio de verdad. `-Listar` y `modo_prueba` no
+reservan ni anotan: un correo de prueba anotado bloquearia el de verdad ese
+dia. Si el `37` todavia no se corre, el envio lo dice en el log y manda como
+antes.
+
+**Mandarlo otra vez a proposito:**
+
+```powershell
+.\Enviar_AvisoProblems.ps1 -Repetir
+```
+
+Manda aunque ya haya salido, y lo anota con `Repetido = 1` para que las demas
+corridas lo vean.
+
+**En el log.**
+
+```text
+Registro de envios: no se repite a quien ya le salio hoy o desde el horario del 2026-09-28 12:00.
+YA SALIO: <Owner Problem> lo recibio el 2026-09-28 12:00 (enviado, equipo <VDI>, cuenta <usuario>). No se repite.
+Fin. 0 enviado(s), 0 fallido(s), 18 ya habia(n) salido antes.
+```
+
+**Objetos.**
+
+| Objeto | Que hace |
+|---|---|
+| `dbo.AvisoProblemsEnvio` | una fila por correo: a quien, cuando, estado, equipo y cuenta |
+| `dbo.usp_AvisoProblems_Reservar` | revisa y, si nadie le ha mandado, aparta el envio |
+| `dbo.usp_AvisoProblems_Confirmar` | anota como termino: `enviado` o `fallido` |
+
+Correrlo otra vez no borra lo anotado. Al final muestra los ultimos envios, y
+en su bloque comentado hay dos consultas: quien mando cada aviso, y los que
+quedaron en `reservado`, con como marcarlos a mano si se confirma que no
+llegaron.
+
+La cuenta de SQL de `config.json` necesita `EXECUTE` sobre los dos
+procedimientos. Si no es la duena del esquema, los `GRANT` vienen comentados al
+final del script.
+
+---
+
+## 9) Pruebas
 
 ```sh
-# SQL: compila y corre 25, 26 y 27 contra un SQL Server de verdad, con el
-# DDL extraido de los archivos versionados. 23 aserciones.
+# SQL: compila y corre 28, 26, 27 y 37 contra un SQL Server de verdad, con
+# el DDL extraido de los archivos versionados. 51 aserciones, 15 de ellas del
+# envio de punta a punta: Enviar_AvisoProblems.ps1 de verdad contra esa base y
+# contra pruebas/smtp_de_mentira.py (necesita pwsh; si no esta, se omiten).
 sh pruebas/correr_problems.sh
 
-# PowerShell: 60 comprobaciones, sin base, sin red y sin mandar nada.
+# PowerShell: 89 comprobaciones, sin base, sin red y sin mandar nada.
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File pruebas\Prueba_AvisoProblems.ps1
 
 # El programador: 155 comprobaciones. Corre en cualquier sitio, sin Windows.
@@ -656,11 +763,14 @@ respaldar nada.
 
 Las dos baterias se comprobaron con mutaciones deliberadas -romper el rojo de
 la fecha que manda, dejar pasar un nombre como si fuera correo, mirar la
-excepcion singular antes que la plural- y las tres se cazaron.
+excepcion singular antes que la plural- y las tres se cazaron. El registro de
+envios, igual: sin `HOLDLOCK` la prueba de dos corridas a la vez deja dos
+reservas para la misma direccion; con el reintento de antes, la de la copia
+rechazada cuenta cuatro correos para dos Owner Problem.
 
 ---
 
-## 9) Objetos que crea `26_aviso_problems_vencidos.sql`
+## 10) Objetos que crea `26_aviso_problems_vencidos.sql`
 
 | Objeto | Que hace |
 |---|---|
@@ -681,7 +791,7 @@ pagar cuatro recorridos de una tabla de millones de filas a cambio de nada.
 
 ---
 
-## 10) Verificacion contra el correo real
+## 11) Verificacion contra el correo real
 
 El `.msg` del 19 de agosto listo diez iniciativas. `28_diagnostico_problems_vencidos.sql`
 (bloque 8) las busca por codigo y aplica la regla **con la fecha de aquel
@@ -689,10 +799,8 @@ dia**. Resultado contra produccion:
 
 - las diez dan `VENCIDA` al 19 de agosto;
 - los responsables que resuelve la base son los mismos que llevaba el correo:
-  Laura Graciela Cardenas Gonzalez (9 filas) y Luis Enrique Mendoza Martinez
-  (`PRB 2026-000124`) como Owner Problem -los dos iban en "Para"-, Javier de
-  la Cruz Hinostroza como Owner del Servicio, y Eduardo Andres Ortiz Lopez y
-  Yuri Vladimir Lopez Martinez -las dos Direcciones- en copia.
+  los dos Owner Problem -uno con 9 filas y otro con `PRB 2026-000124`, los dos
+  en "Para"-, el Owner del Servicio y las dos Direcciones en copia.
 
 O sea que la regla y la resolucion de destinatarios reproducen el criterio de
 quien lo escribio a mano. Ese bloque se puede volver a correr cuando se quiera.
