@@ -1,5 +1,11 @@
 # Para quien trabaje en este repositorio con Claude Code
 
+> **ESTE REPOSITORIO YA NO SE USA (2026-09-30).** Todo se mudo, con su
+> historia completa, a
+> [`Eddisaka/IntegracionSQL-Automatizacion_Main`](https://github.com/Eddisaka/IntegracionSQL-Automatizacion_Main),
+> junto con el agente y los KB de triage. No se sube nada aqui: ni codigo ni
+> salidas.
+
 ## Ramas: main y feature/tablero-sla-productividad son la misma
 
 Pedido del dueno del repositorio el 2026-09-25, despues de unir las dos
